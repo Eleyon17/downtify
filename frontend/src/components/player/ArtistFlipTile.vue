@@ -23,18 +23,6 @@
           class="aspect-square size-full min-h-0 min-w-0 transition-transform duration-500 ease-out-soft"
           :class="isPlaying ? 'scale-100' : 'scale-[0.94]'"
         />
-
-        <!-- Flip Hint Badge -->
-        <button
-          v-if="canFlip"
-          type="button"
-          class="group/flip absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white/90 shadow-lg backdrop-blur-md transition-all duration-200 hover:scale-105 hover:bg-black/80 hover:text-white"
-          :aria-label="t('artistBio.title')"
-          @click.stop="toggleFlip"
-        >
-          <AppIcon name="user" :size="14" class="text-accent" />
-          <span>{{ currentArtist }}</span>
-        </button>
       </div>
 
       <!-- BACK: Artist Bio, Popular Songs & Albums -->
@@ -106,11 +94,11 @@
             </div>
           </section>
 
-          <!-- Popular Songs Section -->
+          <!-- Hit Songs Section -->
           <section v-if="overview?.top_songs?.length">
             <div class="mb-1.5 flex items-center justify-between">
               <span class="text-[11px] font-bold tracking-wider text-accent uppercase">
-                {{ t('artist.topSongs') }}
+                Hit Songs
               </span>
             </div>
             <div class="space-y-1">
@@ -157,11 +145,11 @@
             </div>
           </section>
 
-          <!-- Albums Section -->
+          <!-- Hit Albums Section -->
           <section v-if="overview?.top_albums?.length">
             <div class="mb-1.5 flex items-center justify-between">
               <span class="text-[11px] font-bold tracking-wider text-accent uppercase">
-                {{ t('search.albums') }}
+                Hit Albums
               </span>
             </div>
             <div class="space-y-1">
