@@ -260,6 +260,15 @@
                   "
                 />
               </SettingRow>
+              <SettingRow
+                :label="t('settings.redownloadImproperFormat')"
+                :description="t('settings.redownloadImproperFormatHint')"
+              >
+                <UiSwitch
+                  v-model="s.redownload_improper_format"
+                  :aria-label="t('settings.redownloadImproperFormat')"
+                />
+              </SettingRow>
             </SettingGroup>
 
             <SettingGroup :title="t('settings.filesGroup')">

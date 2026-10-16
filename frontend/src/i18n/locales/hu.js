@@ -376,6 +376,9 @@ export default {
     metadata: 'Címkék frissítése',
     metadataHint:
       'Kitölti az albumot, az albumelőadót, a megjelenés dátumát és a sorszámot a Spotifyról. Csak azoknál a számoknál, amelyek Spotify-felvételét a Downtify még ismeri.',
+    format: 'Újraletöltés a célformátumban és minőségben',
+    formatHint:
+      'Újraletölti azokat a hangfájlokat, amelyek nem egyeznek a Beállításokban kiválasztott formátummal vagy bitrátával.',
     tracksAffected: { one: '{count} szám', other: '{count} szám' },
     options: 'Beállítások',
     artworkMin: 'Borítók feljavítása ez alatt',
@@ -417,6 +420,7 @@ export default {
     paused: 'A feljavítás szünetel',
     tracksTitle: 'Számok',
     stageMatching: 'Azonosítás',
+    stageDownloading: 'Csere hanganyag letöltése',
     stageArtwork: 'Borító keresése',
     stageLyrics: 'Dalszöveg keresése',
     stageWriting: 'Fájl írása',
@@ -818,6 +822,10 @@ export default {
     bitrate: 'Minőség',
     bitrateHint: 'Bitráta veszteséges formátumokhoz.',
     bitrateLossless: 'FLAC-nál nem használt, mert veszteségmentes.',
+    redownloadImproperFormat:
+      'Nem megfelelő formátumú fájlok újraletöltése',
+    redownloadImproperFormatHint:
+      'A könyvtár frissítésekor megkeresi és újraletölti azokat a hangfájlokat, amelyek formátuma vagy minősége nem egyezik a jelenlegi beállításokkal.',
     filesGroup: 'Fájlok',
     template: 'Fájlnév',
     templateHint: 'Mappák létrehozásához használj / jelet.',

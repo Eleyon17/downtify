@@ -1133,6 +1133,7 @@ class Downloader:
         progress_cb: Optional[ProgressCallback] = None,
         provider: Optional[str] = None,
         audio_format: Optional[str] = None,
+        audio_bitrate: Optional[str] = None,
     ) -> Path:
         """Download YouTube video *video_id*'s audio as
         ``<target_dir>/<basename>.<audio_format>`` (default: the chosen
@@ -1140,6 +1141,7 @@ class Downloader:
         error when it fails."""
 
         fmt = audio_format or self.audio_format
+        bitrate = audio_bitrate or self.audio_bitrate
         out_template = str(target_dir / f'{basename}.%(ext)s')
         hook = self._progress_hook(progress_cb, provider)
         ydl_opts, has_cookies = self._ydl_options(out_template, hook)
@@ -1149,7 +1151,7 @@ class Downloader:
                 # Registered directly: `ydl_opts['postprocessors']` only
                 # accepts yt-dlp's built-in postprocessors by name.
                 ydl.add_post_processor(
-                    _ExtractAudioPP(ydl, fmt, self.audio_bitrate),
+                    _ExtractAudioPP(ydl, fmt, bitrate),
                     when='post_process',
                 )
                 ydl.download([url])

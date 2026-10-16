@@ -371,6 +371,9 @@ export default {
     metadata: 'Refresh tags',
     metadataHint:
       'Fill in album, album artist, release date and track number from Spotify. Only for tracks Downtify still knows the Spotify track of.',
+    format: 'Redownload in target format & quality',
+    formatHint:
+      'Re-downloads audio files that do not match the format or bitrate selected in Settings.',
     tracksAffected: { one: '{count} track', other: '{count} tracks' },
     options: 'Options',
     artworkMin: 'Upgrade artwork below',
@@ -411,6 +414,7 @@ export default {
     paused: 'Upgrade paused',
     tracksTitle: 'Tracks',
     stageMatching: 'Matching',
+    stageDownloading: 'Downloading replacement audio',
     stageArtwork: 'Looking for artwork',
     stageLyrics: 'Looking for lyrics',
     stageWriting: 'Writing the file',
@@ -799,6 +803,9 @@ export default {
     bitrate: 'Quality',
     bitrateHint: 'Bitrate for lossy formats.',
     bitrateLossless: 'Not used for FLAC, which is lossless.',
+    redownloadImproperFormat: 'Redownload files in improper format',
+    redownloadImproperFormatHint:
+      'When upgrading the library, scan for and re-download audio files whose format or quality does not match current settings.',
     filesGroup: 'Files',
     template: 'File name',
     templateHint: 'Use / to create folders.',

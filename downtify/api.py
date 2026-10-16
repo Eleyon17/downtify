@@ -499,6 +499,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'lyrics_lrc_dir': lyrics.DEFAULT_LYRICS_LRC_DIR,
     'format': 'mp3',
     'bitrate': '320',
+    'redownload_improper_format': False,
     'output': '{artists} - {title}.{output-ext}',
     'generate_m3u': True,
     'download_cover_art_playlists': True,
@@ -5458,6 +5459,14 @@ def _upgrade_options(
 
     saved = state.settings.get('library_upgrade') or {}
     merged = {**saved, **(payload or {})}
+    merged['check_format'] = bool(
+        state.settings.get('redownload_improper_format', False)
+    )
+    merged['target_format'] = str(state.settings.get('format') or 'mp3')
+    try:
+        merged['target_bitrate'] = int(state.settings.get('bitrate') or 320)
+    except (TypeError, ValueError):
+        merged['target_bitrate'] = 320
     return library_upgrade.options_from(merged)
 
 
@@ -5480,7 +5489,10 @@ def _upgrade_payload(
     runner: library_upgrade.LibraryUpgradeRunner,
 ) -> dict[str, Any]:
     payload = runner.status()
-    payload['categories'] = list(library_upgrade.CATEGORIES)
+    cats = list(library_upgrade.DEFAULT_CATEGORIES)
+    if state.settings.get('redownload_improper_format'):
+        cats.append(library_upgrade.CATEGORY_FORMAT)
+    payload['categories'] = cats
     payload['artwork_sources'] = list(cover_sources.ARTWORK_SOURCES)
     return payload
 

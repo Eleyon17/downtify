@@ -75,9 +75,17 @@ STAGING_TEMPLATE = '{stem}' + UPGRADE_STAGING_MARKER + '{suffix}'
 CATEGORY_ARTWORK = 'artwork'
 CATEGORY_LYRICS = 'lyrics'
 CATEGORY_METADATA = 'metadata'
+CATEGORY_FORMAT = 'format'
+
+DEFAULT_CATEGORIES = (CATEGORY_ARTWORK, CATEGORY_LYRICS, CATEGORY_METADATA)
 
 #: Every category a scan reports on, in the order the UI shows them.
-CATEGORIES = (CATEGORY_ARTWORK, CATEGORY_LYRICS, CATEGORY_METADATA)
+CATEGORIES = (
+    CATEGORY_ARTWORK,
+    CATEGORY_LYRICS,
+    CATEGORY_METADATA,
+    CATEGORY_FORMAT,
+)
 
 #: How far a rewritten file's duration may drift from the original
 #: before it is rejected. Tag writes don't touch audio, so this only
@@ -101,6 +109,9 @@ class UpgradeOptions:
     artwork_min_px: int = DEFAULT_ARTWORK_MIN_PX
     artwork_source: str = cover_sources.PREFERENCE_HIGHEST
     recheck_days: int = DEFAULT_RECHECK_DAYS
+    check_format: bool = False
+    target_format: str = 'mp3'
+    target_bitrate: int = 320
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -108,6 +119,9 @@ class UpgradeOptions:
             'artwork_min_px': self.artwork_min_px,
             'artwork_source': self.artwork_source,
             'recheck_days': self.recheck_days,
+            'check_format': self.check_format,
+            'target_format': self.target_format,
+            'target_bitrate': self.target_bitrate,
         }
 
 
@@ -134,6 +148,10 @@ def options_from(payload: dict[str, Any]) -> UpgradeOptions:
     source = str(payload.get('artwork_source') or '')
     if source not in cover_sources.ARTWORK_SOURCES:
         source = cover_sources.PREFERENCE_HIGHEST
+    check_format = bool(payload.get('check_format', False))
+    target_format = str(payload.get('target_format') or 'mp3').lower().lstrip('.')
+    target_bitrate = _int('target_bitrate', 320, 32, 1000)
+
     return UpgradeOptions(
         categories=normalize_categories(payload.get('categories')),
         artwork_min_px=_int(
@@ -141,6 +159,9 @@ def options_from(payload: dict[str, Any]) -> UpgradeOptions:
         ),
         artwork_source=source,
         recheck_days=_int('recheck_days', DEFAULT_RECHECK_DAYS, 0, 3650),
+        check_format=check_format,
+        target_format=target_format,
+        target_bitrate=target_bitrate,
     )
 
 
@@ -182,11 +203,48 @@ def _summarize(
     }
 
 
+def track_format_improper(
+    entry: dict[str, Any],
+    full_path: Path,
+    *,
+    target_format: str,
+    target_bitrate_kbps: int,
+) -> bool:
+    """Return True if the track on disk does not match the desired format or quality."""
+    file_fmt = full_path.suffix.lower().lstrip('.')
+    target_fmt = str(target_format or 'mp3').lower().lstrip('.')
+
+    if file_fmt != target_fmt:
+        return True
+
+    if target_fmt == 'flac':
+        return False
+
+    bitrate_bps = int(entry.get('bitrate') or 0)
+    if bitrate_bps <= 0:
+        try:
+            audio = MutagenFile(str(full_path))
+            info = getattr(audio, 'info', None)
+            bitrate_bps = int(getattr(info, 'bitrate', 0) or 0)
+        except Exception:
+            bitrate_bps = 0
+
+    if bitrate_bps > 0 and target_bitrate_kbps > 0:
+        file_kbps = round(bitrate_bps / 1000)
+        if abs(file_kbps - target_bitrate_kbps) > 15:
+            return True
+
+    return False
+
+
 def track_findings(
     entry: dict[str, Any],
     full_path: Path,
     *,
     artwork_min_px: int,
+    check_format: bool = False,
+    target_format: str = 'mp3',
+    target_bitrate_kbps: int = 320,
 ) -> list[str]:
     """Which categories this track is behind on."""
 
@@ -198,6 +256,13 @@ def track_findings(
         found.append(CATEGORY_LYRICS)
     if _metadata_gaps(entry):
         found.append(CATEGORY_METADATA)
+    if check_format and track_format_improper(
+        entry,
+        full_path,
+        target_format=target_format,
+        target_bitrate_kbps=target_bitrate_kbps,
+    ):
+        found.append(CATEGORY_FORMAT)
     return found
 
 
@@ -364,6 +429,7 @@ class UpgradeDeps:
     lyrics_cache: Any = None
     publish: Optional[Callable[[dict[str, Any]], None]] = None
     rekey_owners: Optional[Callable[[str, str, str], None]] = None
+    downloader: Optional[Callable[[], Any]] = None
 
 
 def resolve_track(stored_path: str, ctx: LibraryContext) -> Optional[Path]:
@@ -490,11 +556,22 @@ def _write_upgrade(
     return None
 
 
-def _outcome_detail(changed: list[str], artwork: _Artwork) -> str:
+def _outcome_detail(
+    changed: list[str],
+    artwork: _Artwork,
+    target_format: str = '',
+    target_bitrate: int = 0,
+) -> str:
     parts: list[str] = []
     for name in changed:
         if name == CATEGORY_ARTWORK and artwork.px:
             parts.append(f'artwork {artwork.px}px ({artwork.source})')
+        elif name == CATEGORY_FORMAT:
+            fmt_str = target_format or 'format'
+            if target_bitrate and fmt_str != 'flac':
+                parts.append(f'format {fmt_str} ({target_bitrate}k)')
+            else:
+                parts.append(f'format {fmt_str}')
         else:
             parts.append(name)
     return ', '.join(parts)
@@ -545,6 +622,154 @@ def upgrade_track(
         and _metadata_gaps(entry)
     ):
         changed.append(CATEGORY_METADATA)
+
+    format_needed = (
+        CATEGORY_FORMAT in options.categories
+        and track_format_improper(
+            entry,
+            full,
+            target_format=options.target_format,
+            target_bitrate_kbps=options.target_bitrate,
+        )
+    )
+
+    if format_needed:
+        from . import providers
+        video_id, ytm_match = providers.find_match(song)
+        if not video_id:
+            return UpgradeOutcome(
+                JOB_FAILED,
+                f"No verified audio match found for {song.get('name')!r}",
+            )
+
+        stage_now('downloading')
+        downloader = deps.downloader() if deps.downloader is not None else None
+        if downloader is None:
+            return UpgradeOutcome(JOB_FAILED, 'Downloader not available')
+
+        target_fmt = str(options.target_format or 'mp3').lower().lstrip('.')
+        target_bitrate = str(options.target_bitrate or '320')
+        basename = f"{full.stem}{UPGRADE_STAGING_MARKER}"
+        stat = full.stat()
+
+        staged_path: Optional[Path] = None
+        try:
+            staged_path = downloader.fetch_audio(
+                video_id,
+                full.parent,
+                basename,
+                song=song,
+                provider='youtube-music' if ytm_match else 'youtube',
+                audio_format=target_fmt,
+                audio_bitrate=target_bitrate,
+            )
+
+            if not staged_path or not staged_path.is_file() or staged_path.stat().st_size <= 0:
+                return UpgradeOutcome(JOB_FAILED, 'Downloaded audio file is missing or empty')
+
+            after_length = _audio_length(staged_path)
+            if after_length <= 0:
+                return UpgradeOutcome(JOB_FAILED, 'Downloaded audio could not be read')
+
+            stage_now('writing')
+            keep_cover = cover_sources.current_cover(full)
+            cover_bytes = artwork.data or (keep_cover.data if keep_cover is not None else None)
+            embed_metadata(
+                staged_path,
+                song,
+                download_cover=True,
+                cover_bytes=cover_bytes,
+            )
+            eff_lyrics = new_lyrics
+            if eff_lyrics is None:
+                from .lyrics import Lyrics, read_track_lyrics
+                ex = read_track_lyrics(full)
+                if ex.get('synced') or ex.get('plain'):
+                    eff_lyrics = Lyrics(
+                        synced=ex.get('synced') or '',
+                        plain=ex.get('plain') or '',
+                        provider=ex.get('provider') or '',
+                    )
+            if eff_lyrics is not None:
+                embed_lyrics(
+                    staged_path,
+                    eff_lyrics,
+                    sidecar=staged_path.with_suffix('.lrc'),
+                )
+
+            final_path = full.with_name(f"{full.stem}.{target_fmt}")
+            os.replace(str(staged_path), str(final_path))
+            staged_path = None
+
+            if final_path != full:
+                full.unlink(missing_ok=True)
+                old_lrc = full.with_suffix('.lrc')
+                new_lrc = final_path.with_suffix('.lrc')
+                if old_lrc.is_file() and not new_lrc.exists():
+                    try:
+                        os.replace(str(old_lrc), str(new_lrc))
+                    except Exception:
+                        pass
+
+            try:
+                os.utime(str(final_path), ns=(stat.st_atime_ns, stat.st_mtime_ns))
+            except OSError:
+                pass
+
+            changed.append(CATEGORY_FORMAT)
+            if new_lyrics is not None:
+                changed.append(CATEGORY_LYRICS)
+
+            old_stored = stored_path
+            new_stored = str(Path(stored_path).with_suffix(f'.{target_fmt}'))
+            if ctx.metadata_cache is not None:
+                try:
+                    if new_stored != old_stored:
+                        ctx.metadata_cache.forget(old_stored, full_path=full)
+                    ctx.metadata_cache.refresh(new_stored, final_path)
+                except Exception:
+                    logger.debug('Metadata cache refresh failed')
+
+            if new_stored != old_stored and ctx.download_dir:
+                try:
+                    from .m3u import iter_m3u_files
+                    for m3u_path in iter_m3u_files(ctx.download_dir):
+                        try:
+                            text = m3u_path.read_text(encoding='utf-8')
+                            if old_stored in text:
+                                m3u_path.write_text(
+                                    text.replace(old_stored, new_stored),
+                                    encoding='utf-8',
+                                )
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+            return UpgradeOutcome(
+                JOB_DONE,
+                _outcome_detail(
+                    changed,
+                    artwork,
+                    target_format=target_fmt,
+                    target_bitrate=options.target_bitrate,
+                ),
+                changed=changed,
+                artwork_px=artwork.px,
+                artwork_source=artwork.source,
+            )
+        except Exception as exc:
+            logger.opt(exception=True).warning(
+                'Format upgrade failed for {}: {}', full.name, exc
+            )
+            return UpgradeOutcome(JOB_FAILED, f'Format upgrade failed: {exc}')
+        finally:
+            if staged_path is not None and staged_path.is_file():
+                staged_path.unlink(missing_ok=True)
+            for leftover in full.parent.glob(f"{basename}.*"):
+                if leftover.is_file():
+                    leftover.unlink(missing_ok=True)
+
     if not changed and new_lyrics is None:
         return UpgradeOutcome(
             JOB_SKIPPED,
@@ -588,7 +813,12 @@ def upgrade_track(
 
     return UpgradeOutcome(
         JOB_DONE,
-        _outcome_detail(changed, artwork),
+        _outcome_detail(
+            changed,
+            artwork,
+            target_format=options.target_format,
+            target_bitrate=options.target_bitrate,
+        ),
         changed=changed,
         artwork_px=artwork.px,
         artwork_source=artwork.source,
@@ -661,7 +891,11 @@ class LibraryUpgradeRunner:
         with self._lock:
             if self.busy():
                 raise RuntimeError('A library upgrade is already running')
-            run_id = self.db.create_run(list(CATEGORIES), options.as_dict())
+            active_cats = [
+                c for c in CATEGORIES
+                if c != CATEGORY_FORMAT or options.check_format
+            ]
+            run_id = self.db.create_run(active_cats, options.as_dict())
             self._cancelled = False
             self._stop.clear()
             self._scanned = 0
@@ -685,6 +919,10 @@ class LibraryUpgradeRunner:
             checked: list[tuple[str, list[str]]] = []
             total_bytes = 0
             skipped = 0
+            active_cats = [
+                c for c in CATEGORIES
+                if c != CATEGORY_FORMAT or options.check_format
+            ]
             for index, entry in enumerate(entries, start=1):
                 if self._stop.is_set():
                     self.db.set_state(run_id, STATE_CANCELLED)
@@ -695,7 +933,9 @@ class LibraryUpgradeRunner:
                 self._scanned = index
                 self._publish(throttle=True)
                 due = self._categories_due(
-                    checks.get(stored) or {}, options.recheck_days
+                    checks.get(stored) or {},
+                    options.recheck_days,
+                    check_format=options.check_format,
                 )
                 if not due:
                     # Every category was looked at recently: don't even
@@ -707,10 +947,15 @@ class LibraryUpgradeRunner:
                     continue
                 behind = set(
                     track_findings(
-                        entry, full, artwork_min_px=options.artwork_min_px
+                        entry,
+                        full,
+                        artwork_min_px=options.artwork_min_px,
+                        check_format=options.check_format,
+                        target_format=options.target_format,
+                        target_bitrate_kbps=options.target_bitrate,
                     )
                 )
-                found = [name for name in CATEGORIES if name in due & behind]
+                found = [name for name in active_cats if name in due & behind]
                 # Looking and finding nothing counts as a check, so the
                 # next scan doesn't read this file again for those.
                 clean = sorted(due - behind)
@@ -735,7 +980,10 @@ class LibraryUpgradeRunner:
         self._publish()
 
     def _categories_due(
-        self, track_checks: dict[str, Any], recheck_days: int
+        self,
+        track_checks: dict[str, Any],
+        recheck_days: int,
+        check_format: bool = False,
     ) -> set[str]:
         """Categories this track hasn't had looked at recently.
 
@@ -744,15 +992,18 @@ class LibraryUpgradeRunner:
         later run for another category must still consider it.
         """
 
-        return {
+        due = {
             name
-            for name in CATEGORIES
+            for name in DEFAULT_CATEGORIES
             if not check_is_fresh(
                 track_checks.get(name),
                 app_version=self.deps.version,
                 max_age_days=recheck_days,
             )
         }
+        if check_format:
+            due.add(CATEGORY_FORMAT)
+        return due
 
     @staticmethod
     def _summary_for(run: dict[str, Any]) -> dict[str, Any]:
@@ -789,19 +1040,23 @@ class LibraryUpgradeRunner:
             # Remembered so a resume after a restart runs the same
             # categories the user picked, not everything the scan found.
             self.db.set_categories(run_id, list(categories))
+            opts = run.get('options') or {}
             options = UpgradeOptions(
                 categories=categories,
                 artwork_min_px=int(
-                    run['options'].get('artwork_min_px')
+                    opts.get('artwork_min_px')
                     or DEFAULT_ARTWORK_MIN_PX
                 ),
                 artwork_source=str(
-                    run['options'].get('artwork_source')
+                    opts.get('artwork_source')
                     or cover_sources.PREFERENCE_HIGHEST
                 ),
                 recheck_days=int(
-                    run['options'].get('recheck_days') or DEFAULT_RECHECK_DAYS
+                    opts.get('recheck_days') or DEFAULT_RECHECK_DAYS
                 ),
+                check_format=bool(opts.get('check_format', False)),
+                target_format=str(opts.get('target_format') or 'mp3'),
+                target_bitrate=int(opts.get('target_bitrate') or 320),
             )
             self._begin(run_id, options)
         return self.status()
@@ -860,6 +1115,9 @@ class LibraryUpgradeRunner:
                     artwork_min_px=options.artwork_min_px,
                     artwork_source=options.artwork_source,
                     recheck_days=options.recheck_days,
+                    check_format=options.check_format,
+                    target_format=options.target_format,
+                    target_bitrate=options.target_bitrate,
                 ),
                 on_stage=on_stage,
             )
@@ -922,18 +1180,22 @@ class LibraryUpgradeRunner:
         if run['state'] != STATE_RUNNING:
             return
         requeued = self.db.requeue_running(run_id)
+        opts = run.get('options') or {}
         options = UpgradeOptions(
             categories=normalize_categories(run['categories']),
             artwork_min_px=int(
-                run['options'].get('artwork_min_px') or DEFAULT_ARTWORK_MIN_PX
+                opts.get('artwork_min_px') or DEFAULT_ARTWORK_MIN_PX
             ),
             artwork_source=str(
-                run['options'].get('artwork_source')
+                opts.get('artwork_source')
                 or cover_sources.PREFERENCE_HIGHEST
             ),
             recheck_days=int(
-                run['options'].get('recheck_days') or DEFAULT_RECHECK_DAYS
+                opts.get('recheck_days') or DEFAULT_RECHECK_DAYS
             ),
+            check_format=bool(opts.get('check_format', False)),
+            target_format=str(opts.get('target_format') or 'mp3'),
+            target_bitrate=int(opts.get('target_bitrate') or 320),
         )
         logger.info(
             'Library upgrade: resuming run {} ({} track(s) re-queued)',

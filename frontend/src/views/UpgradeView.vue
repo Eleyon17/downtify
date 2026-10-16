@@ -168,7 +168,10 @@
           <AppIcon name="lock" :size="16" class="mt-0.5 shrink-0" />
           {{ t('upgrade.safeNote') }}
         </p>
-        <p class="flex items-start gap-2 text-[13px] text-pretty text-muted">
+        <p
+          v-if="!selected.includes('format')"
+          class="flex items-start gap-2 text-[13px] text-pretty text-muted"
+        >
           <AppIcon name="info" :size="16" class="mt-0.5 shrink-0" />
           {{ t('upgrade.audioNote') }}
         </p>
@@ -402,6 +405,7 @@ const JOB_ICONS = {
 }
 const STAGE_KEYS = {
   matching: 'upgrade.stageMatching',
+  downloading: 'upgrade.stageDownloading',
   artwork: 'upgrade.stageArtwork',
   lyrics: 'upgrade.stageLyrics',
   writing: 'upgrade.stageWriting',

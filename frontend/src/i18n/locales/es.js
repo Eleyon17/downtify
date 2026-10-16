@@ -379,6 +379,9 @@ export default {
     metadata: 'Actualizar etiquetas',
     metadataHint:
       'Rellena álbum, artista del álbum, fecha de lanzamiento y número de pista desde Spotify. Solo para canciones cuya pista de Spotify Downtify todavía conoce.',
+    format: 'Volver a descargar en formato y calidad de destino',
+    formatHint:
+      'Vuelve a descargar archivos de audio que no coincidan con el formato o la tasa de bits seleccionados en Ajustes.',
     tracksAffected: { one: '{count} canción', other: '{count} canciones' },
     options: 'Opciones',
     artworkMin: 'Mejorar portadas menores de',
@@ -420,6 +423,7 @@ export default {
     paused: 'Mejora pausada',
     tracksTitle: 'Canciones',
     stageMatching: 'Identificando',
+    stageDownloading: 'Descargando audio de reemplazo',
     stageArtwork: 'Buscando portada',
     stageLyrics: 'Buscando letra',
     stageWriting: 'Escribiendo el archivo',
@@ -819,6 +823,10 @@ export default {
     bitrate: 'Calidad',
     bitrateHint: 'Tasa de bits para formatos con pérdida.',
     bitrateLossless: 'No se usa para FLAC, que es sin pérdida.',
+    redownloadImproperFormat:
+      'Volver a descargar archivos en formato incorrecto',
+    redownloadImproperFormatHint:
+      'Al actualizar la biblioteca, buscar y volver a descargar archivos de audio cuyo formato o calidad no coincida con la configuración actual.',
     filesGroup: 'Archivos',
     template: 'Nombre de archivo',
     templateHint: 'Usa / para crear carpetas.',

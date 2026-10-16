@@ -387,6 +387,9 @@ export default {
     metadata: 'Actualiser les étiquettes',
     metadataHint:
       'Complète l’album, l’artiste de l’album, la date de sortie et le numéro de piste depuis Spotify. Uniquement pour les morceaux dont Downtify connaît encore la piste Spotify.',
+    format: 'Retélécharger au format et à la qualité cibles',
+    formatHint:
+      'Retélécharge les fichiers audio qui ne correspondent pas au format ou au débit sélectionné dans les Paramètres.',
     tracksAffected: { one: '{count} morceau', other: '{count} morceaux' },
     options: 'Options',
     artworkMin: 'Améliorer les pochettes en dessous de',
@@ -428,6 +431,7 @@ export default {
     paused: 'Amélioration en pause',
     tracksTitle: 'Morceaux',
     stageMatching: 'Identification',
+    stageDownloading: 'Téléchargement de l’audio de remplacement',
     stageArtwork: 'Recherche de la pochette',
     stageLyrics: 'Recherche des paroles',
     stageWriting: 'Écriture du fichier',
@@ -831,6 +835,10 @@ export default {
     bitrate: 'Qualité',
     bitrateHint: 'Débit pour les formats avec perte.',
     bitrateLossless: 'Non utilisé pour le FLAC, qui est sans perte.',
+    redownloadImproperFormat:
+      'Retélécharger les fichiers au format incorrect',
+    redownloadImproperFormatHint:
+      'Lors de la mise à niveau de la bibliothèque, analyser et retélécharger les fichiers audio dont le format ou la qualité ne correspond pas aux paramètres actuels.',
     filesGroup: 'Fichiers',
     template: 'Nom de fichier',
     templateHint: 'Utilisez / pour créer des dossiers.',

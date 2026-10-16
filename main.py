@@ -364,6 +364,7 @@ def _open_library_stores(monitor_db_path: Path) -> None:
             lyrics_cache=api.state.lyrics_cache,
             publish=api.broadcast_upgrade_progress,
             rekey_owners=api.rekey_file_owners,
+            downloader=lambda: api.state.downloader,
         ),
     )
     api.state.external_sync = ExternalSyncJob(

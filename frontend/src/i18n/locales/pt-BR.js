@@ -377,6 +377,9 @@ export default {
     metadata: 'Atualizar tags',
     metadataHint:
       'Preenche álbum, artista do álbum, data de lançamento e número da faixa pelo Spotify. Só para músicas cuja faixa do Spotify o Downtify ainda conhece.',
+    format: 'Baixar novamente no formato e qualidade de destino',
+    formatHint:
+      'Baixa novamente arquivos de áudio que não correspondem ao formato ou taxa de bits selecionados nas Configurações.',
     tracksAffected: { one: '{count} música', other: '{count} músicas' },
     options: 'Opções',
     artworkMin: 'Melhorar capas menores que',
@@ -418,6 +421,7 @@ export default {
     paused: 'Melhoria pausada',
     tracksTitle: 'Músicas',
     stageMatching: 'Identificando',
+    stageDownloading: 'Baixando áudio substituto',
     stageArtwork: 'Procurando capa',
     stageLyrics: 'Procurando letra',
     stageWriting: 'Gravando o arquivo',
@@ -815,6 +819,10 @@ export default {
     bitrate: 'Qualidade',
     bitrateHint: 'Taxa de bits para formatos com perdas.',
     bitrateLossless: 'Não usado para FLAC, que é sem perdas.',
+    redownloadImproperFormat:
+      'Baixar novamente arquivos no formato incorreto',
+    redownloadImproperFormatHint:
+      'Ao atualizar a biblioteca, verificar e baixar novamente arquivos de áudio cujo formato ou qualidade não corresponda às configurações atuais.',
     filesGroup: 'Arquivos',
     template: 'Nome do arquivo',
     templateHint: 'Use / para criar pastas.',

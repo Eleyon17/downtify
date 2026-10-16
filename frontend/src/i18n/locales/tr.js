@@ -378,6 +378,9 @@ export default {
     metadata: 'Etiketleri yenile',
     metadataHint:
       'Albüm, albüm sanatçısı, çıkış tarihi ve parça numarasını Spotify’dan doldurur. Yalnızca Downtify’ın Spotify parçasını hâlâ bildiği parçalar için.',
+    format: 'Hedef biçim ve kalitede yeniden indir',
+    formatHint:
+      'Ayarlar’da seçilen biçim veya bit hızına uymayan ses dosyalarını yeniden indirir.',
     tracksAffected: { one: '{count} parça', other: '{count} parça' },
     options: 'Seçenekler',
     artworkMin: 'Şu boyutun altındaki kapakları iyileştir',
@@ -419,6 +422,7 @@ export default {
     paused: 'İyileştirme duraklatıldı',
     tracksTitle: 'Parçalar',
     stageMatching: 'Eşleştiriliyor',
+    stageDownloading: 'Yeni ses dosyası indiriliyor',
     stageArtwork: 'Kapak aranıyor',
     stageLyrics: 'Şarkı sözü aranıyor',
     stageWriting: 'Dosya yazılıyor',
@@ -816,6 +820,10 @@ export default {
     bitrate: 'Kalite',
     bitrateHint: 'Kayıplı biçimler için bit hızı.',
     bitrateLossless: 'Kayıpsız olan FLAC için kullanılmaz.',
+    redownloadImproperFormat:
+      'Uygun olmayan biçimdeki dosyaları yeniden indir',
+    redownloadImproperFormatHint:
+      'Kitaplığı yükseltirken, biçimi veya kalitesi mevcut ayarlarla eşleşmeyen ses dosyalarını tarayın ve yeniden indirin.',
     filesGroup: 'Dosyalar',
     template: 'Dosya adı',
     templateHint: 'Klasör oluşturmak için / kullan.',

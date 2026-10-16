@@ -890,3 +890,151 @@ def test_options_are_clamped() -> None:
     assert options.artwork_min_px == 3000
     assert options.artwork_source == cover_sources.PREFERENCE_HIGHEST
     assert options.recheck_days == 0
+
+
+def test_track_format_improper(tmp_path: Path) -> None:
+    from downtify.library_upgrade import CATEGORY_FORMAT, track_format_improper
+
+    # An MP3 at 128 kbps
+    mp3_file = _write_track(tmp_path / 'song.mp3')
+    entry = {'file': 'song.mp3', 'bitrate': 128000}
+
+    # Format mismatch: target is FLAC
+    assert track_format_improper(
+        entry, mp3_file, target_format='flac', target_bitrate_kbps=320
+    )
+
+    # Quality mismatch: target is MP3 at 320k, file is 128k
+    assert track_format_improper(
+        entry, mp3_file, target_format='mp3', target_bitrate_kbps=320
+    )
+
+    # Quality match: target is MP3 at 128k
+    assert not track_format_improper(
+        entry, mp3_file, target_format='mp3', target_bitrate_kbps=128
+    )
+
+    # FLAC file matches FLAC target (lossless, no bitrate check)
+    flac_file = tmp_path / 'song.flac'
+    flac_file.write_bytes(b'dummy-flac')
+    flac_entry = {'file': 'song.flac', 'bitrate': 0}
+    assert not track_format_improper(
+        flac_entry, flac_file, target_format='flac', target_bitrate_kbps=320
+    )
+
+
+def test_track_findings_checks_format_only_when_requested(tmp_path: Path) -> None:
+    from downtify.library_upgrade import CATEGORY_FORMAT
+
+    mp3_file = _write_track(tmp_path / 'song.mp3', cover_px=800)
+    entry = {
+        'file': 'song.mp3',
+        'cover_px': 800,
+        'album': 'Album',
+        'album_artist': 'Artist',
+        'year': '2020',
+        'track_number': 1,
+        'bitrate': 128000,
+    }
+
+    # With check_format=False (default/off)
+    findings = track_findings(
+        entry,
+        mp3_file,
+        artwork_min_px=600,
+        check_format=False,
+        target_format='mp3',
+        target_bitrate_kbps=320,
+    )
+    assert CATEGORY_FORMAT not in findings
+
+    # With check_format=True
+    findings_on = track_findings(
+        entry,
+        mp3_file,
+        artwork_min_px=600,
+        check_format=True,
+        target_format='mp3',
+        target_bitrate_kbps=320,
+    )
+    assert CATEGORY_FORMAT in findings_on
+
+
+def test_format_upgrade_requires_verified_match(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    from downtify.library_upgrade import CATEGORY_FORMAT, JOB_FAILED
+
+    ctx = _context(tmp_path)
+    track = _write_track(ctx.download_dir / 'track.mp3')
+    orig_content = track.read_bytes()
+
+    # Monkeypatch find_match to simulate no match found
+    monkeypatch.setattr(
+        'downtify.providers.find_match', lambda _s: (None, None)
+    )
+
+    deps = UpgradeDeps(
+        context=lambda: ctx,
+        settings=lambda: {
+            'redownload_improper_format': True,
+            'format': 'flac',
+            'bitrate': '320',
+        },
+    )
+    options = UpgradeOptions(
+        categories=(CATEGORY_FORMAT,),
+        check_format=True,
+        target_format='flac',
+        target_bitrate=320,
+    )
+
+    outcome = upgrade_track('track.mp3', deps=deps, options=options)
+    assert outcome.status == JOB_FAILED
+    assert 'No verified audio match' in outcome.detail
+    # Original file must remain untouched!
+    assert track.read_bytes() == orig_content
+
+
+def test_format_upgrade_downloads_and_replaces_safely(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    from downtify.library_upgrade import CATEGORY_FORMAT, JOB_DONE
+
+    ctx = _context(tmp_path)
+    track = _write_track(ctx.download_dir / 'track.mp3')
+
+    # Mock verified match
+    monkeypatch.setattr(
+        'downtify.providers.find_match', lambda _s: ('video_match_123', None)
+    )
+
+    class FakeDownloader:
+        def fetch_audio(self, video_id, target_dir, basename, **kwargs):
+            fmt = kwargs.get('audio_format') or 'mp3'
+            staged = target_dir / f'{basename}.{fmt}'
+            # Write a valid audio stream
+            staged.write_bytes(_MP3_FRAME * 100)
+            return staged
+
+    deps = UpgradeDeps(
+        context=lambda: ctx,
+        settings=lambda: {
+            'redownload_improper_format': True,
+            'format': 'mp3',
+            'bitrate': '320',
+        },
+        downloader=lambda: FakeDownloader(),
+    )
+    options = UpgradeOptions(
+        categories=(CATEGORY_FORMAT,),
+        check_format=True,
+        target_format='mp3',
+        target_bitrate=320,
+    )
+
+    outcome = upgrade_track('track.mp3', deps=deps, options=options)
+    assert outcome.status == JOB_DONE
+    assert 'format' in outcome.detail
+    assert track.is_file()
+

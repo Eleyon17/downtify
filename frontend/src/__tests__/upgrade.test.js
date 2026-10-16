@@ -214,7 +214,7 @@ describe('job rows', () => {
 
 describe('offered choices', () => {
   it('matches the backend categories', () => {
-    expect(CATEGORIES).toEqual(['artwork', 'lyrics', 'metadata'])
+    expect(CATEGORIES).toEqual(['artwork', 'lyrics', 'metadata', 'format'])
   })
 
   it('offers the sizes the issue asked for', () => {
