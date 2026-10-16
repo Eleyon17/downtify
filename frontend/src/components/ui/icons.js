@@ -59,6 +59,9 @@ export const STROKE = {
     '<path d="M12 5a7 7 0 1 0 6.32 4"/><path d="M15.7 5.7 18.5 9l-3.6.8"/>',
   gauge:
     '<path d="M4 15a8 8 0 1 1 16 0"/><path d="M12 15 15.5 10"/><path d="M4 15h.01M20 15h.01M12 5.5v.01"/>',
+  cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  'cloud-done':
+    '<path d="m8.5 13.5 2.5 2.5 4.5-4.5"/><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
   check: '<path d="M5 12.5 10 17 19 7"/>',
   'check-circle':
     '<circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.7L16 9.8"/>',

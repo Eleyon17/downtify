@@ -66,7 +66,8 @@ RUN apk update && apk upgrade --no-cache && \
 # Add Deno and its glibc runtime to the Alpine image.
 COPY --from=deno-bin /bin/deno /usr/local/bin/deno
 COPY --from=deno-bin /usr/local/lib/glibc /usr/local/lib/glibc
-COPY --from=deno-bin /lib/ld-linux-* /lib/
+# Newer deno:alpine images no longer ship /lib/ld-linux-*: the loader only
+# lives in /usr/local/lib/glibc, linked into /lib64 here.
 RUN mkdir -p /lib64 && ln -sf /usr/local/lib/glibc/ld-linux-* /lib64/
 
 # Remove the Python packages that come with the base image before
@@ -81,14 +82,16 @@ COPY --from=ffmpeg-bin /ffprobe /usr/local/bin/ffprobe
 COPY --from=builder /usr/local/lib/python3.15/site-packages /usr/local/lib/python3.15/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Application files
-COPY --chmod=755 main.py entrypoint.sh healthcheck.sh ./
+# Application files (chmod in a RUN, not COPY --chmod: that flag needs
+# BuildKit, and this host builds with the classic builder).
+COPY main.py entrypoint.sh healthcheck.sh ./
 COPY downtify ./downtify
 
 COPY --from=frontend-builder /frontend/dist ./frontend/dist
 
 # Normalize scripts to Unix line endings
-RUN sed -i 's/\r$//g' entrypoint.sh healthcheck.sh
+RUN sed -i 's/\r$//g' entrypoint.sh healthcheck.sh && \
+    chmod 755 main.py entrypoint.sh healthcheck.sh
 
 ENV PATH="/home/downtify/.local/bin:${PATH}"
 

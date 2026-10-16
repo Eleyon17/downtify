@@ -1,0 +1,26 @@
+# Personal dev build of the `custom` branch. Runs NEXT TO the stable
+# stack in ~/Navidrome (port 6124) without touching it:
+#   docker compose -f docker-compose.dev.yml up -d --build
+# then open http://<host>:6125
+name: downtify-dev
+
+services:
+  downtify-dev:
+    container_name: downtify-dev
+    image: downtify:custom
+    build: .
+    restart: unless-stopped
+    ports:
+      - '6125:6125'
+    environment:
+      - DOWNTIFY_PORT=6125
+    volumes:
+      # Own downloads + data, so nothing the stable instance owns is written.
+      - ./dev/downloads:/downloads
+      - ./dev/data:/data
+      # To test against the real library read-only, add it as an
+      # external library (Settings > Library) at this container path:
+      # - /home/seth/musikat/navidrome-music:/music/collection:ro
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1

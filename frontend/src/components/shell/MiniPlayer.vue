@@ -44,10 +44,17 @@
             class="size-11 md:size-[52px]"
           />
           <span class="flex min-w-0 flex-col">
-            <span class="flex items-center gap-2">
+            <span class="flex items-center gap-1.5">
               <span class="truncate text-sm font-semibold">{{
                 track.title
               }}</span>
+              <AppIcon
+                v-if="!track?.isPodcast && (!track?.stream || streamDownloaded)"
+                name="cloud"
+                :size="13"
+                class="text-accent shrink-0 inline-block"
+                :title="t('search.inLibrary')"
+              />
               <EqBars
                 v-if="player.isPlaying.value"
                 :size="10"
@@ -137,7 +144,7 @@
           :title="t('search.inLibrary')"
           aria-hidden="true"
         >
-          <AppIcon name="check" :size="18" />
+          <AppIcon name="cloud" :size="18" />
         </span>
       </div>
 

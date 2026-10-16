@@ -55,7 +55,7 @@
          wand plus the download's widest state (see TrackDownPlay). -->
     <div class="flex w-40 shrink-0 items-center justify-end gap-2">
       <SimilarButton :artist="firstArtist" :title="song.name" filled />
-      <UiBadge v-if="inLibrary" tone="accent" icon="check">
+      <UiBadge v-if="inLibrary" tone="accent" icon="cloud">
         {{ t('search.inLibrary') }}
       </UiBadge>
       <DownloadState

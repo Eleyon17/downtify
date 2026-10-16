@@ -140,10 +140,16 @@
           </button>
           <div class="min-w-0">
             <p
-              class="truncate text-sm font-semibold"
+              class="truncate text-sm font-semibold flex items-center gap-1.5"
               :class="isCurrent(row.track) ? 'text-accent' : 'text-fg'"
             >
-              {{ row.track.title }}
+              <span class="truncate">{{ row.track.title }}</span>
+              <AppIcon
+                name="cloud"
+                :size="14"
+                class="text-accent shrink-0 inline-block"
+                :title="t('search.inLibrary')"
+              />
             </p>
             <p class="truncate text-[13px] text-muted">
               <span

@@ -246,6 +246,10 @@ function getArtistProfile(name) {
   return API.get('/api/artists/profile', { params: { name } })
 }
 
+function getArtistOverview(name) {
+  return API.get('/api/artists/overview', { params: { name } })
+}
+
 // Seeds a brand-new artist's profile the first time it's needed - a
 // no-op once a profile already exists, so it's safe to call on every
 // visit to an artist's page instead of the plain GET above.
@@ -785,6 +789,7 @@ export default {
   uploadArtistArt,
   deleteArtistArt,
   getArtistProfile,
+  getArtistOverview,
   ensureArtistProfile,
   fetchArtistBio,
   previewArtistBio,

@@ -255,7 +255,37 @@ function moveTrack(from, to) {
   if (current === from) currentIndex.value = to
   else if (from < current && to >= current) currentIndex.value = current - 1
   else if (from > current && to <= current) currentIndex.value = current + 1
-  if (shuffle.value) buildShuffleOrder()
+  if (shuffle.value) {
+    shuffleOrder = shuffleOrder.map((idx) => {
+      if (idx === from) return to
+      if (from < to && idx > from && idx <= to) return idx - 1
+      if (from > to && idx >= to && idx < from) return idx + 1
+      return idx
+    })
+    shuffleVersion.value += 1
+  }
+}
+
+/** Reorder items in the upcoming queue view at visual positions [fromPos] and [toPos].
+ * Works seamlessly whether shuffle is on or off. */
+function moveUpcoming(fromPos, toPos) {
+  if (fromPos === toPos || fromPos < 0 || toPos < 0) return
+  const list = playlist.value
+  if (shuffle.value && shuffleOrder.length === list.length) {
+    const start = shufflePos + 1
+    const actualFrom = start + fromPos
+    const actualTo = start + toPos
+    if (actualFrom >= shuffleOrder.length || actualTo >= shuffleOrder.length) return
+    const [idx] = shuffleOrder.splice(actualFrom, 1)
+    shuffleOrder.splice(actualTo, 0, idx)
+    shuffleVersion.value += 1
+    prefetchedFor = -1
+    return
+  }
+  const start = currentIndex.value + 1
+  const actualFrom = start + fromPos
+  const actualTo = start + toPos
+  moveTrack(actualFrom, actualTo)
 }
 
 function removeAt(index) {
@@ -822,6 +852,7 @@ export function usePlayer() {
     enqueue,
     playNext,
     moveTrack,
+    moveUpcoming,
     removeAt,
     clearUpcoming,
     forgetFiles,

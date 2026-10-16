@@ -197,6 +197,32 @@ describe('usePlayer queue', () => {
     expect(upcoming()).toEqual(['Three', 'One'])
   })
 
+  it('reorders upcoming queue by position in normal mode', () => {
+    player.playAt(0)
+    expect(upcoming()).toEqual(['Two', 'Three'])
+    player.moveUpcoming(0, 1)
+    expect(upcoming()).toEqual(['Three', 'Two'])
+    expect(player.currentTrack.value.title).toBe('One')
+  })
+
+  it('reorders upcoming queue by position in shuffle mode', () => {
+    player.setPlaylist([
+      'A - One.mp3',
+      'A - Two.mp3',
+      'A - Three.mp3',
+      'A - Four.mp3',
+    ])
+    player.playAt(0)
+    player.setShuffle(true)
+    const before = upcoming()
+    expect(before.length).toBe(3)
+    // Move first upcoming to the end of upcoming
+    player.moveUpcoming(0, 2)
+    const after = upcoming()
+    expect(after).toEqual([before[1], before[2], before[0]])
+    expect(player.currentTrack.value.title).toBe('One')
+  })
+
   it('removes an upcoming track', () => {
     player.removeAt(2)
     expect(titles()).toEqual(['One', 'Two'])

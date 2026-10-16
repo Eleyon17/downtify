@@ -98,22 +98,24 @@
               :class="mobilePanel ? 'max-lg:hidden' : ''"
             >
               <div class="now-playing-cover mx-auto">
-                <CoverArt
-                  :src="track.hasCover ? track.cover : ''"
-                  :name="track.album || track.title"
-                  rounded="rounded-[20px]"
-                  :letter-size="140"
-                  :icon-size="72"
-                  class="aspect-square w-full min-h-0 min-w-0 transition-transform duration-500 ease-out-soft"
-                  :class="player.isPlaying.value ? 'scale-100' : 'scale-[0.94]'"
+                <ArtistFlipTile
+                  :track="track"
+                  :is-playing="player.isPlaying.value"
                 />
               </div>
               <div
                 class="flex w-full min-w-0 shrink-0 items-end justify-between gap-4"
               >
                 <div class="min-w-0 flex-1">
-                  <h2 class="now-playing-title text-display truncate font-bold">
-                    {{ track.title }}
+                  <h2 class="now-playing-title text-display truncate font-bold flex items-center gap-2">
+                    <span class="truncate">{{ track.title }}</span>
+                    <AppIcon
+                      v-if="!track?.isPodcast && (!track?.stream || streamDownloaded)"
+                      name="cloud"
+                      :size="22"
+                      class="text-accent shrink-0 inline-block"
+                      :title="t('search.inLibrary')"
+                    />
                   </h2>
                   <RouterLink
                     v-if="track.albumArtist && !track.isPodcast"
@@ -333,7 +335,7 @@
                   :title="t('search.inLibrary')"
                   aria-hidden="true"
                 >
-                  <AppIcon name="check" :size="22" />
+                  <AppIcon name="cloud" :size="22" />
                 </span>
               </div>
 
@@ -455,6 +457,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useMediaQuery, useNow } from '@vueuse/core'
 import AppIcon from '../ui/AppIcon.vue'
 import CoverArt from '../ui/CoverArt.vue'
+import ArtistFlipTile from '../player/ArtistFlipTile.vue'
 import UiMenu from '../ui/UiMenu.vue'
 import WaveSeekBar from '../player/WaveSeekBar.vue'
 import VolumeControl from '../player/VolumeControl.vue'

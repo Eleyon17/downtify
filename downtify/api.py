@@ -52,6 +52,10 @@ for downloads stay shared, and files are never stored twice.
   bio - not their releases)
 * ``GET  /api/artists/similar`` (an artist's "Fans might also like"
   shelf, same shape as ``/api/artists/search``)
+* ``GET  /api/artists/overview`` (``name``: ``{name, channel_id, url,
+  cover_url, bio, bio_source, top_songs, top_albums}`` - the Now Playing
+  flip tile; bio from the artist's YouTube Music page, else the saved
+  profile bio; cached in memory for a few hours)
 * ``GET  /api/artists/art`` (``{photo_url, banner_url, photo_version,
   banner_version}`` - the version, the file's modified time in ms, goes in
   the URL as ``?v=`` so a replaced image isn't served from a browser
@@ -319,6 +323,7 @@ from fastapi.responses import FileResponse
 from loguru import logger
 
 from . import (
+    artist_flip,
     artist_photo_proxy,
     artist_profile,
     audio_replace,
@@ -2340,6 +2345,17 @@ def artist_similar_endpoint(
     channel_id: str = Query(...),
 ) -> list[dict[str, Any]]:
     return providers.artist_similar_from_channel_id(channel_id)
+
+
+@router.get('/api/artists/overview')
+def artist_overview_endpoint(
+    name: str = Query(..., min_length=1, max_length=300),
+) -> dict[str, Any]:
+    """Bio (YouTube Music "About", else the saved profile bio), popular
+    songs and popular albums for an artist *by name* - the Now Playing
+    flip tile. See ``downtify.artist_flip``."""
+
+    return artist_flip.artist_overview(name, _artist_profile_download_dir())
 
 
 def _artist_profile_download_dir() -> Path:

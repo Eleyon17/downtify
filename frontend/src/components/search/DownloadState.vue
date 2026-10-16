@@ -1,8 +1,8 @@
 <template>
-  <UiBadge v-if="state === 'library'" tone="accent" icon="check">
+  <UiBadge v-if="state === 'library'" tone="accent" icon="cloud">
     {{ t('search.inLibrary') }}
   </UiBadge>
-  <UiBadge v-else-if="state === 'done'" tone="accent" icon="check">
+  <UiBadge v-else-if="state === 'done'" tone="accent" icon="cloud">
     {{ t('queue.statusDone') }}
   </UiBadge>
   <UiBadge v-else-if="state === 'queued'" tone="neutral">
