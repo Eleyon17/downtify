@@ -15,8 +15,8 @@ services:
     environment:
       - DOWNTIFY_PORT=6125
     volumes:
-      # Real library mounted read-only so all music shows up and plays:
-      - /home/seth/musikat/navidrome-music:/downloads:ro
+      # Real library mounted read-write for library upgrade / replacement:
+      - /home/seth/musikat/navidrome-music:/downloads:rw
       - ./dev/data:/data
       # To test against the real library read-only, add it as an
       # external library (Settings > Library) at this container path:
