@@ -26,6 +26,10 @@ jobs:
         id: version
         run: echo "VERSION=$(git describe --tags --always | cut -d'-' -f1)" >> "$GITHUB_OUTPUT"
 
+      - name: Prepare lowercase image name
+        run: |
+          echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -37,7 +41,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository }}
+            ${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest
             type=raw,value=${{ steps.version.outputs.VERSION }}
@@ -62,8 +66,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
           platforms: linux/amd64,linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
