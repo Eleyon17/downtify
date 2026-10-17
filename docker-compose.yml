@@ -1,20 +1,16 @@
 # Downtify Docker Compose Configuration
-# Enhanced edition: Playlist Suggestions, Public Share Links, Cast Support (Web & Android),
-# Format Upgrades, and Artist Bio hit tracks/albums.
+# Public standalone deployment template for Downtify (Enhanced edition: Playlist Suggestions,
+# Public Share Links, Cast Support for PC & Android, Format Upgrades, and Artist Bio hit tracks/albums)
 #
-# Quick start:
-#   docker compose up -d --build
-#
-# Access the web UI at: http://localhost:8000
-# (or connect via the Downtify mobile app using http://<server-ip>:8000)
+# Quick start (standalone - no git repository or source code required):
+#   1. Save this file as docker-compose.yml in any folder
+#   2. Run: docker compose up -d
+#   3. Open: http://localhost:8000 in your browser (or connect with the Downtify mobile app)
 
 services:
   downtify:
     container_name: downtify
-    image: downtify:latest
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/eleyon17/downtify:latest
     restart: unless-stopped
     ports:
       # Host:Container port mapping. Change the left side if port 8000 is already in use.
