@@ -27,6 +27,7 @@ from .cover_thumbs import normalize_size
 from .library_catalog import list_library_entries, resolve_library_file
 from .library_paths_cache import invalidate_library_paths_cache
 from .lyrics import read_track_lyrics
+from .playlist_suggestions import get_playlist_suggestions
 from .transcode import (
     FORMATS,
     TranscodeError,
@@ -143,6 +144,71 @@ async def playlists(request: Request) -> list[dict[str, Any]]:
         }
         for p in found
     ]
+
+
+@router.get('/playlists/{name}/suggestions')
+async def mobile_playlist_suggestions(
+    name: str,
+    request: Request,
+    limit: int = Query(20, ge=1, le=50),
+    dismissed: Optional[list[str]] = Query(None),
+) -> dict[str, Any]:
+    """Songs matching the tone and vibe of the playlist for mobile apps."""
+
+    api.require_playlist_visible(name, request)
+    dismissed_list: list[str] = []
+    if dismissed:
+        for item in dismissed:
+            for piece in str(item).split(','):
+                p = piece.strip()
+                if p:
+                    dismissed_list.append(p)
+
+    ctx = api.library_context()
+    dl_dir = (
+        Path(api.state.downloader.download_dir)
+        if api.state.downloader
+        else ctx.download_dir
+    )
+    return await asyncio.to_thread(
+        get_playlist_suggestions,
+        name,
+        dl_dir,
+        limit=limit,
+        dismissed=dismissed_list,
+        ctx=ctx,
+        catalog=api.state.playlist_catalog,
+        likes_store=api.state.likes,
+        track_index=api.state.track_index,
+    )
+
+
+@router.post('/playlists/{name}/tracks')
+async def mobile_add_playlist_track(
+    name: str,
+    request: Request,
+) -> dict[str, Any]:
+    """Add a library track by track_id to playlist on mobile."""
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    track_id = str((payload or {}).get('track_id') or '').strip()
+    if not track_id:
+        raise HTTPException(status_code=400, detail='track_id is required')
+    api.require_playlist_visible(name, request)
+    row = await asyncio.to_thread(_sync().row_for, track_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail='Track not found')
+    user_id = api.request_user_id(request)
+    try:
+        result = await asyncio.to_thread(
+            api.add_track_to_playlist_internal_sync, name, row['file'], user_id
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {'status': 'ok', 'playlist': name, 'track_id': track_id, 'result': result}
 
 
 @router.get('/likes')
@@ -307,24 +373,26 @@ _SIGNABLE = (
     '/media/',
     '/cover',
     '/playlist-cover',
+    '/api/stream/',
 )
 
 
 @router.post('/sign')
 async def sign(request: Request) -> dict[str, Any]:
-    """Signed URLs for players that can't send the device token (a Cast
+    """Signed URLs for players that can't send auth headers (a Cast
     receiver): ``{items: [{path, params}], ttl}`` ->
-    ``{urls: [...], expires_at}``. Only for a paired app, and only for
-    audio and cover paths; ``ttl`` is seconds (default 1 h, at most 24 h).
+    ``{urls: [...], expires_at}``. For paired apps and signed-in web sessions,
+    and only for audio and cover paths; ``ttl`` is seconds (default 1 h, at most 24 h).
     """
 
     principal: Optional[Principal] = (request.scope.get('state') or {}).get(
         'principal'
     )
-    if principal is None or not principal.device_id:
+    if principal is None:
         raise HTTPException(
-            status_code=400, detail='Only a paired app can sign URLs'
+            status_code=401, detail='Sign in required'
         )
+    device_id = principal.device_id or (f'u_{principal.user_id}' if principal.user_id else 'web')
     try:
         payload = await request.json()
     except Exception:
@@ -354,8 +422,81 @@ async def sign(request: Request) -> dict[str, Any]:
             signer.sign_url(
                 path,
                 [(str(k), str(v)) for k, v in params.items()],
-                device_id=principal.device_id,
+                device_id=device_id,
                 ttl=ttl,
             )
         )
     return {'urls': urls, 'expires_at': int(time.time()) + ttl}
+
+
+# ── Shares (Mobile / APK) ──────────────────────────────────────────────
+
+
+@router.post('/shares')
+async def mobile_create_share(request: Request) -> dict[str, Any]:
+    """Create a persistent public share link from mobile / APK."""
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    kind = str(payload.get('kind') or '').strip().lower()
+    track_id = str(payload.get('track_id') or '').strip()
+    playlist = str(payload.get('playlist') or '').strip()
+    target = str(payload.get('target') or '').strip()
+    title = str(payload.get('title') or '').strip()
+
+    if track_id:
+        kind = 'track'
+        row, _ = _track_path(track_id)
+        target = row['file']
+        if not title:
+            title = row.get('title') or Path(target).stem
+    elif playlist:
+        kind = 'playlist'
+        target = playlist
+        if not title:
+            title = playlist
+    elif not target:
+        raise HTTPException(
+            status_code=400, detail='track_id, playlist, or target is required'
+        )
+
+    if not kind:
+        kind = 'track'
+
+    user_id = api.request_user_id(request)
+    share = api._require_shares().create_share(
+        kind=kind, target=target, title=title, user_id=user_id
+    )
+    base = str(request.base_url).rstrip('/')
+    return {
+        **share,
+        'url': f'{base}/share/{share["id"]}',
+    }
+
+
+@router.get('/shares')
+def mobile_list_shares(request: Request) -> list[dict[str, Any]]:
+    """List active shares for mobile."""
+    user_id = api.request_user_id(request)
+    is_admin = api.request_is_admin(request)
+    shares = api._require_shares().list_shares(
+        user_id=None if is_admin else user_id
+    )
+    base = str(request.base_url).rstrip('/')
+    return [{**s, 'url': f'{base}/share/{s["id"]}'} for s in shares]
+
+
+@router.delete('/shares/{share_id}')
+def mobile_delete_share(share_id: str, request: Request) -> dict[str, Any]:
+    """Delete a share from mobile."""
+    user_id = api.request_user_id(request)
+    is_admin = api.request_is_admin(request)
+    deleted = api._require_shares().delete_share(
+        share_id,
+        user_id=None if is_admin else user_id,
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail='Share not found')
+    return {'deleted': True, 'id': share_id}
+

@@ -45,6 +45,7 @@ export default {
   },
   actions: {
     play: 'Lejátszás',
+    pause: 'Szünet',
     playAll: 'Összes lejátszása',
     playItem: '{name} lejátszása',
     playPreview: '{name} előnézetének lejátszása',
@@ -60,6 +61,7 @@ export default {
     download: 'Letöltés',
     downloadItem: '{name} letöltése',
     delete: 'Törlés a könyvtárból',
+    share: 'Megosztás',
   },
   home: {
     greetingMorning: 'Jó reggelt',
@@ -546,6 +548,13 @@ export default {
     nothingYet: 'Még nincs letöltött szám',
     nothingYetHint: 'A számok letöltés után itt jelennek meg.',
     nothingYetManualHint: 'Adj hozzá számokat a könyvtárból.',
+    suggestionsTitle: 'Javaslatok',
+    suggestionsHint: 'Töltsd le a javasolt számokat és add hozzá ehhez a lejátszási listához',
+    suggestionsDismiss: 'Javaslat elvetése',
+    suggestionsAddToPlaylist: 'Hozzáadás a lejátszási listához',
+    suggestionsAdded: 'Hozzáadva a lejátszási listához',
+    suggestionsEmpty: 'Jelenleg nincs több javaslat',
+    suggestionsRefresh: 'Javaslatok frissítése',
   },
   track: {
     title: 'Cím',
@@ -580,6 +589,9 @@ export default {
     volume: 'Hangerő',
     mute: 'Némítás',
     unmute: 'Némítás feloldása',
+    cast: 'Átküldés',
+    castingTo: 'Átküldés ide: {device}',
+    disconnectCast: 'Átküldés leválasztása',
     playingFrom: {
       album: 'Lejátszás albumról',
       playlist: 'Lejátszás listáról',
@@ -1450,5 +1462,17 @@ export default {
   },
   source: {
     from: 'Letöltve innen: {source}',
+  },
+  share: {
+    titleTrack: 'Szám megosztása',
+    titlePlaylist: 'Lejátszási lista megosztása',
+    description: 'Bárki, aki rendelkezik ezzel a linkkel, bejelentkezés nélkül meghallgathatja.',
+    copied: 'Megosztási link vágólapra másolva',
+    copyLink: 'Link másolása',
+    linkCopied: 'Másolva!',
+    notFound: 'A megosztás nem található vagy már nem érhető el',
+    playingShared: 'Megosztva a Downtify segítségével',
+    queue: 'Lejátszási sor',
+    removeFromQueue: 'Eltávolítás a sorból',
   },
 }

@@ -186,8 +186,35 @@ def _result_to_song(result: dict[str, Any]) -> Optional[dict[str, Any]]:
         if isinstance(a, dict) and a.get('name')
     ]
     artists = _extract_title_featuring_artist(result.get('title', ''), artists)
-    thumbs = result.get('thumbnails') or []
-    cover = thumbs[-1].get('url', '') if thumbs else ''
+    thumbs = result.get('thumbnails') or result.get('thumbnail') or []
+    if isinstance(thumbs, dict):
+        thumbs = [thumbs]
+    cover = ''
+    if thumbs:
+        for t in reversed(thumbs):
+            if isinstance(t, dict) and t.get('url'):
+                cover = t['url']
+                break
+            elif isinstance(t, str) and t.strip():
+                cover = t.strip()
+                break
+    if not cover:
+        album_data = result.get('album')
+        if isinstance(album_data, dict):
+            album_thumbs = (
+                album_data.get('thumbnails') or album_data.get('thumbnail') or []
+            )
+            if isinstance(album_thumbs, dict):
+                album_thumbs = [album_thumbs]
+            for t in reversed(album_thumbs):
+                if isinstance(t, dict) and t.get('url'):
+                    cover = t['url']
+                    break
+                elif isinstance(t, str) and t.strip():
+                    cover = t.strip()
+                    break
+    if not cover and video_id:
+        cover = f'https://i.ytimg.com/vi/{video_id}/hqdefault.jpg'
     cover = _upgrade_thumbnail(cover)
     album = result.get('album') or {}
     album_name = album.get('name', '') if isinstance(album, dict) else ''
@@ -805,8 +832,19 @@ def _artist_album_entry_to_summary(
     :func:`artist_top_albums_from_channel_id` (the shelf's own preview,
     unexpanded).
     """
-    thumbs = entry.get('thumbnails') or []
-    cover = _upgrade_thumbnail(thumbs[-1].get('url', '')) if thumbs else ''
+    thumbs = entry.get('thumbnails') or entry.get('thumbnail') or []
+    if isinstance(thumbs, dict):
+        thumbs = [thumbs]
+    cover = ''
+    if thumbs:
+        for t in reversed(thumbs):
+            if isinstance(t, dict) and t.get('url'):
+                cover = t['url']
+                break
+            elif isinstance(t, str) and t.strip():
+                cover = t.strip()
+                break
+    cover = _upgrade_thumbnail(cover)
     return {
         'album_id': browse_id,
         'name': entry.get('title') or '',
@@ -920,37 +958,42 @@ def artist_top_albums_from_channel_id(channel_id: str) -> list[dict[str, Any]]:
         return []
 
     artist_name = str(artist_data.get('name') or '').strip()
-    section = artist_data.get('albums')
-    if not isinstance(section, dict):
-        return []
-
-    params = section.get('params')
-    entries: list[dict[str, Any]] = []
-    if params:
-        try:
-            entries = _fetch_artist_section_by_popularity(
-                channel_id, params, _TOP_ALBUMS_LIMIT
-            )
-        except Exception:
-            logger.opt(exception=True).debug(
-                'Fetching popularity-sorted albums failed for {}',
-                channel_id,
-            )
-    if not entries:
-        entries = [
-            r for r in (section.get('results') or []) if isinstance(r, dict)
-        ][:_TOP_ALBUMS_LIMIT]
-
     albums = []
-    for entry in entries:
-        browse_id = entry.get('browseId')
-        if not isinstance(browse_id, str) or not browse_id.strip():
+    for section_key, default_type in [('albums', 'Album'), ('singles', 'Single')]:
+        section = artist_data.get(section_key)
+        if not isinstance(section, dict):
             continue
-        albums.append(
-            _artist_album_entry_to_summary(
-                browse_id.strip(), entry, artist_name, 'Album'
+
+        params = section.get('params')
+        entries: list[dict[str, Any]] = []
+        if params:
+            try:
+                entries = _fetch_artist_section_by_popularity(
+                    channel_id, params, _TOP_ALBUMS_LIMIT
+                )
+            except Exception:
+                logger.opt(exception=True).debug(
+                    'Fetching popularity-sorted {} failed for {}',
+                    section_key,
+                    channel_id,
+                )
+        if not entries:
+            entries = [
+                r for r in (section.get('results') or []) if isinstance(r, dict)
+            ][:_TOP_ALBUMS_LIMIT]
+
+        for entry in entries:
+            browse_id = entry.get('browseId')
+            if not isinstance(browse_id, str) or not browse_id.strip():
+                continue
+            albums.append(
+                _artist_album_entry_to_summary(
+                    browse_id.strip(), entry, artist_name, default_type
+                )
             )
-        )
+        if albums:
+            break
+
     return albums
 
 

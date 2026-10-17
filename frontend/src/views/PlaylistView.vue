@@ -139,6 +139,11 @@
             </li>
           </ul>
         </UiPanel>
+
+        <PlaylistSuggestions
+          v-if="playlist"
+          :playlist="playlist"
+        />
       </div>
     </DetailState>
   </div>
@@ -158,6 +163,7 @@ import CollectionHero from '/src/components/library/CollectionHero.vue'
 import DetailState from '/src/components/library/DetailState.vue'
 import PlayButton from '/src/components/library/PlayButton.vue'
 import PlaylistStatus from '/src/components/library/PlaylistStatus.vue'
+import PlaylistSuggestions from '/src/components/library/PlaylistSuggestions.vue'
 import TrackList from '/src/components/library/TrackList.vue'
 import DownloadState from '/src/components/search/DownloadState.vue'
 import API from '/src/model/api'

@@ -369,6 +369,24 @@ class LibraryUpgradeDB:
                 'DELETE FROM library_upgrade_jobs WHERE run_id = ?', (run_id,)
             )
 
+    def rekey_track(self, old_stored: str, new_stored: str) -> None:
+        """Update jobs and checks from old_stored to new_stored if path changed."""
+        old_path = str(old_stored or '').strip().replace('\\', '/')
+        new_path = str(new_stored or '').strip().replace('\\', '/')
+        if not old_path or not new_path or old_path == new_path:
+            return
+        with self._connect() as conn:
+            conn.execute(
+                """UPDATE OR IGNORE library_upgrade_jobs
+                   SET stored_path = ? WHERE stored_path = ?""",
+                (new_path, old_path),
+            )
+            conn.execute(
+                """UPDATE OR IGNORE library_upgrade_checks
+                   SET stored_path = ? WHERE stored_path = ?""",
+                (new_path, old_path),
+            )
+
     # ── Per-track check history ───────────────────────────────────
     def record_check(
         self,

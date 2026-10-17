@@ -45,6 +45,7 @@ export default {
   },
   actions: {
     play: 'Çal',
+    pause: 'Duraklat',
     playAll: 'Tümünü çal',
     playItem: '{name} çal',
     playPreview: '{name} önizlemesini çal',
@@ -60,6 +61,7 @@ export default {
     download: 'İndir',
     downloadItem: '{name} indir',
     delete: 'Kitaplıktan sil',
+    share: 'Paylaş',
   },
   home: {
     greetingMorning: 'Günaydın',
@@ -546,6 +548,13 @@ export default {
     nothingYet: 'Henüz indirilen parça yok',
     nothingYetHint: 'Parçalar indirildikçe burada görünür.',
     nothingYetManualHint: 'Kitaplığından şarkı ekle.',
+    suggestionsTitle: 'Öneriler',
+    suggestionsHint: 'Önerilen şarkıları indir ve bu çalma listesine ekle',
+    suggestionsDismiss: 'Öneriyi gizle',
+    suggestionsAddToPlaylist: 'Çalma listesine ekle',
+    suggestionsAdded: 'Çalma listesine eklendi',
+    suggestionsEmpty: 'Şu anda başka öneri yok',
+    suggestionsRefresh: 'Önerileri yenile',
   },
   track: {
     title: 'Başlık',
@@ -580,6 +589,9 @@ export default {
     volume: 'Ses',
     mute: 'Sesi kapat',
     unmute: 'Sesi aç',
+    cast: 'Yayınla',
+    castingTo: '{device} cihazına yayınlanıyor',
+    disconnectCast: 'Yayını durdur',
     playingFrom: {
       album: 'Albümden çalınıyor',
       playlist: 'Çalma listesinden çalınıyor',
@@ -1442,5 +1454,17 @@ export default {
   },
   source: {
     from: '{source} kaynağından indirildi',
+  },
+  share: {
+    titleTrack: 'Parçayı Paylaş',
+    titlePlaylist: 'Çalma Listesini Paylaş',
+    description: 'Bu bağlantıya sahip olan herkes giriş yapmadan dinleyebilir.',
+    copied: 'Paylaşım bağlantısı panoya kopyalandı',
+    copyLink: 'Bağlantıyı kopyala',
+    linkCopied: 'Kopyalandı!',
+    notFound: 'Paylaşım bulunamadı veya artık mevcut değil',
+    playingShared: 'Downtify ile paylaşıldı',
+    queue: 'Kuyruk',
+    removeFromQueue: 'Kuyruktan kaldır',
   },
 }

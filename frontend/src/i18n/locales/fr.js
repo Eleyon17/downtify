@@ -45,6 +45,7 @@ export default {
   },
   actions: {
     play: 'Lire',
+    pause: 'Pause',
     playAll: 'Tout lire',
     playItem: 'Lire {name}',
     playPreview: 'Écouter un extrait de {name}',
@@ -60,6 +61,7 @@ export default {
     download: 'Télécharger',
     downloadItem: 'Télécharger {name}',
     delete: 'Supprimer de la bibliothèque',
+    share: 'Partager',
   },
   home: {
     greetingMorning: 'Bonjour',
@@ -559,6 +561,13 @@ export default {
     nothingYetHint:
       'Les titres apparaissent ici à mesure qu’ils sont téléchargés.',
     nothingYetManualHint: 'Ajoutez des titres depuis votre bibliothèque.',
+    suggestionsTitle: 'Suggestions',
+    suggestionsHint: 'Téléchargez les titres suggérés et ajoutez-les à cette playlist',
+    suggestionsDismiss: 'Ignorer la suggestion',
+    suggestionsAddToPlaylist: 'Ajouter à la playlist',
+    suggestionsAdded: 'Ajouté à la playlist',
+    suggestionsEmpty: 'Aucune autre suggestion pour le moment',
+    suggestionsRefresh: 'Actualiser les suggestions',
   },
   track: {
     title: 'Titre',
@@ -593,6 +602,9 @@ export default {
     volume: 'Volume',
     mute: 'Couper le son',
     unmute: 'Rétablir le son',
+    cast: 'Caster',
+    castingTo: 'Diffusion vers {device}',
+    disconnectCast: 'Déconnecter la diffusion',
     playingFrom: {
       album: 'Lecture de l’album',
       playlist: 'Lecture de la playlist',
@@ -1461,5 +1473,17 @@ export default {
   },
   source: {
     from: 'Téléchargé depuis {source}',
+  },
+  share: {
+    titleTrack: 'Partager la piste',
+    titlePlaylist: 'Partager la playlist',
+    description: 'Toute personne possédant ce lien peut écouter sans se connecter.',
+    copied: 'Lien de partage copié dans le presse-papiers',
+    copyLink: 'Copier le lien',
+    linkCopied: 'Copié !',
+    notFound: 'Partage introuvable ou indisponible',
+    playingShared: 'Partagé avec Downtify',
+    queue: 'File d’attente',
+    removeFromQueue: 'Retirer de la file d’attente',
   },
 }

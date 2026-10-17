@@ -373,6 +373,16 @@
                     </button>
                   </template>
                 </UiMenu>
+                <button
+                  type="button"
+                  class="flex size-10 items-center justify-center rounded-full transition-colors hover:bg-white/10"
+                  :class="cast.isConnected.value ? 'text-accent' : 'text-white/75'"
+                  :aria-label="cast.isConnected.value ? t('player.castingTo', { device: cast.deviceName.value }) : t('player.cast')"
+                  :title="cast.isConnected.value ? t('player.castingTo', { device: cast.deviceName.value }) : t('player.cast')"
+                  @click="cast.toggleCast()"
+                >
+                  <AppIcon :name="cast.isConnected.value ? 'cast-connected' : 'cast'" :size="20" />
+                </button>
                 <VolumeControl
                   width="w-28"
                   track-class="bg-white/20"
@@ -424,6 +434,16 @@
                     </button>
                   </template>
                 </UiMenu>
+                <button
+                  type="button"
+                  class="flex size-10 items-center justify-center rounded-full transition-colors hover:bg-white/10"
+                  :class="cast.isConnected.value ? 'text-accent' : 'text-white/75'"
+                  :aria-label="cast.isConnected.value ? t('player.castingTo', { device: cast.deviceName.value }) : t('player.cast')"
+                  :title="cast.isConnected.value ? t('player.castingTo', { device: cast.deviceName.value }) : t('player.cast')"
+                  @click="cast.toggleCast()"
+                >
+                  <AppIcon :name="cast.isConnected.value ? 'cast-connected' : 'cast'" :size="20" />
+                </button>
               </div>
               <div class="flex gap-2">
                 <button
@@ -467,6 +487,7 @@ import UpNextPanel from '../player/UpNextPanel.vue'
 import TrackDetails from '../player/TrackDetails.vue'
 import EqualizerPanel from '../player/EqualizerPanel.vue'
 import { usePlayer } from '/src/model/player'
+import { useCast } from '/src/model/cast'
 import { useDownloadManager, useProgressTracker } from '/src/model/download'
 import { useLibrary } from '/src/model/library'
 import { useUi } from '/src/model/ui'
@@ -479,6 +500,7 @@ import { saveName } from '/src/lib/paths'
 import { useI18n } from '/src/i18n'
 
 const player = usePlayer()
+const cast = useCast()
 const library = useLibrary()
 const dm = useDownloadManager()
 const tracker = useProgressTracker()

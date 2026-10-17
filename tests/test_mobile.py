@@ -16,6 +16,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from unittest.mock import patch
+
 import pytest
 from mutagen.id3 import APIC, ID3, TALB, TIT2, TPE1
 from starlette.testclient import TestClient
@@ -746,3 +748,41 @@ def test_discovery_can_be_turned_off(monkeypatch, value, enabled):
 def test_a_bound_host_is_the_only_address_announced():
     assert local_addresses('192.168.1.20') == ['192.168.1.20']
     assert all(not a.startswith('127.') for a in local_addresses('0.0.0.0'))
+
+
+def test_mobile_playlist_suggestions_and_add_track(client, app_dirs):
+    downloads, _data = app_dirs
+    _make_mp3(downloads / 'Artist' / 'Album' / 'Song.mp3')
+    pl_dir = downloads / 'Playlists'
+    pl_dir.mkdir(parents=True, exist_ok=True)
+    m3u_path = pl_dir / 'MobileMix.m3u'
+    m3u_path.write_text('#EXTM3U\n#EXTDOWNTIFY:manual\n')
+
+    mock_suggestions = {
+        'playlist': 'MobileMix',
+        'suggestions': [
+            {
+                'song_id': 'mob-1',
+                'name': 'Cool Vibe Song',
+                'artist': 'Vibe Master',
+            }
+        ],
+    }
+    with patch(
+        'downtify.mobile_routes.get_playlist_suggestions',
+        return_value=mock_suggestions,
+    ):
+        res = client.get('/api/v1/playlists/MobileMix/suggestions')
+        assert res.status_code == 200
+        data = res.json()
+        assert data['playlist'] == 'MobileMix'
+        assert data['suggestions'][0]['name'] == 'Cool Vibe Song'
+
+    track_id = _library(client)['tracks'][0]['id']
+    add_res = client.post(
+        '/api/v1/playlists/MobileMix/tracks',
+        json={'track_id': track_id},
+    )
+    assert add_res.status_code == 200
+    assert add_res.json()['status'] == 'ok'
+    assert 'Artist/Album/Song.mp3' in m3u_path.read_text(encoding='utf-8')

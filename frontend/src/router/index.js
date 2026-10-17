@@ -109,6 +109,12 @@ const routes = [
     name: 'Settings',
     component: () => import('/src/views/SettingsView.vue'),
   },
+  {
+    path: '/share/:id',
+    name: 'Share',
+    component: () => import('/src/views/ShareView.vue'),
+    meta: { public: true },
+  },
   // 2.x paths, kept so bookmarks and the PWA start URL still work.
   { path: '/download', redirect: { name: 'Queue' } },
   { path: '/player', redirect: { name: 'Home', query: { np: '1' } } },

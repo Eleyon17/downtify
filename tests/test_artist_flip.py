@@ -145,3 +145,67 @@ def test_endpoint_passes_the_download_dir(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(api, '_artist_profile_download_dir', lambda: tmp_path)
     assert api.artist_overview_endpoint(name='Band') == {'name': 'Band'}
     assert seen['args'] == ('Band', tmp_path)
+
+
+def test_overview_covers_crossfill_and_fallback(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(providers, 'resolve_artist_id', lambda name: 'UC123')
+    monkeypatch.setattr(
+        providers,
+        'artist_info_from_channel_id',
+        lambda cid: {'name': 'Artist', 'cover_url': '', 'description': 'Bio'},
+    )
+    monkeypatch.setattr(
+        providers,
+        'artist_top_songs_from_channel_id',
+        lambda cid: [
+            {'name': 'Song 1', 'album_name': 'Album 1', 'cover_url': ''},
+            {'name': 'Song 2', 'album_name': 'Album 2', 'song_id': 'vid123', 'cover_url': ''},
+        ],
+    )
+    monkeypatch.setattr(
+        providers,
+        'artist_top_albums_from_channel_id',
+        lambda cid: [
+            {'name': 'Album 1', 'cover_url': 'https://img/album1.jpg'},
+            {'name': 'Album 2', 'cover_url': ''},
+        ],
+    )
+
+    result = artist_flip.artist_overview('Artist', tmp_path)
+
+    # Song 1 got cover from Album 1 matching by name
+    assert result['top_songs'][0]['cover_url'] == 'https://img/album1.jpg'
+    # Song 2 got cover from YouTube video id fallback
+    assert result['top_songs'][1]['cover_url'] == 'https://i.ytimg.com/vi/vid123/hqdefault.jpg'
+    # Album 2 got crossfilled cover from Song 2
+    assert result['top_albums'][1]['cover_url'] == 'https://i.ytimg.com/vi/vid123/hqdefault.jpg'
+    # Overall cover resolved from available album cover
+    assert result['cover_url'] == 'https://img/album1.jpg'
+
+
+def test_artist_top_albums_falls_back_to_singles(monkeypatch):
+    class FakeYTM:
+        def get_artist(self, channel_id):
+            return {
+                'name': 'Indie Artist',
+                'albums': {'results': []},
+                'singles': {
+                    'results': [
+                        {
+                            'title': 'Hit Single',
+                            'browseId': 'MPREb_single1',
+                            'thumbnails': [{'url': 'https://img/single1.jpg'}],
+                            'year': '2024',
+                        }
+                    ]
+                },
+            }
+
+    monkeypatch.setattr(providers, '_ytm', lambda: FakeYTM())
+    albums = providers.artist_top_albums_from_channel_id('UC_indie')
+    assert len(albums) == 1
+    assert albums[0]['name'] == 'Hit Single'
+    assert albums[0]['cover_url'] == 'https://img/single1.jpg'
+    assert albums[0]['release_type'] == 'Single'
+
+

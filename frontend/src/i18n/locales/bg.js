@@ -45,6 +45,7 @@ export default {
   },
   actions: {
     play: 'Пусни',
+    pause: 'Пауза',
     playAll: 'Пусни всички',
     playItem: 'Пусни {name}',
     playPreview: 'Чуй откъс от {name}',
@@ -60,6 +61,7 @@ export default {
     download: 'Изтегли',
     downloadItem: 'Изтегли {name}',
     delete: 'Изтрий от библиотеката',
+    share: 'Споделяне',
   },
   home: {
     greetingMorning: 'Добро утро',
@@ -539,6 +541,13 @@ export default {
     nothingYet: 'Още няма изтеглени песни',
     nothingYetHint: 'Песните се появяват тук, когато се изтеглят.',
     nothingYetManualHint: 'Добави песни от библиотеката.',
+    suggestionsTitle: 'Предложения',
+    suggestionsHint: 'Изтеглете предложени песни и ги добавете към този плейлист',
+    suggestionsDismiss: 'Отхвърляне на предложението',
+    suggestionsAddToPlaylist: 'Добавяне към плейлиста',
+    suggestionsAdded: 'Добавено към плейлиста',
+    suggestionsEmpty: 'Няма повече предложения в момента',
+    suggestionsRefresh: 'Обновяване на предложенията',
   },
   track: {
     title: 'Заглавие',
@@ -573,6 +582,9 @@ export default {
     volume: 'Сила на звука',
     mute: 'Заглуши',
     unmute: 'Включи звука',
+    cast: 'Предаване',
+    castingTo: 'Предаване към {device}',
+    disconnectCast: 'Прекъсване на предаването',
     playingFrom: {
       album: 'Звучи от албум',
       playlist: 'Звучи от плейлист',
@@ -1436,5 +1448,17 @@ export default {
   },
   source: {
     from: 'Изтеглено от {source}',
+  },
+  share: {
+    titleTrack: 'Споделяне на песен',
+    titlePlaylist: 'Споделяне на плейлист',
+    description: 'Всеки с тази връзка може да слуша без влизане в профила.',
+    copied: 'Връзката за споделяне е копирана в клипборда',
+    copyLink: 'Копиране на връзка',
+    linkCopied: 'Копирано!',
+    notFound: 'Споделянето не е намерено или вече не е налично',
+    playingShared: 'Споделено с Downtify',
+    queue: 'Опашка',
+    removeFromQueue: 'Премахване от опашката',
   },
 }

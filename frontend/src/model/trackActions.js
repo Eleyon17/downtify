@@ -10,6 +10,7 @@ import { useReplaceAudio } from '/src/model/replaceAudio'
 import { canReplace } from '/src/lib/replaceAudio'
 import { saveName } from '/src/lib/paths'
 import { useI18n } from '/src/i18n'
+import { useShares } from '/src/model/shares'
 
 export function useTrackActions() {
   const player = usePlayer()
@@ -18,6 +19,7 @@ export function useTrackActions() {
   const ui = useUi()
   const auth = useAuth()
   const replaceAudio = useReplaceAudio()
+  const shares = useShares()
   const router = useRouter()
   const { t } = useI18n()
 
@@ -155,6 +157,11 @@ export function useTrackActions() {
         label: t('library.saveToDevice'),
         icon: 'download',
         action: () => saveToDevice(track),
+      },
+      {
+        label: t('actions.share'),
+        icon: 'share',
+        action: () => shares.shareTrack(track),
       },
       {
         // Wrong song or version: pick the right one by hand (admins).

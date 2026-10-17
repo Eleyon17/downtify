@@ -1,5 +1,9 @@
 <template>
-  <SignIn v-if="auth.mustSignIn.value" />
+  <div v-if="isShareRoute" class="min-h-dvh bg-bg text-fg">
+    <RouterView />
+    <UiToasts />
+  </div>
+  <SignIn v-else-if="auth.mustSignIn.value" />
   <div v-else class="flex min-h-dvh bg-bg text-fg">
     <SideNav class="hidden md:flex" />
     <div class="flex min-w-0 flex-1 flex-col">
@@ -26,13 +30,14 @@
     <CreatePlaylistModal />
     <RenamePlaylistModal />
     <AddTracksToPlaylistModal />
+    <ShareModal />
     <DefaultPasswordPrompt />
     <ReplaceAudioDialog v-if="auth.isAdmin.value" />
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SideNav from './SideNav.vue'
 import TopBar from './TopBar.vue'
@@ -45,6 +50,7 @@ import UiDialog from '../ui/UiDialog.vue'
 import CreatePlaylistModal from '../library/CreatePlaylistModal.vue'
 import RenamePlaylistModal from '../library/RenamePlaylistModal.vue'
 import AddTracksToPlaylistModal from '../library/AddTracksToPlaylistModal.vue'
+import ShareModal from '../library/ShareModal.vue'
 import SignIn from './SignIn.vue'
 import DefaultPasswordPrompt from './DefaultPasswordPrompt.vue'
 import ReplaceAudioDialog from '../library/ReplaceAudioDialog.vue'
@@ -70,13 +76,19 @@ const ui = useUi()
 const nowPlaying = useNowPlaying()
 const shortcutsOpen = ref(false)
 
+const isShareRoute = computed(
+  () => route.name === 'Share' || route.path.startsWith('/share/')
+)
+
 // The Now playing overlay lives in the query string (?np=1); it must not
 // remount the page underneath it.
 function viewKey(viewRoute) {
   return viewRoute.meta.viewKey || viewRoute.path
 }
 
-useLibrary().load()
+if (!route.path.startsWith('/share/')) {
+  useLibrary().load()
+}
 // The account's own preferences (theme, language...) and telling the
 // server what plays here, once someone is signed in.
 watch(

@@ -16,6 +16,7 @@
         alt=""
         loading="lazy"
         decoding="async"
+        referrerpolicy="no-referrer"
         class="size-full min-h-0 min-w-0 object-cover"
         :class="i === 0 && mosaic.length === 3 ? 'row-span-2' : ''"
       />
@@ -24,8 +25,9 @@
       v-else-if="imageSrc && !failed"
       :src="imageSrc"
       :alt="alt"
-      loading="lazy"
+      :loading="letterSize <= 24 ? 'eager' : 'lazy'"
       decoding="async"
+      referrerpolicy="no-referrer"
       class="size-full object-cover transition-opacity duration-300"
       :class="ready ? 'opacity-100' : 'opacity-0'"
       @load="ready = true"
@@ -72,29 +74,52 @@ const props = defineProps({
   // The icon on a fixed tile, whatever art or name there is — for
   // collections that are recognised by what they are, like liked songs.
   symbol: { type: Boolean, default: false },
-  // Optional second image tried once `src` fails to load, before giving up
-  // on the initials: for a `src` that may simply not exist (an artist photo
-  // from a proxy), with a picture known to. Unset = today's behaviour.
-  fallback: { type: String, default: '' },
+  // Optional image or list of images tried when `src` fails to load,
+  // before falling back to initials.
+  fallback: { type: [String, Array], default: '' },
 })
 
 const failed = ref(false)
 const ready = ref(false)
-const usingFallback = ref(false)
+const fallbackIndex = ref(0)
+const currentSrc = ref('')
+
+const fallbackList = computed(() => {
+  if (Array.isArray(props.fallback)) {
+    return props.fallback.filter((u) => u && typeof u === 'string')
+  }
+  if (props.fallback && typeof props.fallback === 'string') {
+    return [props.fallback]
+  }
+  return []
+})
+
+const fallbackKey = computed(() =>
+  Array.isArray(props.fallback)
+    ? props.fallback.filter(Boolean).join('|')
+    : String(props.fallback || '')
+)
+
 watch(
-  () => props.src,
+  () => [props.src, fallbackKey.value],
   () => {
     failed.value = false
     ready.value = false
-    usingFallback.value = false
-  }
+    const initialSrc = props.src || fallbackList.value[0] || ''
+    currentSrc.value = initialSrc
+    fallbackIndex.value = props.src ? 0 : 1
+  },
+  { immediate: true }
 )
 
 function onImageError() {
-  if (props.fallback && !usingFallback.value) {
-    usingFallback.value = true
-    ready.value = false
-    return
+  while (fallbackIndex.value < fallbackList.value.length) {
+    const nextCandidate = fallbackList.value[fallbackIndex.value++]
+    if (nextCandidate && nextCandidate !== currentSrc.value) {
+      currentSrc.value = nextCandidate
+      ready.value = false
+      return
+    }
   }
   failed.value = true
 }
@@ -102,12 +127,11 @@ function onImageError() {
 // A real cover always wins: a playlist with its own artwork shows it
 // instead of a grid of the tracks it happens to contain.
 const mosaic = computed(() =>
-  props.symbol || props.src ? [] : props.covers.filter(Boolean)
+  props.symbol || props.src || fallbackList.value.length ? [] : props.covers.filter(Boolean)
 )
 const imageSrc = computed(() => {
   if (props.symbol) return ''
-  if (usingFallback.value) return props.fallback
-  return props.src || mosaic.value[0] || ''
+  return currentSrc.value || mosaic.value[0] || ''
 })
 const letters = computed(() => (props.symbol ? '' : initials(props.name)))
 const showFallback = computed(

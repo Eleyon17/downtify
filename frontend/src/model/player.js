@@ -288,6 +288,36 @@ function moveUpcoming(fromPos, toPos) {
   moveTrack(actualFrom, actualTo)
 }
 
+/** Pull a song further down the upcoming queue to "now playing", leaving the rest of the queue as is. */
+function playUpcoming(fromPos) {
+  if (fromPos < 0) return
+  const list = playlist.value
+  if (!list.length) return
+
+  if (shuffle.value && shuffleOrder.length === list.length) {
+    const actualFrom = shufflePos + 1 + fromPos
+    if (actualFrom >= shuffleOrder.length) return
+    const [targetIdx] = shuffleOrder.splice(actualFrom, 1)
+    shuffleOrder.splice(shufflePos + 1, 0, targetIdx)
+    shuffleVersion.value += 1
+    playAt(targetIdx)
+    return
+  }
+
+  const current = currentIndex.value
+  const actualFrom = current >= 0 ? current + 1 + fromPos : fromPos
+  if (actualFrom >= list.length) return
+
+  const toIndex = current >= 0 ? current + 1 : 0
+  const newList = list.slice()
+  const [track] = newList.splice(actualFrom, 1)
+  newList.splice(toIndex, 0, track)
+  playlist.value = newList
+  currentIndex.value = toIndex
+
+  playAt(toIndex)
+}
+
 function removeAt(index) {
   if (index < 0 || index >= playlist.value.length) return
   const list = playlist.value.slice()
@@ -337,6 +367,25 @@ function refreshTracks(byFile) {
     return track
   })
   if (changed) playlist.value = list
+}
+
+/** Update a queued track when its underlying file was renamed / upgraded. */
+function updateTrackFile(oldFile, newTrack) {
+  let changed = false
+  const list = playlist.value.map((track) => {
+    if (track.file === oldFile) {
+      changed = true
+      return newTrack
+    }
+    return track
+  })
+  if (changed) {
+    playlist.value = list
+    const cur = playlist.value[currentIndex.value]
+    if (cur?.file === newTrack.file && audio && !isPlaying.value) {
+      audio.src = newTrack.url
+    }
+  }
 }
 
 function stop() {
@@ -853,15 +902,18 @@ export function usePlayer() {
     playNext,
     moveTrack,
     moveUpcoming,
+    playUpcoming,
     removeAt,
     clearUpcoming,
     forgetFiles,
     refreshTracks,
+    updateTrackFile,
     stop,
     playAt,
     play,
     pause,
     toggle,
+    togglePlay: toggle,
     seek,
     seekRatio,
     seekBy,
@@ -875,5 +927,6 @@ export function usePlayer() {
     setShuffle,
     toggleShuffle,
     setSleepTimer,
+    getAudio: ensureAudio,
   }
 }

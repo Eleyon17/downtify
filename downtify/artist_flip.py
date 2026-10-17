@@ -19,15 +19,35 @@ YouTube Music round-trips every time.
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Optional
+from urllib.parse import quote
 
 from loguru import logger
 
 from downtify import artist_profile, providers
+
+def _normalize_title(text: str) -> str:
+    if not text:
+        return ''
+    s = text.strip().lower()
+    s = re.sub(
+        r'\s*[\(\[][^\)\]]*(edition|deluxe|version|bonus|remaster|anniversary|revisited|expanded|explicit|single|ep)[^\)\]]*[\)\]]',
+        ' ',
+        s,
+        flags=re.IGNORECASE,
+    )
+    s = re.sub(
+        r'\b(deluxe|edition|version|remastered|remaster|anniversary|revisited|expanded|explicit|single|ep)\b',
+        ' ',
+        s,
+        flags=re.IGNORECASE,
+    )
+    return ' '.join(re.sub(r'[^\w\s]', '', s).split())
 
 #: How long one artist's overview is served from memory.
 CACHE_TTL_SECONDS = 6 * 60 * 60
@@ -93,12 +113,27 @@ def _channel_id(profile: dict[str, Any], name: str) -> str:
     if saved:
         return saved
     try:
-        return providers.resolve_artist_id(name) or ''
+        cid = providers.resolve_artist_id(name)
+        if cid:
+            return cid
     except Exception:
         logger.opt(exception=True).debug(
             'YouTube Music artist lookup failed for {!r}', name
         )
-        return ''
+
+    # For collaboration or featured artist tags like "Artist A; Artist B" or
+    # "Artist A feat. Artist B", try the primary artist name.
+    for delim in (';', '/', ' feat. ', ' feat ', ' ft. ', ' ft ', ' & ', ', '):
+        if delim in name:
+            primary = name.split(delim)[0].strip()
+            if primary and primary != name:
+                try:
+                    cid = providers.resolve_artist_id(primary)
+                    if cid:
+                        return cid
+                except Exception:
+                    pass
+    return ''
 
 
 def _safe(fn: Callable[[str], Any], channel_id: str, empty: Any) -> Any:
@@ -168,6 +203,89 @@ def artist_overview(
         bio = str(profile.get('bio') or '').strip()
         bio_source = BIO_SOURCE_PROFILE if bio else ''
 
+    artist_cover = str(info.get('cover_url') or profile.get('cover_url') or '')
+    top_songs = [dict(s) for s in songs[:TOP_SONGS_LIMIT]]
+    top_albums = [dict(a) for a in albums[:TOP_ALBUMS_LIMIT]]
+
+    album_cover_by_name = {
+        _normalize_title(a['name']): a['cover_url']
+        for a in top_albums
+        if a.get('name') and a.get('cover_url')
+    }
+
+    for s in top_songs:
+        if not s.get('cover_url'):
+            alb = _normalize_title(s.get('album_name', ''))
+            if alb and alb in album_cover_by_name:
+                s['cover_url'] = album_cover_by_name[alb]
+            elif s.get('song_id'):
+                s['cover_url'] = f"https://i.ytimg.com/vi/{s['song_id']}/hqdefault.jpg"
+            elif artist_cover:
+                s['cover_url'] = artist_cover
+
+    # Rebuild song_cover_by_album AFTER resolving top_songs covers,
+    # so video thumbnails and filled covers propagate to top_albums!
+    song_cover_by_album = {
+        _normalize_title(s['album_name']): s['cover_url']
+        for s in top_songs
+        if s.get('album_name') and s.get('cover_url')
+    }
+
+    # Find any local covers from download_dir for this artist
+    local_covers: dict[str, str] = {}
+    if download_dir and download_dir.exists():
+        try:
+            artist_folder = None
+            for d in download_dir.iterdir():
+                if d.is_dir() and d.name.strip().lower() == clean.lower():
+                    artist_folder = d
+                    break
+            if artist_folder:
+                for alb_dir in artist_folder.iterdir():
+                    if alb_dir.is_dir():
+                        alb_norm = _normalize_title(alb_dir.name)
+                        audio_file = next(
+                            (
+                                f for f in alb_dir.iterdir()
+                                if f.is_file() and f.suffix.lower() in {'.flac', '.mp3', '.m4a', '.ogg', '.opus'}
+                            ),
+                            None,
+                        )
+                        if audio_file:
+                            rel = audio_file.relative_to(download_dir).as_posix()
+                            local_covers[alb_norm] = f'/cover?file={quote(rel)}'
+                        elif (alb_dir / 'cover.jpg').exists():
+                            rel = (alb_dir / 'cover.jpg').relative_to(download_dir).as_posix()
+                            local_covers[alb_norm] = f'/cover?file={quote(rel)}'
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Failed scanning local covers for {!r}', clean
+            )
+
+    for a in top_albums:
+        if not a.get('cover_url'):
+            alb_name = _normalize_title(a.get('name', ''))
+            if alb_name and alb_name in song_cover_by_album:
+                a['cover_url'] = song_cover_by_album[alb_name]
+            elif alb_name and alb_name in local_covers:
+                a['cover_url'] = local_covers[alb_name]
+            elif artist_cover:
+                a['cover_url'] = artist_cover
+
+    resolved_cover = artist_cover
+    if not resolved_cover:
+        for item in top_albums + top_songs:
+            if item.get('cover_url'):
+                resolved_cover = item['cover_url']
+                break
+    if not resolved_cover and local_covers:
+        resolved_cover = next(iter(local_covers.values()))
+
+    # Guarantee no album is left with an empty cover_url when an artist/local cover is known
+    for a in top_albums:
+        if not a.get('cover_url') and resolved_cover:
+            a['cover_url'] = resolved_cover
+
     result = {
         'name': str(info.get('name') or clean),
         'channel_id': channel_id,
@@ -176,14 +294,14 @@ def artist_overview(
             if channel_id
             else ''
         ),
-        'cover_url': str(info.get('cover_url') or ''),
+        'cover_url': resolved_cover,
         'bio': bio,
         'bio_source': bio_source,
-        'top_songs': list(songs)[:TOP_SONGS_LIMIT],
-        'top_albums': list(albums)[:TOP_ALBUMS_LIMIT],
+        'top_songs': top_songs,
+        'top_albums': top_albums,
     }
     # A failed lookup isn't cached: the next flip tries again.
-    if channel_id and (bio or songs or albums):
+    if channel_id and (bio or top_songs or top_albums):
         _store(key, result, stamp)
     return result
 

@@ -45,6 +45,7 @@ export default {
   },
   actions: {
     play: 'Play',
+    pause: 'Pause',
     playAll: 'Play all',
     playItem: 'Play {name}',
     playPreview: 'Play a preview of {name}',
@@ -60,6 +61,7 @@ export default {
     download: 'Download',
     downloadItem: 'Download {name}',
     delete: 'Delete from library',
+    share: 'Share',
   },
   home: {
     greetingMorning: 'Good morning',
@@ -536,6 +538,13 @@ export default {
     nothingYet: 'No tracks yet',
     nothingYetHint: 'Tracks appear here as they finish downloading.',
     nothingYetManualHint: 'Add songs from your library.',
+    suggestionsTitle: 'Suggestions',
+    suggestionsHint: 'Download suggested songs and add to this playlist',
+    suggestionsDismiss: 'Dismiss suggestion',
+    suggestionsAddToPlaylist: 'Add to playlist',
+    suggestionsAdded: 'Added to playlist',
+    suggestionsEmpty: 'No more suggestions right now',
+    suggestionsRefresh: 'Refresh suggestions',
   },
   track: {
     title: 'Title',
@@ -570,6 +579,9 @@ export default {
     volume: 'Volume',
     mute: 'Mute',
     unmute: 'Unmute',
+    cast: 'Cast',
+    castingTo: 'Casting to {device}',
+    disconnectCast: 'Disconnect Cast',
     playingFrom: {
       album: 'Playing from album',
       playlist: 'Playing from playlist',
@@ -1410,5 +1422,17 @@ export default {
   },
   source: {
     from: 'Downloaded from {source}',
+  },
+  share: {
+    titleTrack: 'Share Track',
+    titlePlaylist: 'Share Playlist',
+    description: 'Anyone with this link can listen without logging in.',
+    copied: 'Share link copied to clipboard',
+    copyLink: 'Copy link',
+    linkCopied: 'Copied!',
+    notFound: 'Share not found or no longer available',
+    playingShared: 'Shared with Downtify',
+    queue: 'Queue',
+    removeFromQueue: 'Remove from queue',
   },
 }

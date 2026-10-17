@@ -14,6 +14,7 @@ import { usePlayer } from '/src/model/player'
 import { useHistory } from '/src/model/history'
 import { useI18n } from '/src/i18n'
 import { itemTrackCount } from '/src/lib/library'
+import { useShares } from '/src/model/shares'
 
 const createOpen = ref(false)
 const createFiles = ref([])
@@ -26,6 +27,7 @@ export function usePlaylistActions() {
   const library = useLibrary()
   const likes = useLikes()
   const tracks = useTrackActions()
+  const shares = useShares()
   const ui = useUi()
   const player = usePlayer()
   const history = useHistory()
@@ -336,6 +338,11 @@ export function usePlaylistActions() {
         icon: 'zip',
         hidden: empty,
         action: () => tracks.downloadZip(playlist.tracks),
+      },
+      {
+        label: t('actions.share'),
+        icon: 'share',
+        action: () => shares.sharePlaylist(playlist),
       },
       { divider: true },
       {

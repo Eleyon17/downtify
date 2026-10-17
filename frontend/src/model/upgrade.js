@@ -117,7 +117,12 @@ API.onMessage((data) => {
     clearTimeout(jobTimer)
     jobTimer = null
     refreshJobs()
-    useLibrary().refreshSoon(500)
+    const lib = useLibrary()
+    lib.tracksComplete.value = false
+    lib.albumsComplete.value = false
+    lib.artistsComplete.value = false
+    lib.load({ force: true })
+    lib.ensureTracks({ force: true })
   } else if (!jobTimer) {
     // Rows change far faster than anyone can read them; while a run is
     // going, poll them at a human pace instead of once per track.

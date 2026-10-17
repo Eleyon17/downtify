@@ -416,6 +416,7 @@ class UpgradeOutcome:
     changed: list[str] = field(default_factory=list)
     artwork_px: int = 0
     artwork_source: str = ''
+    new_path: Optional[str] = None
 
 
 @dataclass
@@ -430,6 +431,7 @@ class UpgradeDeps:
     publish: Optional[Callable[[dict[str, Any]], None]] = None
     rekey_owners: Optional[Callable[[str, str, str], None]] = None
     downloader: Optional[Callable[[], Any]] = None
+    on_track_path_changed: Optional[Callable[[str, str, Path], None]] = None
 
 
 def resolve_track(stored_path: str, ctx: LibraryContext) -> Optional[Path]:
@@ -651,6 +653,10 @@ def upgrade_track(
         target_bitrate = str(options.target_bitrate or '320')
         basename = f"{full.stem}{UPGRADE_STAGING_MARKER}"
         stat = full.stat()
+        try:
+            old_key = file_content_key(full) or ''
+        except Exception:
+            old_key = ''
 
         staged_path: Optional[Path] = None
         try:
@@ -730,21 +736,52 @@ def upgrade_track(
                 except Exception:
                     logger.debug('Metadata cache refresh failed')
 
-            if new_stored != old_stored and ctx.download_dir:
+            if new_stored != old_stored:
+                if ctx.download_dir:
+                    try:
+                        from .m3u import iter_m3u_files
+                        for m3u_path in iter_m3u_files(ctx.download_dir):
+                            try:
+                                text = m3u_path.read_text(encoding='utf-8')
+                                if old_stored in text:
+                                    m3u_path.write_text(
+                                        text.replace(old_stored, new_stored),
+                                        encoding='utf-8',
+                                    )
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
                 try:
-                    from .m3u import iter_m3u_files
-                    for m3u_path in iter_m3u_files(ctx.download_dir):
-                        try:
-                            text = m3u_path.read_text(encoding='utf-8')
-                            if old_stored in text:
-                                m3u_path.write_text(
-                                    text.replace(old_stored, new_stored),
-                                    encoding='utf-8',
-                                )
-                        except Exception:
-                            pass
+                    from .library_catalog import drop_library_listing_files, merge_library_listing_file
+                    drop_library_listing_files(ctx, [old_stored])
+                    merge_library_listing_file(ctx, new_stored)
                 except Exception:
-                    pass
+                    logger.opt(exception=True).debug('Library listing RAM update failed')
+
+                try:
+                    from .library_paths_cache import invalidate_library_paths_cache
+                    invalidate_library_paths_cache(drop_entries=True, notify=True)
+                except Exception:
+                    logger.opt(exception=True).debug('Library paths cache invalidation failed')
+
+                if old_key and deps.rekey_owners is not None:
+                    try:
+                        new_key = file_content_key(final_path) or ''
+                        if new_key:
+                            deps.rekey_owners(old_key, new_key, new_stored)
+                    except Exception:
+                        logger.opt(exception=True).debug(
+                            'Library upgrade: could not rekey owners for {}',
+                            new_stored,
+                        )
+
+                if deps.on_track_path_changed is not None:
+                    try:
+                        deps.on_track_path_changed(old_stored, new_stored, final_path)
+                    except Exception:
+                        logger.opt(exception=True).debug('on_track_path_changed hook failed')
 
             return UpgradeOutcome(
                 JOB_DONE,
@@ -757,6 +794,7 @@ def upgrade_track(
                 changed=changed,
                 artwork_px=artwork.px,
                 artwork_source=artwork.source,
+                new_path=new_stored if new_stored != old_stored else None,
             )
         except Exception as exc:
             logger.opt(exception=True).warning(
@@ -1094,6 +1132,11 @@ class LibraryUpgradeRunner:
             state = STATE_CANCELLED if self._cancelled else STATE_PAUSED
             self.db.requeue_running(run_id)
             self.db.set_state(run_id, state)
+        try:
+            from .library_paths_cache import invalidate_library_paths_cache
+            invalidate_library_paths_cache(drop_entries=True, notify=True)
+        except Exception:
+            pass
         self._publish()
 
     def _process(
@@ -1127,9 +1170,16 @@ class LibraryUpgradeRunner:
             )
             outcome = UpgradeOutcome(JOB_FAILED, str(exc)[:200])
 
+        target_stored = outcome.new_path or stored
+        if outcome.new_path and outcome.new_path != stored:
+            try:
+                self.db.rekey_track(stored, outcome.new_path)
+            except Exception:
+                pass
+
         self.db.finish_job(
             run_id,
-            stored,
+            target_stored,
             outcome.status,
             detail=outcome.detail,
             changed=outcome.changed,
@@ -1139,7 +1189,7 @@ class LibraryUpgradeRunner:
             # stay due, so a later run for them still considers the
             # track.
             self.db.record_check(
-                stored,
+                target_stored,
                 todo,
                 app_version=self.deps.version,
                 artwork_px=outcome.artwork_px,

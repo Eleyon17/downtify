@@ -269,6 +269,13 @@ async function loadArtistTracks(name) {
   const text = String(name || '').trim()
   if (!text) return
   const res = await API.listTracks({ artist: text })
+  const incoming = (res.data || []).map(normalizeTrack)
+  const incomingFiles = new Set(incoming.map((t) => t.file))
+  const key = artistKey(text)
+  tracks.value = tracks.value.filter((t) => {
+    if (artistKey(t.artist) !== key) return true
+    return incomingFiles.has(t.file)
+  })
   mergeTrackRows(res.data)
   usePlayer().refreshTracks(tracksByFile.value)
 }
@@ -301,6 +308,30 @@ function refreshSoon(delay = 2500) {
 
 API.onMessage((data) => {
   if (data?.status === 'done') refreshSoon()
+  if (data?.type === 'track_path_changed' && data.old_file && data.new_file) {
+    const oldFile = data.old_file
+    const newFile = data.new_file
+    let replacedTrack = null
+    tracks.value = tracks.value.map((track) => {
+      if (track.file !== oldFile) return track
+      replacedTrack = normalizeTrack({
+        ...track,
+        file: newFile,
+      })
+      return replacedTrack
+    })
+    rawPlaylists.value = rawPlaylists.value.map((playlist) => ({
+      ...playlist,
+      files: (playlist.files || []).map((f) => (f === oldFile ? newFile : f)),
+    }))
+    if (replacedTrack) {
+      usePlayer().updateTrackFile(oldFile, replacedTrack)
+    }
+    usePlayer().refreshTracks(tracksByFile.value)
+  }
+  if (data?.type === 'library_changed') {
+    refreshSoon(1000)
+  }
 })
 
 function forget(files) {

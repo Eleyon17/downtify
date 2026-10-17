@@ -1038,3 +1038,60 @@ def test_format_upgrade_downloads_and_replaces_safely(
     assert 'format' in outcome.detail
     assert track.is_file()
 
+
+def test_format_upgrade_extension_change_and_hooks(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    from downtify.library_upgrade import CATEGORY_FORMAT, JOB_DONE
+
+    ctx = _context(tmp_path)
+    old_track = _write_track(ctx.download_dir / 'track.mp3')
+
+    monkeypatch.setattr(
+        'downtify.providers.find_match', lambda _s: ('video_match_flac', None)
+    )
+    monkeypatch.setattr(
+        'downtify.library_upgrade._audio_length', lambda _p: 180.0
+    )
+    monkeypatch.setattr(
+        'downtify.library_upgrade.embed_metadata', lambda *a, **k: None
+    )
+
+    class FakeDownloader:
+        def fetch_audio(self, video_id, target_dir, basename, **kwargs):
+            fmt = kwargs.get('audio_format') or 'flac'
+            staged = target_dir / f'{basename}.{fmt}'
+            staged.write_bytes(b'FLAC_MOCK_DATA_12345')
+            return staged
+
+    path_changed_calls = []
+
+    def on_path_changed(old, new, full):
+        path_changed_calls.append((old, new, full))
+
+    deps = UpgradeDeps(
+        context=lambda: ctx,
+        settings=lambda: {
+            'redownload_improper_format': True,
+            'format': 'flac',
+            'bitrate': '320',
+        },
+        downloader=lambda: FakeDownloader(),
+        on_track_path_changed=on_path_changed,
+    )
+    options = UpgradeOptions(
+        categories=(CATEGORY_FORMAT,),
+        check_format=True,
+        target_format='flac',
+        target_bitrate=320,
+    )
+
+    outcome = upgrade_track('track.mp3', deps=deps, options=options)
+    assert outcome.status == JOB_DONE
+    assert outcome.new_path == 'track.flac'
+    assert not old_track.exists()
+    new_track = ctx.download_dir / 'track.flac'
+    assert new_track.is_file()
+    assert len(path_changed_calls) == 1
+    assert path_changed_calls[0] == ('track.mp3', 'track.flac', new_track)
+

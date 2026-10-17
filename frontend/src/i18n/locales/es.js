@@ -45,6 +45,7 @@ export default {
   },
   actions: {
     play: 'Reproducir',
+    pause: 'Pausar',
     playAll: 'Reproducir todo',
     playItem: 'Reproducir {name}',
     playPreview: 'Escuchar un adelanto de {name}',
@@ -60,6 +61,7 @@ export default {
     download: 'Descargar',
     downloadItem: 'Descargar {name}',
     delete: 'Eliminar de la biblioteca',
+    share: 'Compartir',
   },
   home: {
     greetingMorning: 'Buenos días',
@@ -547,6 +549,13 @@ export default {
     nothingYet: 'Aún no hay canciones descargadas',
     nothingYetHint: 'Las canciones aparecen aquí a medida que se descargan.',
     nothingYetManualHint: 'Añade canciones de tu biblioteca.',
+    suggestionsTitle: 'Sugerencias',
+    suggestionsHint: 'Descarga canciones sugeridas y añádelas a esta lista de reproducción',
+    suggestionsDismiss: 'Descartar sugerencia',
+    suggestionsAddToPlaylist: 'Añadir a la lista de reproducción',
+    suggestionsAdded: 'Añadida a la lista de reproducción',
+    suggestionsEmpty: 'No hay más sugerencias en este momento',
+    suggestionsRefresh: 'Actualizar sugerencias',
   },
   track: {
     title: 'Título',
@@ -581,6 +590,9 @@ export default {
     volume: 'Volumen',
     mute: 'Silenciar',
     unmute: 'Activar sonido',
+    cast: 'Transmitir',
+    castingTo: 'Transmitiendo a {device}',
+    disconnectCast: 'Desconectar transmisión',
     playingFrom: {
       album: 'Reproduciendo del álbum',
       playlist: 'Reproduciendo de la playlist',
@@ -1453,5 +1465,17 @@ export default {
   },
   source: {
     from: 'Descargado desde {source}',
+  },
+  share: {
+    titleTrack: 'Compartir canción',
+    titlePlaylist: 'Compartir lista de reproducción',
+    description: 'Cualquiera con este enlace puede escuchar sin iniciar sesión.',
+    copied: 'Enlace copiado al portapapeles',
+    copyLink: 'Copiar enlace',
+    linkCopied: '¡Copiado!',
+    notFound: 'Enlace compartido no encontrado o ya no disponible',
+    playingShared: 'Compartido con Downtify',
+    queue: 'Cola',
+    removeFromQueue: 'Eliminar de la cola',
   },
 }

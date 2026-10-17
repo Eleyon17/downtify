@@ -45,6 +45,7 @@ export default {
   },
   actions: {
     play: 'Tocar',
+    pause: 'Pausar',
     playAll: 'Tocar tudo',
     playItem: 'Tocar {name}',
     playPreview: 'Ouvir uma prévia de {name}',
@@ -60,6 +61,7 @@ export default {
     download: 'Baixar',
     downloadItem: 'Baixar {name}',
     delete: 'Excluir da biblioteca',
+    share: 'Compartilhar',
   },
   home: {
     greetingMorning: 'Bom dia',
@@ -544,6 +546,13 @@ export default {
     nothingYet: 'Nenhuma faixa ainda',
     nothingYetHint: 'As faixas aparecem aqui conforme terminam de baixar.',
     nothingYetManualHint: 'Adicione músicas da biblioteca.',
+    suggestionsTitle: 'Sugestões',
+    suggestionsHint: 'Baixe músicas sugeridas e adicione a esta playlist',
+    suggestionsDismiss: 'Dispensar sugestão',
+    suggestionsAddToPlaylist: 'Adicionar à playlist',
+    suggestionsAdded: 'Adicionada à playlist',
+    suggestionsEmpty: 'Não há mais sugestões no momento',
+    suggestionsRefresh: 'Atualizar sugestões',
   },
   track: {
     title: 'Título',
@@ -578,6 +587,9 @@ export default {
     volume: 'Volume',
     mute: 'Silenciar',
     unmute: 'Ativar som',
+    cast: 'Transmitir',
+    castingTo: 'Transmitindo para {device}',
+    disconnectCast: 'Desconectar transmissão',
     playingFrom: {
       album: 'Tocando do álbum',
       playlist: 'Tocando da playlist',
@@ -1436,5 +1448,17 @@ export default {
   },
   source: {
     from: 'Baixado de {source}',
+  },
+  share: {
+    titleTrack: 'Compartilhar faixa',
+    titlePlaylist: 'Compartilhar playlist',
+    description: 'Qualquer pessoa com este link pode ouvir sem fazer login.',
+    copied: 'Link de compartilhamento copiado para a área de transferência',
+    copyLink: 'Copiar link',
+    linkCopied: 'Copiado!',
+    notFound: 'Compartilhamento não encontrado ou não disponível',
+    playingShared: 'Compartilhado com Downtify',
+    queue: 'Fila',
+    removeFromQueue: 'Remover da fila',
   },
 }

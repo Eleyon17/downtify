@@ -316,6 +316,27 @@ class PlaylistCatalog:
             ).fetchall()
         return [str(row['playlist_name']) for row in rows]
 
+    def update_filename(
+        self, old_filename: str, new_filename: str
+    ) -> list[str]:
+        """Update rows from old_filename to new_filename; return affected playlist names."""
+        old = _norm_path(old_filename)
+        new = _norm_path(new_filename)
+        if not old or not new or old == new:
+            return []
+        with self._connect() as conn:
+            conn.execute(
+                """UPDATE playlist_tracks SET filename = ?
+                   WHERE filename = ?""",
+                (new, old),
+            )
+            rows = conn.execute(
+                """SELECT DISTINCT playlist_name FROM playlist_tracks
+                   WHERE filename = ?""",
+                (new,),
+            ).fetchall()
+        return [str(row['playlist_name']) for row in rows]
+
     def playlists_by_content_keys(
         self, content_keys: list[str]
     ) -> dict[str, list[str]]:

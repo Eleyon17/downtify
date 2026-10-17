@@ -223,6 +223,47 @@ describe('usePlayer queue', () => {
     expect(player.currentTrack.value.title).toBe('One')
   })
 
+  it('pulls a song further down the upcoming queue to now playing and leaves the rest of the queue as is', () => {
+    player.setPlaylist([
+      'A - One.mp3',
+      'A - Two.mp3',
+      'A - Three.mp3',
+      'A - Four.mp3',
+      'A - Five.mp3',
+    ])
+    player.playAt(0)
+    expect(player.currentTrack.value.title).toBe('One')
+    expect(upcoming()).toEqual(['Two', 'Three', 'Four', 'Five'])
+
+    // Click 'Four' (position 2 in upcoming)
+    player.playUpcoming(2)
+    expect(player.currentTrack.value.title).toBe('Four')
+    expect(upcoming()).toEqual(['Two', 'Three', 'Five'])
+
+    // Next track plays 'Two'
+    player.next()
+    expect(player.currentTrack.value.title).toBe('Two')
+    expect(upcoming()).toEqual(['Three', 'Five'])
+  })
+
+  it('pulls a song further down the upcoming queue in shuffle mode and leaves the rest of the queue as is', () => {
+    player.setPlaylist([
+      'A - One.mp3',
+      'A - Two.mp3',
+      'A - Three.mp3',
+      'A - Four.mp3',
+      'A - Five.mp3',
+    ])
+    player.playAt(0)
+    player.setShuffle(true)
+    const before = upcoming()
+    const target = before[2] // 3rd upcoming song
+
+    player.playUpcoming(2)
+    expect(player.currentTrack.value.title).toBe(target)
+    expect(upcoming()).toEqual([before[0], before[1], before[3]])
+  })
+
   it('removes an upcoming track', () => {
     player.removeAt(2)
     expect(titles()).toEqual(['One', 'Two'])

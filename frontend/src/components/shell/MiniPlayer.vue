@@ -176,6 +176,14 @@
           size="sm"
           @click="nowPlaying.open('queue')"
         />
+        <UiIconButton
+          :icon="cast.isConnected.value ? 'cast-connected' : 'cast'"
+          :label="cast.isConnected.value ? t('player.castingTo', { device: cast.deviceName.value }) : t('player.cast')"
+          :active="cast.isConnected.value"
+          size="sm"
+          class="hidden sm:inline-flex"
+          @click="cast.toggleCast()"
+        />
         <!-- The slider is what gives when the row is tight, so the time
              next to it never has to. -->
         <VolumeControl class="hidden min-w-0 lg:flex" width="w-20 min-w-8" />
@@ -203,6 +211,7 @@ import SliderBar from '../player/SliderBar.vue'
 import { useSmoothTime } from '../player/useSmoothTime'
 import VolumeControl from '../player/VolumeControl.vue'
 import { usePlayer } from '/src/model/player'
+import { useCast } from '/src/model/cast'
 import { useDownloadManager, useProgressTracker } from '/src/model/download'
 import { useLibrary } from '/src/model/library'
 import { usePlayerPrefs } from '/src/model/playerPrefs'
@@ -211,6 +220,7 @@ import { formatDuration, widestClock } from '/src/lib/format'
 import { useI18n } from '/src/i18n'
 
 const player = usePlayer()
+const cast = useCast()
 const { showLyrics } = usePlayerPrefs()
 const nowPlaying = useNowPlaying()
 const { t } = useI18n()

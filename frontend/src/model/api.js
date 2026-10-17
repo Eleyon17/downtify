@@ -21,7 +21,7 @@ API.interceptors.response.use(
   (error) => {
     const url = String(error?.config?.url || '')
     const status = error?.response?.status
-    if (status === 401 && !url.startsWith('/api/auth/')) {
+    if (status === 401 && !url.startsWith('/api/auth/') && !url.startsWith('/api/share/')) {
       for (const fn of unauthorizedListeners) fn()
     }
     if (
@@ -426,6 +426,37 @@ function renameLibraryPlaylist(name, newName) {
   })
 }
 
+function getPlaylistSuggestions(name, dismissed = [], limit = 30) {
+  return API.post('/api/playlists/suggestions', {
+    name,
+    dismissed,
+    limit,
+  })
+}
+
+function addTrackToPlaylist(name, file) {
+  return API.post('/api/playlists/tracks/add', {
+    playlist_name: name,
+    file,
+  })
+}
+
+function createShare(payload) {
+  return API.post('/api/shares', payload)
+}
+
+function listShares() {
+  return API.get('/api/shares')
+}
+
+function deleteShare(shareId) {
+  return API.delete(`/api/shares/${encodeURIComponent(shareId)}`)
+}
+
+function getPublicShare(shareId) {
+  return API.get(`/api/share/${encodeURIComponent(shareId)}`)
+}
+
 function reconcileLibrary() {
   return API.post('/api/library/reconcile')
 }
@@ -491,6 +522,10 @@ function setPreferences(prefs) {
 
 function signOutEverywhere() {
   return API.post('/api/me/sign-out-everywhere')
+}
+
+function signUrls(items, ttl = 3600) {
+  return API.post('/api/v1/sign', { items, ttl })
 }
 
 // ── Users and activity (admins) ───────────────────────────────────────
@@ -825,6 +860,10 @@ export default {
   createLibraryPlaylist,
   editLibraryPlaylistTracks,
   renameLibraryPlaylist,
+  createShare,
+  listShares,
+  deleteShare,
+  getPublicShare,
   prepareLibraryArchive,
   libraryArchiveURL,
   reconcileLibrary,
@@ -845,6 +884,7 @@ export default {
   changeMyPassword,
   setPreferences,
   signOutEverywhere,
+  signUrls,
   listUsers,
   createUser,
   updateUser,
@@ -911,4 +951,6 @@ export default {
   ws_onmessage,
   ws_onerror,
   getVersion,
+  getPlaylistSuggestions,
+  addTrackToPlaylist,
 }

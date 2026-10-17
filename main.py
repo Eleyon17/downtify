@@ -88,6 +88,7 @@ from downtify.playlist_spotify_cache import (
 )
 from downtify.podcasts import PodcastStore
 from downtify.server_identity import ServerIdentity
+from downtify.shares import ShareStore
 from downtify.server_port import (
     DEFAULT_PORT,
     resolve_port,
@@ -347,6 +348,7 @@ def _open_library_stores(monitor_db_path: Path) -> None:
     api.state.track_owners = TrackOwners(library_db)
     api.state.traffic = TrafficCounters(library_db)
     api.state.podcasts = PodcastStore(library_db)
+    api.state.shares = ShareStore(library_db)
     # The mobile API (downtify/mobile_routes.py).
     api.state.library_sync = LibrarySync(library_db)
     api.state.transcoder = transcoder_from_env(DATABASE_DIR)
@@ -365,6 +367,7 @@ def _open_library_stores(monitor_db_path: Path) -> None:
             publish=api.broadcast_upgrade_progress,
             rekey_owners=api.rekey_file_owners,
             downloader=lambda: api.state.downloader,
+            on_track_path_changed=api.on_track_path_changed,
         ),
     )
     api.state.external_sync = ExternalSyncJob(

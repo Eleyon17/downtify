@@ -67,7 +67,7 @@
           <button
             type="button"
             class="flex min-w-0 flex-1 items-center gap-3 text-left"
-            @click="player.playAt(item.index)"
+            @click="player.playUpcoming(position)"
           >
             <CoverArt
               :src="item.track.hasCover ? item.track.cover : ''"

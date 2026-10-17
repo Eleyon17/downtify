@@ -109,7 +109,8 @@
                 @click="queueSong(song)"
               >
                 <CoverArt
-                  :src="song.cover_url"
+                  :src="songCover(song)"
+                  :fallback="songFallbackCovers(song)"
                   :name="song.album_name || song.name"
                   rounded="rounded-[6px]"
                   :letter-size="12"
@@ -160,7 +161,8 @@
                 @click="queueAlbum(album)"
               >
                 <CoverArt
-                  :src="album.cover_url"
+                  :src="albumCover(album)"
+                  :fallback="albumFallbackCovers(album)"
                   :name="album.name"
                   rounded="rounded-[6px]"
                   :letter-size="12"
@@ -257,6 +259,9 @@ const hasMoreBio = computed(() => {
 
 async function fetchOverview(name) {
   if (!name) return
+  if (library?.loadArtistTracks) {
+    library.loadArtistTracks(name)
+  }
   if (cache.has(name)) {
     overview.value = cache.get(name)
     return
@@ -290,13 +295,247 @@ function onFrontClick() {
 function toggleFlip() {
   if (!canFlip.value) return
   isFlipped.value = !isFlipped.value
-  if (isFlipped.value && !overview.value && !loading.value) {
-    fetchOverview(currentArtist.value)
+  if (isFlipped.value) {
+    if (library?.loadArtistTracks && currentArtist.value) {
+      library.loadArtistTracks(currentArtist.value)
+    }
+    if (!overview.value && !loading.value) {
+      fetchOverview(currentArtist.value)
+    }
   }
 }
 
+function normalizeAlbumTitle(title) {
+  if (!title || typeof title !== 'string') return ''
+  return title
+    .toLowerCase()
+    .replace(/\s*[\(\[][^\)\]]*(edition|deluxe|version|bonus|remaster|anniversary|revisited|expanded|explicit|single|ep)[^\)\]]*[\)\]]/gi, ' ')
+    .replace(/\b(deluxe|edition|version|remastered|remaster|anniversary|revisited|expanded|explicit|single|ep)\b/gi, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function songCoverCandidates(song) {
+  const candidates = []
+  const add = (url) => {
+    if (url && typeof url === 'string' && !candidates.includes(url)) {
+      candidates.push(url)
+    }
+  }
+
+  // 1. Direct song cover URL (remote YouTube/provider)
+  add(song.cover_url || song.cover)
+
+  // 2. Local library track cover
+  const localTrack = library.findTrack(songArtist(song) || currentArtist.value, song.name)
+  if (localTrack?.hasCover && localTrack?.cover) {
+    add(localTrack.cover)
+  }
+
+  const normSongAlbum = normalizeAlbumTitle(song.album_name)
+
+  // 3. Local library album cover
+  if (song.album_name) {
+    const localAlbum =
+      library.findAlbum(songArtist(song), song.album_name) ||
+      library.findAlbum(currentArtist.value, song.album_name)
+    if (localAlbum?.cover) {
+      add(localAlbum.cover)
+    }
+    if (normSongAlbum && library.albums?.value) {
+      const fuzzyAlbum = library.albums.value.find((a) => {
+        const aNorm = normalizeAlbumTitle(a.title)
+        return aNorm && (aNorm === normSongAlbum || aNorm.includes(normSongAlbum) || normSongAlbum.includes(aNorm))
+      })
+      if (fuzzyAlbum?.cover) {
+        add(fuzzyAlbum.cover)
+      }
+    }
+  }
+
+  // 4. Matching album from overview top_albums
+  if (song.album_name && overview.value?.top_albums) {
+    const match = overview.value.top_albums.find((a) => {
+      if (!a.name) return false
+      if (a.name.toLowerCase() === song.album_name.toLowerCase()) return true
+      const aNorm = normalizeAlbumTitle(a.name)
+      return aNorm && normSongAlbum && aNorm === normSongAlbum
+    })
+    if (match?.cover_url) {
+      add(match.cover_url)
+    }
+  }
+
+  // 5. Playing track if same song or album
+  if (props.track?.hasCover && props.track?.cover) {
+    if (
+      (props.track.title && song.name && props.track.title.toLowerCase() === song.name.toLowerCase()) ||
+      (props.track.album && song.album_name && props.track.album.toLowerCase() === song.album_name.toLowerCase())
+    ) {
+      add(props.track.cover)
+    }
+  }
+
+  // 6. YouTube video thumbnail
+  const vid = song.song_id || song.video_id
+  if (vid) {
+    add(`https://i.ytimg.com/vi/${vid}/hqdefault.jpg`)
+  }
+
+  // 7. Artist photo from overview
+  if (overview.value?.cover_url) {
+    add(overview.value.cover_url)
+  }
+
+  // 8. Currently playing track cover
+  if (props.track?.hasCover && props.track?.cover) {
+    add(props.track.cover)
+  }
+
+  return candidates
+}
+
+function songCover(song) {
+  const c = songCoverCandidates(song)
+  return c[0] || ''
+}
+
+function songFallbackCovers(song) {
+  const c = songCoverCandidates(song)
+  return c.slice(1)
+}
+
+function songFallbackCover(song) {
+  const c = songCoverCandidates(song)
+  return c[1] || ''
+}
+
+function albumCoverCandidates(album) {
+  const candidates = []
+  const add = (url) => {
+    if (url && typeof url === 'string' && !candidates.includes(url)) {
+      candidates.push(url)
+    }
+  }
+
+  // 1. Direct album cover URL
+  add(album.cover_url || album.cover)
+
+  const normAlbumName = normalizeAlbumTitle(album.name)
+
+  // 2. Local library exact album match
+  const localAlbum =
+    library.findAlbum(album.artist, album.name) ||
+    library.findAlbum(currentArtist.value, album.name)
+  if (localAlbum?.cover) {
+    add(localAlbum.cover)
+  }
+
+  // 3. Fuzzy match in library albums
+  if (normAlbumName && library.albums?.value) {
+    const fuzzyAlbum = library.albums.value.find((a) => {
+      const aNorm = normalizeAlbumTitle(a.title)
+      return aNorm && (aNorm === normAlbumName || aNorm.includes(normAlbumName) || normAlbumName.includes(aNorm))
+    })
+    if (fuzzyAlbum?.cover) {
+      add(fuzzyAlbum.cover)
+    }
+  }
+
+  // 4. Fuzzy match in library tracks
+  if (normAlbumName && library.tracks?.value) {
+    const trackWithCover = library.tracks.value.find((t) => {
+      if (!t.hasCover || !t.cover) return false
+      const tNorm = normalizeAlbumTitle(t.album)
+      return tNorm && (tNorm === normAlbumName || tNorm.includes(normAlbumName) || normAlbumName.includes(tNorm))
+    })
+    if (trackWithCover?.cover) {
+      add(trackWithCover.cover)
+    }
+  }
+
+  // 5. Matching song from overview top_songs
+  if (album.name && overview.value?.top_songs) {
+    const match = overview.value.top_songs.find((s) => {
+      if (!s.album_name) return false
+      if (s.album_name.toLowerCase() === album.name.toLowerCase()) return true
+      const sNorm = normalizeAlbumTitle(s.album_name)
+      return sNorm && normAlbumName && sNorm === normAlbumName
+    })
+    if (match?.cover_url || match?.cover) {
+      add(match.cover_url || match.cover)
+    }
+    const matchVid = match?.song_id || match?.video_id
+    if (matchVid) {
+      add(`https://i.ytimg.com/vi/${matchVid}/hqdefault.jpg`)
+    }
+  }
+
+  // 6. Currently playing track if matching album
+  if (props.track?.hasCover && props.track?.cover) {
+    const trackAlbumNorm = normalizeAlbumTitle(props.track.album)
+    if (
+      (props.track.album && album.name && props.track.album.toLowerCase() === album.name.toLowerCase()) ||
+      (trackAlbumNorm && normAlbumName && trackAlbumNorm === normAlbumName)
+    ) {
+      add(props.track.cover)
+    }
+  }
+
+  // 7. Any track in the user's library by this artist that has a cover
+  if (library.tracks?.value) {
+    const anyArtistTrack = library.tracks.value.find((t) => {
+      const artist = t.albumArtist || (t.artists || [])[0] || t.artist || ''
+      return artist.toLowerCase() === currentArtist.value.toLowerCase() && t.hasCover && t.cover
+    })
+    if (anyArtistTrack?.cover) {
+      add(anyArtistTrack.cover)
+    }
+  }
+
+  // 8. Artist photo from overview
+  if (overview.value?.cover_url) {
+    add(overview.value.cover_url)
+  }
+
+  // 9. Any top song video thumbnails from overview
+  if (overview.value?.top_songs) {
+    for (const s of overview.value.top_songs) {
+      if (s.cover_url || s.cover) add(s.cover_url || s.cover)
+      const vid = s.song_id || s.video_id
+      if (vid) {
+        add(`https://i.ytimg.com/vi/${vid}/hqdefault.jpg`)
+      }
+    }
+  }
+
+  // 10. Currently playing track cover
+  if (props.track?.hasCover && props.track?.cover) {
+    add(props.track.cover)
+  }
+
+  return candidates
+}
+
+function albumCover(album) {
+  const c = albumCoverCandidates(album)
+  return c[0] || ''
+}
+
+function albumFallbackCovers(album) {
+  const c = albumCoverCandidates(album)
+  return c.slice(1)
+}
+
+function albumFallbackCover(album) {
+  const c = albumCoverCandidates(album)
+  return c[1] || ''
+}
+
 function queueSong(song) {
-  const playerTrack = songToPlayerTrack(song, library.findTrack)
+  const resolvedSong = song.cover_url ? song : { ...song, cover_url: songCover(song) }
+  const playerTrack = songToPlayerTrack(resolvedSong, library.findTrack)
   actions.enqueue([playerTrack])
 }
 

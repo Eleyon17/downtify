@@ -387,12 +387,16 @@ from .library_catalog import (
     library_artist_index,
     library_context_from_state,
     library_home_summary,
+    list_entries_for_stored_paths,
     list_library_paths,
     listing_for_request,
     lookup_library_songs,
     merge_library_listing_file,
     resolve_library_file,
+    resolve_library_image,
 )
+from .cover_art import extract_cover_art
+from .shares import ShareStore, audio_media_type
 from .library_delete import (
     delete_library_files,
     delete_playlist_from_library,
@@ -450,6 +454,7 @@ from .playlist_batches import (
 )
 from .playlist_catalog import ManualPlaylistOwners, PlaylistCatalog
 from .playlist_listing import list_library_playlists
+from .playlist_suggestions import get_playlist_suggestions
 from .playlist_spotify_cache import (
     PlaylistSpotifyCache,
     fetch_playlist_tracks,
@@ -1044,6 +1049,7 @@ class AppState:
     stream_cache: Optional[StreamCache] = None
     cover_thumbs: Optional[CoverThumbs] = None
     discovery: Any = None
+    shares: Optional[ShareStore] = None
 
 
 state = AppState()
@@ -1891,7 +1897,12 @@ def _playlist_context_from_hints(
                 name = ''
 
     subdir: Optional[str] = None
-    if name and state.downloader is not None and not _organize_enabled():
+    if (
+        name
+        and not is_liked_playlist(name)
+        and state.downloader is not None
+        and not _organize_enabled()
+    ):
         subdir = m3u.sanitize_playlist_name(name)
 
     return {
@@ -1966,6 +1977,92 @@ def _upsert_track_in_playlists(
         catalog.upsert_track(pl_name, song, filename, full, track_order=order)
 
 
+def add_track_to_playlist_internal_sync(
+    name: str, file: str, user_id: int = 0
+) -> dict[str, Any]:
+    """Add an audio file already in the library to any playlist (liked, manual, imported)."""
+
+    clean_name = str(name or '').strip()
+    clean_file = str(file or '').strip().replace('\\', '/')
+    if not clean_name or not clean_file:
+        raise ValueError('name and file are required')
+
+    ctx = library_context()
+    full = resolve_library_file(clean_file, ctx)
+    if full is None or not full.is_file():
+        raise FileNotFoundError(f'Track not in library: {clean_file}')
+
+    # 1. Liked songs
+    if is_liked_playlist(clean_name):
+        if state.likes is not None:
+            state.likes.like(clean_file, user_id=user_id)
+            _announce_likes()
+        invalidate_library_paths_cache()
+        announce_library_changed()
+        return {'playlist': clean_name, 'file': clean_file, 'liked': True}
+
+    # 2. Manual M3U playlist
+    path = m3u.find_m3u_for_name(ctx.download_dir, clean_name)
+    if path is not None and m3u.is_manual_m3u(path):
+        res = edit_manual_playlist(ctx, clean_name, add=[clean_file])
+        invalidate_library_paths_cache()
+        announce_library_changed()
+        return res
+
+    # 3. Existing M3U playlist (imported or catalog)
+    if path is not None and path.is_file():
+        current_tracks = m3u.read_m3u_tracks(
+            path,
+            ctx.download_dir,
+            slskd_dir=ctx.slskd_dir,
+            extra_dirs=ctx.extra_dirs,
+            keep_missing=True,
+        )
+        if clean_file not in current_tracks:
+            current_tracks.append(clean_file)
+            entries = [{'filename': f} for f in current_tracks]
+            content, _ = m3u.build_m3u_content(
+                entries,
+                download_dir=ctx.download_dir,
+                m3u_dir=path.parent,
+                slskd_dir=ctx.slskd_dir,
+                extra_dirs=ctx.extra_dirs,
+            )
+            path.write_text(content, encoding='utf-8', newline='\n')
+        if state.playlist_catalog is not None:
+            meta = read_audio_metadata(full)
+            song = {
+                'name': meta.get('title') or full.stem,
+                'artists': [meta.get('artist') or ''],
+                'duration': meta.get('duration') or 0,
+            }
+            state.playlist_catalog.ensure_playlist(clean_name, user_id=user_id)
+            state.playlist_catalog.upsert_track(clean_name, song, clean_file, full)
+        invalidate_library_paths_cache()
+        announce_library_changed()
+        return {
+            'playlist': clean_name,
+            'file': clean_file,
+            'count': len(current_tracks),
+        }
+
+    # 4. Catalog playlist or create manual playlist if no M3U on disk yet
+    if state.playlist_catalog is not None:
+        meta = read_audio_metadata(full)
+        song = {
+            'name': meta.get('title') or full.stem,
+            'artists': [meta.get('artist') or ''],
+            'duration': meta.get('duration') or 0,
+        }
+        state.playlist_catalog.ensure_playlist(clean_name, user_id=user_id)
+        state.playlist_catalog.upsert_track(clean_name, song, clean_file, full)
+        invalidate_library_paths_cache()
+        announce_library_changed()
+        return {'playlist': clean_name, 'file': clean_file}
+
+    return {'playlist': clean_name, 'file': clean_file}
+
+
 def _register_download_playlists_on_disk(
     song: dict[str, Any],
     filename: str,
@@ -1982,6 +2079,16 @@ def _register_download_playlists_on_disk(
     tid = normalize_spotify_track_id(song)
     if state.monitor_db is not None and tid:
         state.monitor_db.update_filename_for_spotify(tid, filename)
+
+    if playlist_name:
+        try:
+            add_track_to_playlist_internal_sync(
+                playlist_name, filename, user_id=user_id
+            )
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Failed adding downloaded track to playlist {!r}', playlist_name
+            )
 
     affected = _playlists_for_successful_download(
         song, primary_playlist=playlist_name
@@ -5485,6 +5592,62 @@ def broadcast_upgrade_progress(status: dict[str, Any]) -> None:
     )
 
 
+def on_track_path_changed(
+    old_stored: str, new_stored: str, full_path: Path
+) -> None:
+    """Invoked when an upgraded track changes path on disk (e.g. mp3 -> flac)."""
+
+    old_file = str(old_stored or '').strip().replace('\\', '/')
+    new_file = str(new_stored or '').strip().replace('\\', '/')
+    if not old_file or not new_file or old_file == new_file:
+        return
+
+    if state.track_index is not None:
+        try:
+            spotify_id = state.track_index.spotify_id_for_filename(old_file)
+            if spotify_id:
+                state.track_index.register(spotify_id, new_file, full_path=full_path)
+            else:
+                state.track_index.remove_by_filename(old_file)
+        except Exception:
+            logger.opt(exception=True).debug('Failed updating track_index on path change')
+
+    if state.likes is not None:
+        try:
+            state.likes.update_path(old_file, new_file)
+            _announce_likes()
+        except Exception:
+            logger.opt(exception=True).debug('Failed updating likes on path change')
+
+    if state.playlist_catalog is not None:
+        try:
+            state.playlist_catalog.update_filename(old_file, new_file)
+        except Exception:
+            logger.opt(exception=True).debug('Failed updating playlist_catalog on path change')
+
+    if state.cover_cache is not None:
+        try:
+            state.cover_cache.forget_by_stored_path(old_file)
+        except Exception:
+            logger.opt(exception=True).debug('Failed clearing cover_cache on path change')
+
+    loop = state.loop
+    if loop is not None and state.connections is not None:
+        try:
+            asyncio.run_coroutine_threadsafe(
+                state.connections.broadcast({
+                    'type': 'track_path_changed',
+                    'old_file': old_file,
+                    'new_file': new_file,
+                }),
+                loop,
+            )
+        except Exception:
+            logger.opt(exception=True).debug('Failed broadcasting track_path_changed')
+
+    announce_library_changed()
+
+
 def _upgrade_payload(
     runner: library_upgrade.LibraryUpgradeRunner,
 ) -> dict[str, Any]:
@@ -5885,6 +6048,94 @@ async def _delete_owned_playlist(
         }
 
     result = await asyncio.to_thread(_run)
+    return result
+
+
+@router.get('/api/playlists/suggestions')
+@router.post('/api/playlists/suggestions')
+async def playlist_suggestions_endpoint(
+    request: Request,
+    name: Optional[str] = Query(None),
+    limit: int = Query(30, ge=1, le=50),
+    dismissed: Optional[list[str]] = Query(None),
+) -> dict[str, Any]:
+    """10+ songs similar in tone or vibe to the playlist."""
+
+    payload: dict[str, Any] = {}
+    if request.method == 'POST':
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+    pl_name = str(
+        payload.get('name')
+        or payload.get('playlist_name')
+        or name
+        or ''
+    ).strip()
+    if not pl_name:
+        raise HTTPException(
+            status_code=400, detail='Playlist name is required'
+        )
+    require_playlist_visible(pl_name, request)
+
+    dismissed_list: list[str] = []
+    if dismissed:
+        for item in dismissed:
+            for piece in str(item).split(','):
+                p = piece.strip()
+                if p:
+                    dismissed_list.append(p)
+    if isinstance(payload.get('dismissed'), list):
+        for item in payload['dismissed']:
+            p = str(item).strip()
+            if p:
+                dismissed_list.append(p)
+
+    ctx = library_context()
+    dl_dir = (
+        Path(state.downloader.download_dir)
+        if state.downloader
+        else ctx.download_dir
+    )
+    return await asyncio.to_thread(
+        get_playlist_suggestions,
+        pl_name,
+        dl_dir,
+        limit=int(payload.get('limit') or limit),
+        dismissed=dismissed_list,
+        ctx=ctx,
+        catalog=state.playlist_catalog,
+        likes_store=state.likes,
+        track_index=state.track_index,
+    )
+
+
+@router.post('/api/playlists/tracks/add')
+async def add_track_to_playlist_endpoint(request: Request) -> dict[str, Any]:
+    """Add an already downloaded audio file to any playlist."""
+
+    payload = await _json_object(request)
+    name = str(
+        payload.get('playlist_name') or payload.get('name') or ''
+    ).strip()
+    file = str(payload.get('file') or '').strip().replace('\\', '/')
+    if not name or not file:
+        raise HTTPException(
+            status_code=400, detail='playlist_name and file are required'
+        )
+    require_playlist_visible(name, request)
+    user_id = request_user_id(request)
+    try:
+        result = await asyncio.to_thread(
+            add_track_to_playlist_internal_sync, name, file, user_id
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     return result
 
 
@@ -7942,3 +8193,266 @@ async def manual_check_playlist(
 
     spawn_task(_run(), name='monitor-manual-check')
     return {'status': 'check_started', 'id': playlist_id}
+
+
+# ── Public shares (never-expiring, zero-login, confined sandbox) ────────
+
+
+def _require_shares() -> ShareStore:
+    if state.shares is not None:
+        return state.shares
+    db_path = Path(os.getenv('DATABASE_DIR', '/data')) / 'downtify_library.db'
+    state.shares = ShareStore(db_path)
+    return state.shares
+
+
+def _resolve_share_files(
+    share: dict[str, Any],
+) -> tuple[list[str], str, Optional[str]]:
+    """Return (files, title, playlist_cover_image_path) for a share."""
+    kind = str(share.get('kind') or 'track').strip().lower()
+    target = str(share.get('target') or '').strip()
+    title = str(share.get('title') or '').strip()
+    ctx = library_context()
+
+    if kind == 'track':
+        file = target
+        if state.library_sync is not None:
+            row = state.library_sync.row_for(target)
+            if row:
+                file = row['file']
+        if not title:
+            title = Path(file).stem
+        return [file], title, None
+
+    # Kind is playlist
+    pl_name = target
+    files: list[str] = []
+    playlist_cover: Optional[str] = None
+
+    if is_liked_playlist(pl_name):
+        user_id = int(share.get('user_id') or 0)
+        if state.likes is not None:
+            try:
+                files = state.likes.paths(user_id)
+            except Exception:
+                files = []
+        if not title:
+            title = pl_name
+    else:
+        try:
+            playlists = list_library_playlists(
+                ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs
+            )
+            for p in playlists:
+                if str(p.get('name') or '') == pl_name:
+                    files = list(p.get('files') or [])
+                    playlist_cover = p.get('cover') or None
+                    break
+        except Exception:
+            pass
+
+        if not files and state.playlist_catalog is not None:
+            try:
+                rows = state.playlist_catalog.list_tracks(pl_name)
+                files = [
+                    str(r.get('filename') or '')
+                    for r in rows
+                    if r.get('filename')
+                ]
+            except Exception:
+                pass
+
+        if not title:
+            title = pl_name
+
+    return files, title, playlist_cover
+
+
+@router.get('/api/share/{share_id}')
+def get_share_endpoint(share_id: str) -> dict[str, Any]:
+    """Inspect a shared song or playlist without login."""
+    share = _require_shares().get_share(share_id)
+    if not share:
+        raise HTTPException(status_code=404, detail='Share not found')
+    files, title, playlist_cover = _resolve_share_files(share)
+    if not files:
+        raise HTTPException(status_code=404, detail='No tracks found for share')
+
+    ctx = library_context()
+    entries = list_entries_for_stored_paths(ctx, files)
+    by_file = {e['file']: e for e in entries}
+
+    tracks = []
+    for idx, f in enumerate(files):
+        entry = by_file.get(f) or {}
+        tracks.append({
+            'index': idx,
+            'title': str(entry.get('title') or Path(f).stem),
+            'artist': str(entry.get('artist') or ''),
+            'album': str(entry.get('album') or ''),
+            'duration': float(entry.get('duration') or 0),
+            'has_cover': entry.get('has_cover') is not False,
+            'stream_url': f'/api/share/{share["id"]}/stream/{idx}',
+            'cover_url': f'/api/share/{share["id"]}/cover/{idx}',
+        })
+
+    has_cover = playlist_cover is not None or any(t['has_cover'] for t in tracks)
+    cover_url = (
+        f'/api/share/{share["id"]}/playlist-cover'
+        if playlist_cover
+        else f'/api/share/{share["id"]}/cover/0'
+    )
+
+    return {
+        'id': share['id'],
+        'kind': share['kind'],
+        'title': title,
+        'created_at': share['created_at'],
+        'count': len(tracks),
+        'has_cover': has_cover,
+        'cover_url': cover_url if has_cover else '',
+        'tracks': tracks,
+    }
+
+
+@router.api_route('/api/share/{share_id}/stream', methods=['GET', 'HEAD'])
+@router.api_route('/api/share/{share_id}/stream/{track_idx}', methods=['GET', 'HEAD'])
+def share_stream_endpoint(share_id: str, track_idx: int = 0) -> FileResponse:
+    """Stream audio for track_idx within the shared item."""
+    share = _require_shares().get_share(share_id)
+    if not share:
+        raise HTTPException(status_code=404, detail='Share not found')
+    files, _, _ = _resolve_share_files(share)
+    if not (0 <= track_idx < len(files)):
+        raise HTTPException(status_code=404, detail='Track not found in share')
+    file = files[track_idx]
+    full = resolve_library_file(file, library_context())
+    if full is None or not full.is_file():
+        raise HTTPException(status_code=404, detail='File not found')
+    return FileResponse(
+        str(full),
+        media_type=audio_media_type(full),
+        headers={
+            'Accept-Ranges': 'bytes',
+            'Cache-Control': 'public, max-age=86400',
+        },
+    )
+
+
+@router.api_route('/api/share/{share_id}/cover', methods=['GET', 'HEAD'])
+@router.api_route('/api/share/{share_id}/cover/{track_idx}', methods=['GET', 'HEAD'])
+def share_cover_endpoint(share_id: str, track_idx: int = 0) -> Response:
+    """Cover art for track_idx within the shared item."""
+    share = _require_shares().get_share(share_id)
+    if not share:
+        raise HTTPException(status_code=404, detail='Share not found')
+    files, _, playlist_cover = _resolve_share_files(share)
+    if not files:
+        raise HTTPException(status_code=404, detail='No tracks in share')
+    if not (0 <= track_idx < len(files)):
+        track_idx = 0
+    file = files[track_idx]
+    full = resolve_library_file(file, library_context())
+    if full is None or not full.is_file():
+        raise HTTPException(status_code=404, detail='File not found')
+    data, mime = None, None
+    cache = state.cover_cache
+    if cache is not None:
+        hit = cache.lookup(file, full)
+        if hit is not None:
+            data, mime = hit
+    if data is None:
+        data, mime = extract_cover_art(full)
+        if data is None:
+            raise HTTPException(status_code=404, detail='No cover art')
+        if state.settings.get('cache_cover_art') and cache is not None:
+            cache.store(file, full, data, mime or 'image/jpeg')
+    return Response(
+        content=data,
+        media_type=mime or 'image/jpeg',
+        headers={
+            'Cache-Control': 'public, max-age=86400',
+            'ETag': f'"{int(full.stat().st_mtime)}"',
+        },
+    )
+
+
+@router.api_route('/api/share/{share_id}/playlist-cover', methods=['GET', 'HEAD'])
+def share_playlist_cover_endpoint(share_id: str) -> FileResponse:
+    """Playlist sidecar cover image for a shared playlist."""
+    share = _require_shares().get_share(share_id)
+    if not share or share.get('kind') != 'playlist':
+        raise HTTPException(status_code=404, detail='Playlist cover not found')
+    _, _, playlist_cover = _resolve_share_files(share)
+    if not playlist_cover:
+        raise HTTPException(status_code=404, detail='No playlist cover')
+    full = resolve_library_image(playlist_cover, library_context())
+    if full is None or not full.is_file():
+        raise HTTPException(status_code=404, detail='File not found')
+    return FileResponse(
+        str(full),
+        media_type=mimetypes.guess_type(str(full))[0] or 'image/jpeg',
+        headers={
+            'Cache-Control': 'public, max-age=86400',
+            'ETag': f'"{int(full.stat().st_mtime)}"',
+        },
+    )
+
+
+@router.post('/api/shares')
+async def create_share_endpoint(request: Request) -> dict[str, Any]:
+    """Create a persistent public share link for a track or playlist."""
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    kind = str(payload.get('kind') or 'track').strip().lower()
+    target = str(payload.get('target') or '').strip()
+    title = str(payload.get('title') or '').strip()
+    if not target:
+        raise HTTPException(status_code=400, detail='target is required')
+
+    ctx = library_context()
+    if kind == 'track' and not title:
+        entries = list_entries_for_stored_paths(ctx, [target])
+        if entries and entries[0].get('title'):
+            title = entries[0]['title']
+        else:
+            title = Path(target).stem
+    elif kind == 'playlist' and not title:
+        title = target
+
+    user_id = request_user_id(request)
+    share = _require_shares().create_share(
+        kind=kind, target=target, title=title, user_id=user_id
+    )
+    base = str(request.base_url).rstrip('/')
+    return {
+        **share,
+        'url': f'{base}/share/{share["id"]}',
+    }
+
+
+@router.get('/api/shares')
+def list_shares_endpoint(request: Request) -> list[dict[str, Any]]:
+    """List active shares created by the caller (or all if admin)."""
+    user_id = request_user_id(request)
+    is_admin = request_is_admin(request)
+    shares = _require_shares().list_shares(user_id=None if is_admin else user_id)
+    base = str(request.base_url).rstrip('/')
+    return [{**s, 'url': f'{base}/share/{s["id"]}'} for s in shares]
+
+
+@router.delete('/api/shares/{share_id}')
+def delete_share_endpoint(share_id: str, request: Request) -> dict[str, Any]:
+    """Revoke/delete an active share link."""
+    user_id = request_user_id(request)
+    is_admin = request_is_admin(request)
+    deleted = _require_shares().delete_share(
+        share_id,
+        user_id=None if is_admin else user_id,
+    )
+    if not deleted:
+        raise HTTPException(status_code=404, detail='Share not found')
+    return {'deleted': True, 'id': share_id}

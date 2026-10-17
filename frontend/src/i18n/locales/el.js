@@ -45,6 +45,7 @@ export default {
   },
   actions: {
     play: 'Αναπαραγωγή',
+    pause: 'Παύση',
     playAll: 'Αναπαραγωγή όλων',
     playItem: 'Αναπαραγωγή {name}',
     playPreview: 'Αναπαραγωγή προεπισκόπησης του {name}',
@@ -60,6 +61,7 @@ export default {
     download: 'Λήψη',
     downloadItem: 'Λήψη {name}',
     delete: 'Διαγραφή από τη βιβλιοθήκη',
+    share: 'Κοινοποίηση',
   },
   home: {
     greetingMorning: 'Καλημέρα',
@@ -546,6 +548,13 @@ export default {
     nothingYet: 'Δεν έχουν κατέβει κομμάτια ακόμα',
     nothingYetHint: 'Τα κομμάτια εμφανίζονται εδώ καθώς ολοκληρώνονται.',
     nothingYetManualHint: 'Προσθέστε κομμάτια από τη βιβλιοθήκη.',
+    suggestionsTitle: 'Προτάσεις',
+    suggestionsHint: 'Κατεβάστε προτεινόμενα κομμάτια και προσθέστε τα σε αυτή τη λίστα αναπαραγωγής',
+    suggestionsDismiss: 'Απόρριψη πρότασης',
+    suggestionsAddToPlaylist: 'Προσθήκη στη λίστα αναπαραγωγής',
+    suggestionsAdded: 'Προστέθηκε στη λίστα αναπαραγωγής',
+    suggestionsEmpty: 'Δεν υπάρχουν άλλες προτάσεις αυτή τη στιγμή',
+    suggestionsRefresh: 'Ανανέωση προτάσεων',
   },
   track: {
     title: 'Τίτλος',
@@ -580,6 +589,9 @@ export default {
     volume: 'Ένταση',
     mute: 'Σίγαση',
     unmute: 'Κατάργηση σίγασης',
+    cast: 'Μετάδοση',
+    castingTo: 'Μετάδοση σε {device}',
+    disconnectCast: 'Αποσύνδεση μετάδοσης',
     playingFrom: {
       album: 'Αναπαραγωγή από άλμπουμ',
       playlist: 'Αναπαραγωγή από λίστα',
@@ -1458,5 +1470,17 @@ export default {
   },
   source: {
     from: 'Λήψη από {source}',
+  },
+  share: {
+    titleTrack: 'Κοινοποίηση κομματιού',
+    titlePlaylist: 'Κοινοποίηση λίστας αναπαραγωγής',
+    description: 'Όποιος έχει αυτόν τον σύνδεσμο μπορεί να ακούσει χωρίς σύνδεση.',
+    copied: 'Ο σύνδεσμος κοινοποίησης αντιγράφηκε στο πρόχειρο',
+    copyLink: 'Αντιγραφή συνδέσμου',
+    linkCopied: 'Αντιγράφηκε!',
+    notFound: 'Η κοινοποίηση δεν βρέθηκε ή δεν είναι πλέον διαθέσιμη',
+    playingShared: 'Κοινοποιήθηκε με το Downtify',
+    queue: 'Ουρά',
+    removeFromQueue: 'Αφαίρεση από την ουρά',
   },
 }

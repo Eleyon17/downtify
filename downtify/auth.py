@@ -863,6 +863,8 @@ RULES: list[tuple[frozenset[str], re.Pattern[str], str]] = [
         (_m('POST'), r'^/api/auth/login$', PUBLIC),
         (_m('POST'), r'^/api/auth/logout$', PUBLIC),
         (_m('POST'), r'^/api/auth/pair$', PUBLIC),
+        # Public: shared tracks and playlists (zero login, sandbox-confined).
+        (_READ, r'^/api/share/[a-zA-Z0-9_-]+(/.*)?$', PUBLIC),
         # Any signed-in user: their own account, devices and pairing
         # (the routes check whose), and a WebSocket ticket.
         (_m('POST'), r'^/api/auth/ws-ticket$', CLIENT),
@@ -927,9 +929,11 @@ RULES: list[tuple[frozenset[str], re.Pattern[str], str]] = [
         (_m('POST'), r'^/api/stream/prefetch$', CLIENT),
         (_m('POST'), r'^/api/download/(url|batch|album)$', CLIENT),
         (_READ, r'^/api/queue$', CLIENT),
-        (_READ, r'^/api/playlists/(batches|incomplete)', CLIENT),
+        (_READ, r'^/api/playlists/(batches|incomplete|suggestions)', CLIENT),
+        (_m('POST'), r'^/api/playlists/(suggestions|tracks/add)$', CLIENT),
         (_READ, r'^/api/likes$', CLIENT),
         (_m('PUT'), r'^/api/likes$', CLIENT),
+        (_m('GET', 'POST', 'DELETE'), r'^/api/shares(/.*)?$', CLIENT),
         (
             _m('POST'),
             r'^/api/discover(/collections(/deezer|/spotify)?|/listens)?$',

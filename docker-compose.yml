@@ -1,25 +1,54 @@
+# Downtify Docker Compose Configuration
+# Enhanced edition: Playlist Suggestions, Public Share Links, Cast Support (Web & Android),
+# Format Upgrades, and Artist Bio hit tracks/albums.
+#
+# Quick start:
+#   docker compose up -d --build
+#
+# Access the web UI at: http://localhost:8000
+# (or connect via the Downtify mobile app using http://<server-ip>:8000)
+
 services:
   downtify:
     container_name: downtify
-    image: 'downtify:${TAG-latest}'
+    image: downtify:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
-    build: .
     ports:
+      # Host:Container port mapping. Change the left side if port 8000 is already in use.
       - '8000:8000'
     volumes:
-      - ./docker/downloads:/downloads
-      - ./docker/data:/data
-      # Existing music folders (container path goes in Settings):
-      # - ./mp3:/music/collection
-      # slskd's download folder, when using the slskd audio source:
-      # - ./docker/slskd:/slskd
-      # - settings/server./docker/cookies.txt:/cookies.txt
-    # environment:
-      # - DOWNTIFY_PORT=30321
-      # https://downtify.henriquesebastiao.com/getting-started/environment-variables/#getting-a-cookiestxt
+      # Primary music download directory and library
+      - ./downloads:/downloads
+      # Persistent application data, SQLite database, artist bio & cover cache
+      - ./data:/data
+      # (Optional) Mount existing music folders to index or upgrade in-place:
+      # - /path/to/existing/music:/music:rw
+      # (Optional) Slskd downloads folder if using Soulseek audio provider:
+      # - ./slskd:/slskd
+      # (Optional) Exported browser cookies for YouTube/Spotify lookup:
+      # - ./cookies.txt:/cookies.txt:ro
+    environment:
+      # User and Group ID to own files created in mounted volumes
+      - UID=1000
+      - GID=1000
+      - UMASK=022
+      - TZ=Etc/UTC
+      - DOWNTIFY_LOG_LEVEL=info
+      # (Optional) Override container internal port (defaults to 8000)
+      # - DOWNTIFY_PORT=8000
+      # (Optional) Path to cookies file if mounted
       # - DOWNTIFY_COOKIES_FILE=/cookies.txt
-      # - TZ=America/Sao_Paulo
+      # (Optional) Scheduled background library monitor check (e.g. 03:00)
       # - DOWNTIFY_MONITOR_SYNC_TIME=03:00
     dns:
       - 1.1.1.1
       - 1.0.0.1
+    healthcheck:
+      test: ["CMD", "./healthcheck.sh"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
