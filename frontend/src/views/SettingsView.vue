@@ -163,12 +163,14 @@
                     :label="t('settings.slskdUrl')"
                     placeholder="http://slskd:5030"
                     type="url"
+                    autocomplete="url"
                     :error="needsValue(s.slskd.base_url)"
                   />
                   <UiInput
                     v-model.trim="s.slskd.api_key"
                     :label="t('settings.slskdKey')"
                     type="password"
+                    autocomplete="new-password"
                     :error="needsValue(s.slskd.api_key)"
                   />
                   <UiInput

@@ -713,3 +713,132 @@ def test_download_from_slskd_tries_next_candidate_on_failure(
     assert len(wait_calls) == 2
     assert wait_calls[0].endswith('(1).mp3')
     assert wait_calls[1].endswith('(2).mp3')
+
+
+def test_filter_slskd_responses_falls_back_when_no_free_slots():
+    responses = [
+        {
+            'username': 'queued_peer_1',
+            'hasFreeUploadSlot': False,
+            'fileCount': 1,
+        },
+        {
+            'username': 'queued_peer_2',
+            'hasFreeUploadSlot': False,
+            'fileCount': 3,
+        },
+    ]
+    filtered = _filter_slskd_responses(responses)
+    assert len(filtered) == 2
+    assert [r['username'] for r in filtered] == [
+        'queued_peer_1',
+        'queued_peer_2',
+    ]
+
+
+def test_wait_search_complete_succeeds_when_free_files_present_without_is_complete():
+    client = SlskdClient({
+        'base_url': 'https://slskd.example',
+        'api_key': 'key',
+        'search_retries': 2,
+        'search_poll_seconds': 1,
+    })
+    # Search status with files found, but isComplete is still False
+    client._request = lambda method, path, **k: {  # type: ignore[method-assign]
+        'fileCount': 6,
+        'lockedFileCount': 1,
+        'isComplete': False,
+    }
+    # Should succeed because 5 free files were found
+    assert client.wait_search_complete('search-1', 'Artist - Track') is True
+
+
+def test_download_from_slskd_falls_back_to_queued_peers(monkeypatch, tmp_path):
+    class FakeClient:
+        base_url = 'https://slskd.example'
+
+        @staticmethod
+        def configured() -> bool:
+            return True
+
+        @staticmethod
+        def can_connect() -> bool:
+            return True
+
+        @staticmethod
+        def start_search(query: str) -> str:
+            return 'search-1'
+
+        @staticmethod
+        def wait_search_complete(*args, **kwargs) -> bool:
+            return True
+
+        @staticmethod
+        def search_responses(search_id: str) -> list[dict[str, Any]]:
+            return [
+                {
+                    'username': 'queued_peer',
+                    'hasFreeUploadSlot': False,
+                    'fileCount': 1,
+                }
+            ]
+
+        @staticmethod
+        def delete_search(search_id: str) -> None:
+            pass
+
+        @staticmethod
+        def enqueue_download(row: dict[str, Any]) -> bool:
+            return True
+
+        @staticmethod
+        def remote_download_directories() -> list[str]:
+            return []
+
+    target = tmp_path / 'Track.mp3'
+    target.write_bytes(b'x' * 1024)
+
+    monkeypatch.setattr(
+        'downtify.slskd_provider.SlskdClient',
+        lambda settings: FakeClient(),
+    )
+    monkeypatch.setattr(
+        'downtify.slskd_provider._rank_slskd_candidates',
+        lambda song, responses, settings=None, allow_mix_variants=False: [
+            {
+                'username': 'queued_peer',
+                'filename': 'Track.mp3',
+                'match_score': 10,
+                'match_reasons': ['title', 'artist'],
+            }
+        ]
+        if responses
+        else [],
+    )
+    monkeypatch.setattr(
+        'downtify.slskd_provider._select_download_candidates',
+        lambda ranked, settings: ranked,
+    )
+    monkeypatch.setattr(
+        'downtify.slskd_provider._search_roots',
+        lambda settings, client: [tmp_path],
+    )
+    monkeypatch.setattr(
+        'downtify.slskd_provider._wait_for_slskd_file',
+        lambda *args, **kwargs: target,
+    )
+
+    settings = {
+        'enabled': True,
+        'base_url': 'https://slskd.example',
+        'api_key': 'key',
+        'output_dir': str(tmp_path),
+        'source_dir': str(tmp_path),
+        'leave_in_place': True,
+    }
+    result = download_from_slskd(
+        {'name': 'Track', 'artists': ['Artist'], 'album_name': 'Album'},
+        settings,
+    )
+    assert result == target
+

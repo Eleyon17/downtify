@@ -814,6 +814,14 @@ export default {
     sourceYtmHint: 'Най-добри съвпадения на метаданни',
     sourceYt: 'YouTube',
     sourceYtHint: 'Резерва за песни, които липсват в YouTube Music',
+    sourceTargetsOrder: 'Предпочитания за формат и качество',
+    sourceTargetsHint:
+      'Предпочитани формати и битрейтове за този източник, проверявани по ред.',
+    addTarget: 'Добавяне на формат',
+    removeTarget: 'Премахване',
+    formatLabel: 'Формат',
+    bitrateLabel: 'Качество / Битрейт',
+    losslessBitrate: 'Без загуби',
     slskdTitle: 'slskd',
     slskdHint:
       'Изтегляй от Soulseek чрез своя slskd сървър. Ненамерените песни минават към следващия източник.',

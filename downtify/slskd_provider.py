@@ -157,7 +157,7 @@ class SlskdClient:
             'searchText': query,
             'filterResponses': True,
             'minimumResponseFileCount': 1,
-            'minimumPeerUploadSpeed': 1,
+            'minimumPeerUploadSpeed': 0,
         }
         try:
             data = self._request('POST', '/api/v0/searches', json_body=body)
@@ -182,8 +182,17 @@ class SlskdClient:
         deadline: Optional[float] = None,
     ) -> bool:
         max_attempts = max(1, self.search_retries)
+        last_file_count = 0
+        last_locked = 0
         for attempt in range(max_attempts):
             if deadline is not None and _past_deadline(deadline):
+                if last_file_count > 0 and last_file_count > last_locked:
+                    logger.info(
+                        'slskd: search deadline reached with {} files label={!r}',
+                        last_file_count - last_locked,
+                        label[:120],
+                    )
+                    return True
                 return False
             if on_poll is not None:
                 try:
@@ -198,13 +207,18 @@ class SlskdClient:
                 logger.info(
                     'slskd: search status failed id={} err={}', search_id, exc
                 )
+                if last_file_count > 0 and last_file_count > last_locked:
+                    return True
                 return False
             if not isinstance(status, dict):
                 return False
             file_count = int(status.get('fileCount') or 0)
             locked = int(status.get('lockedFileCount') or 0)
+            last_file_count = file_count
+            last_locked = locked
+            free_files = file_count - locked
             if status.get('isComplete'):
-                if file_count > 0 and file_count != locked:
+                if free_files > 0:
                     return True
                 logger.info(
                     'slskd: search complete but no free files label={!r} '
@@ -214,8 +228,22 @@ class SlskdClient:
                     locked,
                 )
                 return False
+            if attempt >= 1 and free_files >= 5:
+                logger.info(
+                    'slskd: search acquired {} free files early label={!r}',
+                    free_files,
+                    label[:120],
+                )
+                return True
             if attempt + 1 < self.search_retries:
                 time.sleep(max(1, self.search_poll_seconds))
+        if last_file_count > 0 and last_file_count > last_locked:
+            logger.info(
+                'slskd: search completed polling with {} free files label={!r}',
+                last_file_count - last_locked,
+                label[:120],
+            )
+            return True
         logger.info(
             'slskd: search timed out label={!r} retries={}',
             label[:120],
@@ -523,8 +551,9 @@ def _locked_filenames(resp: dict[str, Any]) -> set[str]:
 def _filter_slskd_responses(
     responses: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Drop peers without a free upload slot (slskd UI: hide no free slots)."""
-    return [r for r in responses if _response_has_free_slot(r)]
+    """Prefer peers with a free upload slot; fall back to all responses if none."""
+    free = [r for r in responses if _response_has_free_slot(r)]
+    return free if free else responses
 
 
 def _song_duration_seconds(song: dict[str, Any]) -> int:
@@ -1338,17 +1367,28 @@ def download_from_slskd(  # noqa: PLR0914  # search, rank, enqueue, poll, finali
                 search_id = ''
                 continue
             raw_responses = client.search_responses(search_id)
-            responses = _filter_slskd_responses(raw_responses)
-            if not responses:
+            if not raw_responses:
                 client.delete_search(search_id)
                 search_id = ''
                 continue
 
-            ranked = _rank_slskd_candidates(song, responses, settings)
+            # Prioritize peers with a free upload slot, but fall back to all peers (queued)
+            # if free-slot peers have no matching track.
+            free_responses = [
+                r for r in raw_responses if _response_has_free_slot(r)
+            ]
+            ranked = (
+                _rank_slskd_candidates(song, free_responses, settings)
+                if free_responses
+                else []
+            )
+            if not ranked:
+                ranked = _rank_slskd_candidates(song, raw_responses, settings)
+
             if not ranked:
                 ranked = _rank_slskd_candidates(
                     song,
-                    responses,
+                    raw_responses,
                     settings,
                     allow_mix_variants=True,
                 )
@@ -1365,7 +1405,7 @@ def download_from_slskd(  # noqa: PLR0914  # search, rank, enqueue, poll, finali
                     'responses={}',
                     query[:120],
                     song.get('name'),
-                    len(responses),
+                    len(raw_responses),
                 )
                 client.delete_search(search_id)
                 search_id = ''

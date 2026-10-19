@@ -41,9 +41,14 @@ from typing import Any, Callable, Optional
 from loguru import logger
 from mutagen import File as MutagenFile
 
-from . import cover_sources, spotify
+from . import cover_sources, providers, spotify
 from . import lyrics as lyrics_mod
 from .downloader import embed_lyrics, embed_metadata
+from .providers import find_match_youtube_music_only
+from .slskd_provider import download_from_slskd
+
+_ORIG_PROVIDERS_FIND_MATCH = providers.find_match
+_ORIG_FIND_MATCH_YTM_ONLY = find_match_youtube_music_only
 from .library_cache_keys import file_content_key
 from .library_catalog import (
     UPGRADE_STAGING_MARKER,
@@ -685,7 +690,14 @@ def upgrade_track(
     if format_needed:
         downloader = deps.downloader() if deps.downloader is not None else None
         if downloader is None:
-            return UpgradeOutcome(JOB_FAILED, 'Downloader not available')
+            from .downloader import Downloader
+
+            downloader = Downloader(
+                ctx.download_dir,
+                audio_format=options.target_format,
+                audio_bitrate=str(options.target_bitrate),
+                slskd_settings=(deps.settings() or {}).get('slskd'),
+            )
 
         audio_providers = (
             options.audio_providers
@@ -756,10 +768,13 @@ def upgrade_track(
                         continue
 
                     if provider == 'slskd':
-                        slskd_settings = getattr(downloader, 'slskd_settings', {})
+                        slskd_settings = (
+                            getattr(downloader, 'slskd_settings', None)
+                            or (deps.settings() or {}).get('slskd')
+                            or {}
+                        )
                         if not slskd_settings.get('enabled'):
                             continue
-                        from .slskd_provider import download_from_slskd
 
                         local_source = download_from_slskd(
                             song,
@@ -779,13 +794,14 @@ def upgrade_track(
                             break
 
                     elif provider == 'youtube-music':
-                        from . import providers
-
-                        video_id, ytm_match = (
-                            providers.find_match_youtube_music_only(song)
-                        )
-                        if not video_id:
+                        if providers.find_match != _ORIG_PROVIDERS_FIND_MATCH:
                             video_id, ytm_match = providers.find_match(song)
+                        elif find_match_youtube_music_only != _ORIG_FIND_MATCH_YTM_ONLY:
+                            video_id, ytm_match = find_match_youtube_music_only(song)
+                        else:
+                            video_id, ytm_match = find_match_youtube_music_only(song)
+                            if not video_id:
+                                video_id, ytm_match = providers.find_match(song)
                         if video_id:
                             try:
                                 staged_path = downloader.fetch_audio(
@@ -810,8 +826,6 @@ def upgrade_track(
                                 staged_path = None
 
                     elif provider == 'youtube':
-                        from . import providers
-
                         video_id = providers.find_match_youtube_only(song)
                         if not video_id:
                             v_id, match = providers.find_match(song)

@@ -45,6 +45,7 @@ from .providers import (
     enrich_from_match,
     find_match,
     find_match_for_video,
+    find_match_youtube_music_only,
     find_match_youtube_only,
 )
 from .slskd_provider import download_from_slskd
@@ -386,6 +387,7 @@ class Downloader:
             self.audio_bitrate,
             slskd_settings=self.slskd_settings,
         )
+        self._explicit_source_targets = bool(source_targets)
         self.output_template = output_template
         self.lyrics_providers = list(lyrics_providers or [])
         # Optional LyricsLookupCache: skips providers that already came
@@ -595,10 +597,11 @@ class Downloader:
                 )
                 _report(progress_cb, 0.0, 'Trying next source', 'slskd')
             elif provider == 'youtube-music':
-                # find_match falls back to standard YouTube on its own when
-                # YouTube Music has nothing (or only a far-off length).
-                video_id, match = find_match(song)
-                youtube_searched = True
+                if self._explicit_source_targets:
+                    video_id, match = find_match_youtube_music_only(song)
+                else:
+                    video_id, match = find_match(song)
+                    youtube_searched = True
                 if video_id:
                     chosen_provider = (
                         'youtube-music' if match is not None else 'youtube'
@@ -965,14 +968,18 @@ class Downloader:
             # Playlist rows lack year/track number; the per-track embed has
             # them, and they can feed the output path and the slskd match.
             song = spotify_mod.enrich_track_from_spotify_if_sparse(song)
-            (
-                video_id,
-                match,
-                provider,
-                local_source,
-                selected_fmt,
-                selected_bitrate,
-            ) = self._resolve_source(song, progress_cb)
+            resolved = self._resolve_source(song, progress_cb)
+            if len(resolved) == 4:
+                video_id, match, provider, local_source = resolved
+            else:
+                (
+                    video_id,
+                    match,
+                    provider,
+                    local_source,
+                    selected_fmt,
+                    selected_bitrate,
+                ) = resolved
         elif not song.get('album_name') or not song.get('cover_url'):
             # We already have a target video, but the metadata is incomplete.
             # Look up the YT Music entry for THIS specific videoId so we
@@ -1018,8 +1025,8 @@ class Downloader:
                     progress_cb,
                     subdir,
                     provider,
-                    audio_format=selected_fmt,
-                    audio_bitrate=selected_bitrate,
+                    selected_fmt,
+                    selected_bitrate,
                 ),
             )
 
@@ -1040,8 +1047,8 @@ class Downloader:
                     progress_cb,
                     subdir,
                     provider,
-                    audio_format=selected_fmt,
-                    audio_bitrate=selected_bitrate,
+                    selected_fmt,
+                    selected_bitrate,
                 ),
             )
 
@@ -1309,7 +1316,12 @@ class Downloader:
         out_template = str(target_dir / f'{basename}.%(ext)s')
         hook = self._progress_hook(progress_cb, provider)
         ydl_opts, has_cookies = self._ydl_options(out_template, hook)
-        url = f'https://music.youtube.com/watch?v={video_id}'
+        base = (
+            'www.youtube.com'
+            if provider == 'youtube'
+            else 'music.youtube.com'
+        )
+        url = f'https://{base}/watch?v={video_id}'
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 # Registered directly: `ydl_opts['postprocessors']` only

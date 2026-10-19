@@ -66,7 +66,7 @@ def test_resolve_video_id_falls_back_after_slskd_timeout(
         lambda song: ('yt123', {'name': song.get('name')}),
     )
 
-    video_id, match, provider, local = d._resolve_source(
+    video_id, match, provider, local, *_ = d._resolve_source(
         {'name': 'Track', 'artists': ['Artist']}, None
     )
     assert provider == 'youtube-music'

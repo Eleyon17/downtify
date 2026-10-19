@@ -823,6 +823,14 @@ export default {
     sourceYtmHint: 'Mejores coincidencias de metadatos',
     sourceYt: 'YouTube',
     sourceYtHint: 'Alternativa para canciones que faltan en YouTube Music',
+    sourceTargetsOrder: 'Preferencia de formato y calidad',
+    sourceTargetsHint:
+      'Formatos y tasas de bits preferidos para esta fuente, comprobados en orden.',
+    addTarget: 'Añadir formato',
+    removeTarget: 'Eliminar',
+    formatLabel: 'Formato',
+    bitrateLabel: 'Calidad / Tasa de bits',
+    losslessBitrate: 'Sin pérdida',
     slskdTitle: 'slskd',
     slskdHint:
       'Descarga de Soulseek a través de tu servidor slskd. Lo que no encuentre pasa a la siguiente fuente.',

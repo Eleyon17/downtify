@@ -826,6 +826,14 @@ export default {
     sourceYtmHint: 'Καλύτερες αντιστοιχίες μεταδεδομένων',
     sourceYt: 'YouTube',
     sourceYtHint: 'Εναλλακτική για τραγούδια που λείπουν από το YouTube Music',
+    sourceTargetsOrder: 'Προτίμηση μορφής και ποιότητας',
+    sourceTargetsHint:
+      'Προτιμώμενες μορφές και ρυθμοί bit για αυτήν την πηγή, ελεγμένες με τη σειρά.',
+    addTarget: 'Προσθήκη μορφής',
+    removeTarget: 'Αφαίρεση',
+    formatLabel: 'Μορφή',
+    bitrateLabel: 'Ποιότητα / Ρυθμός bit',
+    losslessBitrate: 'Χωρίς απώλειες',
     slskdTitle: 'slskd',
     slskdHint:
       'Λήψη από Soulseek μέσω του διακομιστή slskd. Όσα δεν βρεθούν περνούν στην επόμενη πηγή.',

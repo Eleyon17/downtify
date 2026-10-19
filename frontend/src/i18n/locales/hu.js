@@ -822,6 +822,14 @@ export default {
     sourceYtmHint: 'Legjobb metaadat-egyezések',
     sourceYt: 'YouTube',
     sourceYtHint: 'Tartalék a YouTube Musicból hiányzó dalokhoz',
+    sourceTargetsOrder: 'Formátum és minőség beállítása',
+    sourceTargetsHint:
+      'Előnyben részesített formátumok és bitráták ehhez a forráshoz, sorrendben ellenőrizve.',
+    addTarget: 'Formátum hozzáadása',
+    removeTarget: 'Eltávolítás',
+    formatLabel: 'Formátum',
+    bitrateLabel: 'Minőség / Bitráta',
+    losslessBitrate: 'Veszteségmentes',
     slskdTitle: 'slskd',
     slskdHint:
       'Letöltés a Soulseekről a slskd szervereden át. A nem talált számok a következő forráshoz kerülnek.',

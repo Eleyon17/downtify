@@ -823,6 +823,14 @@ export default {
     sourceYtmHint: 'En iyi meta veri eşleşmeleri',
     sourceYt: 'YouTube',
     sourceYtHint: 'YouTube Music’te olmayan şarkılar için yedek',
+    sourceTargetsOrder: 'Format ve kalite tercihi',
+    sourceTargetsHint:
+      'Bu kaynak için tercih edilen formatlar ve bit hızları, sırayla kontrol edilir.',
+    addTarget: 'Format ekle',
+    removeTarget: 'Kaldır',
+    formatLabel: 'Format',
+    bitrateLabel: 'Kalite / Bit Hızı',
+    losslessBitrate: 'Kayıpsız',
     slskdTitle: 'slskd',
     slskdHint:
       'Soulseek’ten slskd sunucun üzerinden indir. Bulunamayan parçalar sonraki kaynağa geçer.',

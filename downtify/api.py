@@ -745,7 +745,7 @@ def _slskd_extensions(raw: dict[str, Any]) -> list[str]:
     extensions = [
         str(e).strip().lower().lstrip('.') for e in value if str(e).strip()
     ]
-    return extensions or ['mp3', 'flac']
+    return extensions or ['flac', 'mp3']
 
 
 def _effective_slskd_settings(settings: dict[str, Any]) -> dict[str, Any]:

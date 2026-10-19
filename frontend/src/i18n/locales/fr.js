@@ -835,6 +835,14 @@ export default {
     sourceYtmHint: 'Meilleures correspondances de métadonnées',
     sourceYt: 'YouTube',
     sourceYtHint: 'Solution de repli pour les titres absents de YouTube Music',
+    sourceTargetsOrder: 'Préférence de format et qualité',
+    sourceTargetsHint:
+      'Formats et débits préférés pour cette source, vérifiés dans l’ordre.',
+    addTarget: 'Ajouter un format',
+    removeTarget: 'Supprimer',
+    formatLabel: 'Format',
+    bitrateLabel: 'Qualité / Débit',
+    losslessBitrate: 'Sans perte',
     slskdTitle: 'slskd',
     slskdHint:
       'Téléchargez depuis Soulseek via votre serveur slskd. Les titres introuvables passent à la source suivante.',
