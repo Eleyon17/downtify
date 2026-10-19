@@ -297,6 +297,7 @@ import asyncio
 import base64
 import concurrent.futures.thread as cf_thread
 import contextlib
+import copy
 import hashlib
 import json
 import mimetypes
@@ -7125,11 +7126,11 @@ async def update_settings_endpoint(
             elif key == 'source_targets':
                 state.settings[key] = (
                     _effective_source_targets({
+                        **pending,
                         'source_targets': raw_value,
-                        **state.settings,
                     })
                     if isinstance(raw_value, dict)
-                    else dict(DEFAULT_SOURCE_TARGETS)
+                    else copy.deepcopy(DEFAULT_SOURCE_TARGETS)
                 )
             else:
                 state.settings[key] = raw_value

@@ -935,3 +935,41 @@ def test_update_settings_applies_providers_and_slskd_to_downloader(
     assert downloader.audio_providers == ['slskd', 'youtube-music']
     assert downloader.slskd_settings['enabled'] is True
     assert downloader.slskd_settings['output_dir'] == str(tmp_path)
+
+
+def test_update_settings_preserves_custom_source_targets_order(monkeypatch):
+    custom_targets = {
+        'slskd': [
+            {'format': 'mp3', 'bitrate': '320'},
+            {'format': 'flac', 'bitrate': 'lossless'},
+        ],
+        'youtube-music': [{'format': 'opus', 'bitrate': '160'}],
+        'youtube': [{'format': 'm4a', 'bitrate': '256'}],
+    }
+    out = _update(monkeypatch, {'source_targets': custom_targets})
+    assert out['source_targets']['slskd'][0] == {'format': 'mp3', 'bitrate': '320'}
+    assert out['source_targets']['slskd'][1] == {'format': 'flac', 'bitrate': 'lossless'}
+    assert out['source_targets']['youtube-music'][0] == {'format': 'opus', 'bitrate': '160'}
+    assert out['source_targets']['youtube'][0] == {'format': 'm4a', 'bitrate': '256'}
+
+
+def test_load_settings_preserves_custom_source_targets_order(tmp_path):
+    path = tmp_path / 'settings.json'
+    custom_targets = {
+        'slskd': [
+            {'format': 'mp3', 'bitrate': '320'},
+            {'format': 'flac', 'bitrate': 'lossless'},
+        ],
+        'youtube-music': [{'format': 'opus', 'bitrate': '160'}],
+        'youtube': [{'format': 'm4a', 'bitrate': '256'}],
+    }
+    path.write_text(
+        json.dumps({'source_targets': custom_targets}),
+        encoding='utf-8',
+    )
+    out = _load_settings(path)
+    assert out['source_targets']['slskd'][0] == {'format': 'mp3', 'bitrate': '320'}
+    assert out['source_targets']['slskd'][1] == {'format': 'flac', 'bitrate': 'lossless'}
+    assert out['source_targets']['youtube-music'][0] == {'format': 'opus', 'bitrate': '160'}
+    assert out['source_targets']['youtube'][0] == {'format': 'm4a', 'bitrate': '256'}
+

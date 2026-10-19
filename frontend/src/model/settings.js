@@ -211,6 +211,10 @@ function loadServerSettings() {
       settings.value = {
         ...settings.value,
         ...rest,
+        source_targets: {
+          ...settings.value.source_targets,
+          ...(rest.source_targets || {}),
+        },
         slskd: { ...settings.value.slskd, ...(rest.slskd || {}) },
         navidrome: { ...settings.value.navidrome, ...(rest.navidrome || {}) },
         external_library: {
@@ -290,6 +294,10 @@ async function saveSettings() {
     settings.value = {
       ...settings.value,
       ...rest,
+      source_targets: {
+        ...settings.value.source_targets,
+        ...(rest.source_targets || {}),
+      },
       slskd: { ...settings.value.slskd, ...(rest.slskd || {}) },
       navidrome: { ...settings.value.navidrome, ...(rest.navidrome || {}) },
       external_library: {

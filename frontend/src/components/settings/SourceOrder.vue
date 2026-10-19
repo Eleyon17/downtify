@@ -26,7 +26,7 @@
         </div>
         <div
           v-for="(target, idx) in getTargets(row.id)"
-          :key="idx"
+          :key="`${row.id}-${idx}-${target.format}-${target.bitrate}`"
           class="flex flex-wrap items-center gap-2 rounded-[8px] border border-line-2/40 bg-surface/50 px-2.5 py-1.5"
         >
           <span class="w-4 text-center text-xs font-semibold text-muted">
@@ -129,7 +129,8 @@ function getTargets(id) {
   if (Array.isArray(current) && current.length > 0) {
     return current
   }
-  return defaultTargets[id] || [{ format: 'mp3', bitrate: '320' }]
+  const fallback = defaultTargets[id] || [{ format: 'mp3', bitrate: '320' }]
+  return fallback.map((t) => ({ ...t }))
 }
 
 function updateSourceTargets(id, list) {
