@@ -343,17 +343,17 @@ def test_promotion_shows_everything_without_losing_rows(monkeypatch, tmp_path):
         'state': {'principal': _principal(5, 'admin', 'maria')},
     })
 
-    # As a user: only their own track.
+    # Under the shared library model, all users see all server tracks.
     assert [
         e['file'] for e in api._filter_entries_for(entries, user_request)
-    ] == ['a.mp3']
+    ] == ['a.mp3', 'b.mp3']
     # Promoted to admin: the whole library, same rows underneath.
     assert api._filter_entries_for(entries, admin_request) == entries
     assert api._filter_playlists_for([], admin_request) == []
-    # Demoted back: only their own again, nothing was dropped.
+    # Demoted back: all library tracks still visible.
     assert [
         e['file'] for e in api._filter_entries_for(entries, user_request)
-    ] == ['a.mp3']
+    ] == ['a.mp3', 'b.mp3']
     assert api.likes_scope(admin_request) == 5
     assert api.likes_scope(user_request) == 5
 
@@ -513,15 +513,14 @@ def _wired_state(monkeypatch, tmp_path, owners: dict[str, int]) -> None:
     monkeypatch.setattr(api.state, 'track_owners', store)
 
 
-def test_entries_keep_only_owned_files(monkeypatch, tmp_path):
+def test_shared_library_shows_all_entries_to_users(monkeypatch, tmp_path):
     _wired_state(monkeypatch, tmp_path, {_key('a.mp3'): 5})
     entries = [_entry('a.mp3'), _entry('b.mp3')]
 
     mine = api._filter_entries_for(entries, _request(5))
-    assert [e['file'] for e in mine] == ['a.mp3']
-    assert api._filter_entries_for(entries, _request(7)) == []
+    assert [e['file'] for e in mine] == ['a.mp3', 'b.mp3']
+    assert [e['file'] for e in api._filter_entries_for(entries, _request(7))] == ['a.mp3', 'b.mp3']
     assert api._filter_entries_for(entries, _admin_request()) == entries
-    assert api._filter_entries_for(entries, _request()) == []
 
 
 def test_entries_scrub_foreign_playlists(monkeypatch, tmp_path):

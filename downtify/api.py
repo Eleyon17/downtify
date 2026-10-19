@@ -1103,17 +1103,12 @@ def request_is_admin(request: Optional[Request]) -> bool:
 def allowed_entry_keys(request: Optional[Request]) -> Optional[set[str]]:
     """Content keys *request* may browse (``None``: everything).
 
-    Admins see the whole library, including files nobody owns (monitor
-    sweeps, reconciled drops, pre-feature downloads). Anyone else sees
-    only files they asked to download.
+    Under the shared server library model, every song on the server
+    can be seen by all users, while personal collections (likes, playlists,
+    queue, recommendations) remain per-user.
     """
 
-    if request_is_admin(request) or state.track_owners is None:
-        return None
-    user_id = request_user_id(request)
-    if not user_id:
-        return set()
-    return state.track_owners.owned_keys(user_id)
+    return None
 
 
 def _playlist_owner_maps() -> tuple[dict[str, int], dict[str, int]]:
@@ -1373,8 +1368,7 @@ def _filter_entries_for(
     snapshot they come from is shared.
     """
 
-    allowed = allowed_entry_keys(request)
-    if allowed is None:
+    if request_is_admin(request):
         return entries
     user_id = request_user_id(request)
     catalog_names, manual_owners, monitored_owners, visibility, _ = (
@@ -1402,8 +1396,6 @@ def _filter_entries_for(
 
     filtered = []
     for entry in entries:
-        if entry_content_key(entry) not in allowed:
-            continue
         names = entry.get('playlists')
         filtered.append(_scrubbed(entry, names) if names else entry)
     return filtered
@@ -1420,19 +1412,7 @@ def filter_paths_for_request(
 ) -> list[str]:
     """Library paths *request* may browse (``GET /list``), order kept."""
 
-    allowed = allowed_entry_keys(request)
-    if allowed is None:
-        return list(paths)
-    by_file = {}
-    for entry in listing_for_request(library_context()):
-        by_file[str(entry.get('file') or '').replace('\\', '/')] = (
-            entry_content_key(entry)
-        )
-    return [
-        path
-        for path in paths
-        if by_file.get(str(path or '').replace('\\', '/')) in allowed
-    ]
+    return list(paths)
 
 
 def playlists_for_request(request: Optional[Request]) -> list[dict[str, Any]]:
@@ -4852,16 +4832,13 @@ def _playlist_completeness_report(
         playlist_name,
         spotify_id,
     )
-    owned: Optional[set[str]] = None
-    if user_id is not None and state.track_owners is not None:
-        owned = state.track_owners.owned_keys(user_id)
     downloaded_count, missing_tracks = split_tracks_by_library(
         tracks,
         downloader=state.downloader,
         track_index=state.track_index,
         subdir=subdir,
         catalog_filenames=catalog_filenames,
-        owned_keys=owned,
+        owned_keys=None,
     )
     expected_count = len(tracks) or int(expected_hint or 0)
     if batch is not None and not expected_count:
@@ -5047,16 +5024,13 @@ def _missing_tracks_for_playlist(
         playlist_name,
         sid,
     )
-    owned: Optional[set[str]] = None
-    if user_id is not None and state.track_owners is not None:
-        owned = state.track_owners.owned_keys(user_id)
     _downloaded, missing = split_tracks_by_library(
         tracks,
         downloader=state.downloader,
         track_index=state.track_index,
         subdir=subdir,
         catalog_filenames=catalog_filenames,
-        owned_keys=owned,
+        owned_keys=None,
     )
     playlist_url = f'https://open.spotify.com/playlist/{sid}'
     return playlist_name, playlist_url, missing
