@@ -320,7 +320,7 @@ from fastapi import (
     WebSocket,
     WebSocketDisconnect,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from loguru import logger
 
 from . import (
@@ -2507,6 +2507,18 @@ def bind_lrc_resolver() -> None:
 @router.get('/api/version')
 def get_version() -> str:
     return state.version
+
+
+@router.get('/api/apk')
+def get_latest_apk() -> Response:
+    """Redirect to the latest Downtify Android APK release asset, or repository releases."""
+    apk_url = None
+    if state.update_checker is not None:
+        apk_url = getattr(state.update_checker, '_apk_url', None)
+    if not apk_url:
+        repo = getattr(state.update_checker, '_repo', 'Eleyon17/downtify') if state.update_checker else 'Eleyon17/downtify'
+        apk_url = f'https://github.com/{repo}/releases'
+    return RedirectResponse(url=apk_url, status_code=307)
 
 
 @router.get('/api/health')

@@ -320,7 +320,7 @@ def fetch_feed(feed_url: str) -> ParsedFeed:
         timeout=_FEED_TIMEOUT,
         follow_redirects=True,
         headers={
-            'User-Agent': 'Downtify/podcasts (+https://github.com/henriquesebastiao/downtify)'
+            'User-Agent': 'Downtify/podcasts (+https://github.com/Eleyon17/downtify)'
         },
     )
     resp.raise_for_status()

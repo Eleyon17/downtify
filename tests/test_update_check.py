@@ -72,6 +72,19 @@ def test_is_newer_false_when_latest_is_unparseable():
     assert is_newer('not-a-version', '2.11.0') is False
 
 
+def test_parse_version_single_component_padded():
+    assert _parse_version('v3') == (3, 0, 0)
+    assert _parse_version('3') == (3, 0, 0)
+    assert _parse_version('v3-unstable') == (3, 0, 0)
+
+
+def test_is_newer_handles_single_component_version():
+    assert is_newer('v4', 'v3') is True
+    assert is_newer('v3', 'v3') is False
+    assert is_newer('v3', '3.0.0') is False
+    assert is_newer('v3.1.0', 'v3') is True
+
+
 # ── UpdateChecker ─────────────────────────────────────────────────────────────
 
 

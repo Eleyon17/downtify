@@ -721,7 +721,7 @@
                 <UiButton
                   variant="ghost"
                   icon="arrow-up-right"
-                  href="https://github.com/henriquesebastiao/downtify"
+                  href="https://github.com/Eleyon17/downtify"
                 >
                   GitHub
                 </UiButton>

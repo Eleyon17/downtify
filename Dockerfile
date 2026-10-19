@@ -27,19 +27,22 @@ RUN npm run build
 # Final minimal runtime image
 FROM python:3.15-alpine
 
-LABEL maintainer="Henrique Sebastião <contato@henriquesebastiao.com>"
-LABEL version="3.5.0"
+ARG VERSION=3.0.0
+ENV DOWNTIFY_VERSION=${VERSION}
+
+LABEL maintainer="Eleyon17 <https://github.com/Eleyon17>"
+LABEL version="3.0.0"
 LABEL description="Self-hosted Spotify downloader"
 
 LABEL org.opencontainers.image.title="Downtify" \
     org.opencontainers.image.description="Download your Spotify playlists and songs along with album art and metadata in a self-hosted way via Docker." \
-    org.opencontainers.image.version="3.5.0" \
-    org.opencontainers.image.authors="Henrique Sebastião <contato@henriquesebastiao.com>" \
-    org.opencontainers.image.url="https://github.com/henriquesebastiao/downtify" \
-    org.opencontainers.image.source="https://github.com/henriquesebastiao/downtify" \
+    org.opencontainers.image.version="3.0.0" \
+    org.opencontainers.image.authors="Eleyon17 <https://github.com/Eleyon17>" \
+    org.opencontainers.image.url="https://github.com/Eleyon17/downtify" \
+    org.opencontainers.image.source="https://github.com/Eleyon17/downtify" \
     org.opencontainers.image.licenses="AGPL-3.0" \
-    org.opencontainers.image.documentation="https://github.com/henriquesebastiao/downtify#readme" \
-    org.opencontainers.image.vendor="Henrique Sebastião" \
+    org.opencontainers.image.documentation="https://github.com/Eleyon17/downtify#readme" \
+    org.opencontainers.image.vendor="Eleyon17" \
     org.opencontainers.image.base.name="python:3.15-alpine"
 
 # Runtime configuration

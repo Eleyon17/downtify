@@ -7,14 +7,14 @@
     >
       <div class="flex flex-col gap-4 px-5 py-4">
         <p class="text-sm text-pretty text-fg-2">{{ t('apps.androidBody') }}</p>
-        <div
-          class="flex items-start gap-2.5 rounded-control bg-warn/10 px-3 py-2.5 text-[13px] text-pretty text-warn"
-          role="note"
-        >
-          <AppIcon name="alert" :size="16" class="mt-0.5 shrink-0" />
-          <span>{{ t('apps.androidUnreleased') }}</span>
-        </div>
         <div class="flex flex-wrap gap-2">
+          <UiButton
+            variant="primary"
+            icon="arrow-down-to-line"
+            :href="apkDownloadUrl"
+          >
+            Download APK
+          </UiButton>
           <UiButton
             :href="ANDROID_REPO"
             icon="link"
@@ -195,13 +195,15 @@ import { useUi } from '/src/model/ui'
 import { formatCountdown, pairingUri, qrPath } from '/src/lib/auth'
 import { timeAgo } from '/src/lib/format'
 import { useI18n } from '/src/i18n'
+import { useUpdateCheck } from '/src/model/updateCheck'
 
 const { t, locale } = useI18n()
 const ui = useUi()
 const auth = useAuth()
+const { status: update } = useUpdateCheck()
 
-// The Android client, still in development - no release yet.
-const ANDROID_REPO = 'https://github.com/henriquesebastiao/downtify-android'
+const ANDROID_REPO = 'https://github.com/Eleyon17/downtify'
+const apkDownloadUrl = computed(() => update.value?.apk_url || '/api/apk')
 
 const info = ref(null)
 const serverName = ref('')

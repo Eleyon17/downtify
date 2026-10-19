@@ -38,7 +38,7 @@ from .lyrics_cache import song_key
 
 LRCLIB_BASE = 'https://lrclib.net/api'
 NETEASE_BASE = 'https://music.163.com/api'
-_USER_AGENT = 'Downtify (https://github.com/henriquesebastiao/downtify)'
+_USER_AGENT = 'Downtify (https://github.com/Eleyon17/downtify)'
 _TIMEOUT = 10
 
 #: Implemented providers, in the order they are offered by default.

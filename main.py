@@ -611,7 +611,7 @@ def build_app() -> FastAPI:
     cookies_store = CookiesStore(DATABASE_DIR / 'cookies.txt')
     api.state.cookies_store = cookies_store
 
-    api.state.version = __version__
+    api.state.version = os.getenv('DOWNTIFY_VERSION', __version__)
     api.state.downloader = Downloader(
         DOWNLOAD_DIR,
         cookies_store=cookies_store,

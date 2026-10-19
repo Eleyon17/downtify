@@ -10,6 +10,7 @@ waits on it.
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -17,7 +18,7 @@ from typing import Any, Optional
 import httpx
 from loguru import logger
 
-GITHUB_REPO = 'henriquesebastiao/downtify'
+GITHUB_REPO = os.getenv('DOWNTIFY_GITHUB_REPO', 'Eleyon17/downtify')
 RELEASES_API_URL = (
     f'https://api.github.com/repos/{GITHUB_REPO}/releases/latest'
 )
@@ -31,7 +32,7 @@ _VERSION_RE = re.compile(r'\d+(?:\.\d+)*')
 
 
 def _parse_version(raw: str) -> tuple[int, ...]:
-    """Turn ``'2.11.0'``, ``'v2.11.0'`` or ``'Downtify 2.11.0'`` into
+    """Turn ``'2.11.0'``, ``'v2.11.0'``, ``'v3'`` or ``'Downtify 2.11.0'`` into
     ``(2, 11, 0)``.
 
     Falls back to an empty tuple for anything unparseable, which always
@@ -40,7 +41,10 @@ def _parse_version(raw: str) -> tuple[int, ...]:
     match = _VERSION_RE.search(raw or '')
     if not match:
         return ()
-    return tuple(int(part) for part in match.group().split('.'))
+    parts = [int(part) for part in match.group().split('.')]
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts)
 
 
 def is_newer(latest: str, current: str) -> bool:
@@ -57,10 +61,11 @@ class UpdateChecker:
     :meth:`status` is cheap and safe to call from a request handler.
     """
 
-    def __init__(self, repo: str = GITHUB_REPO) -> None:
-        self._repo = repo
+    def __init__(self, repo: Optional[str] = None) -> None:
+        self._repo = repo or os.getenv('DOWNTIFY_GITHUB_REPO', GITHUB_REPO)
         self._latest_version: Optional[str] = None
-        self._release_url = DEFAULT_RELEASES_PAGE_URL
+        self._release_url = f'https://github.com/{self._repo}/releases/latest'
+        self._apk_url: Optional[str] = None
         self._last_checked: Optional[str] = None
         self._last_error: Optional[str] = None
 
@@ -84,6 +89,12 @@ class UpdateChecker:
                 raise ValueError('release response has no tag_name')
             self._latest_version = tag
             self._release_url = data.get('html_url') or self._release_url
+            apk_url = None
+            for asset in data.get('assets', []):
+                if str(asset.get('name', '')).lower().endswith('.apk'):
+                    apk_url = asset.get('browser_download_url')
+                    break
+            self._apk_url = apk_url
             self._last_error = None
         except Exception as exc:
             logger.opt(exception=True).warning(
@@ -99,13 +110,16 @@ class UpdateChecker:
             self._latest_version
             and is_newer(self._latest_version, current_version)
         )
-        return {
+        res = {
             'current_version': current_version,
             'latest_version': self._latest_version,
             'update_available': update_available,
             'release_url': self._release_url,
             'last_checked': self._last_checked,
         }
+        if self._apk_url:
+            res['apk_url'] = self._apk_url
+        return res
 
 
 async def update_check_loop(
