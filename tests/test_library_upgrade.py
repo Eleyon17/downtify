@@ -1095,3 +1095,125 @@ def test_format_upgrade_extension_change_and_hooks(
     assert len(path_changed_calls) == 1
     assert path_changed_calls[0] == ('track.mp3', 'track.flac', new_track)
 
+
+def test_track_format_improper_with_source_targets(tmp_path: Path) -> None:
+    from downtify.library_upgrade import track_format_improper
+
+    mp3_file = _write_track(tmp_path / 'song.mp3')
+    entry = {'file': 'song.mp3', 'bitrate': 320000}
+
+    # If source_targets specifies FLAC for top provider, MP3 is improper
+    assert track_format_improper(
+        entry,
+        mp3_file,
+        source_targets={'slskd': [{'format': 'flac', 'bitrate': 'lossless'}]},
+        audio_providers=['slskd'],
+    )
+
+    # If source_targets specifies MP3 320, MP3 at 320 is proper
+    assert not track_format_improper(
+        entry,
+        mp3_file,
+        source_targets={'slskd': [{'format': 'mp3', 'bitrate': '320'}]},
+        audio_providers=['slskd'],
+    )
+
+
+def test_format_upgrade_with_slskd_source(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    from downtify.library_upgrade import CATEGORY_FORMAT, JOB_DONE
+
+    ctx = _context(tmp_path)
+    old_track = _write_track(ctx.download_dir / 'track.mp3')
+
+    slskd_staged = tmp_path / 'slskd_download.flac'
+    slskd_staged.write_bytes(b'FLAC_SLSKD_MOCK_123')
+
+    monkeypatch.setattr(
+        'downtify.library_upgrade.download_from_slskd',
+        lambda song, settings, **kwargs: slskd_staged,
+    )
+    monkeypatch.setattr(
+        'downtify.library_upgrade._audio_length', lambda _p: 180.0
+    )
+    monkeypatch.setattr(
+        'downtify.library_upgrade.embed_metadata', lambda *a, **k: None
+    )
+
+    deps = UpgradeDeps(
+        context=lambda: ctx,
+        settings=lambda: {
+            'redownload_improper_format': True,
+            'audio_providers': ['slskd'],
+            'slskd': {'enabled': True},
+        },
+        downloader=lambda: None,
+    )
+    options = UpgradeOptions(
+        categories=(CATEGORY_FORMAT,),
+        check_format=True,
+        source_targets={'slskd': [{'format': 'flac', 'bitrate': 'lossless'}]},
+        audio_providers=['slskd'],
+    )
+
+    outcome = upgrade_track('track.mp3', deps=deps, options=options)
+    assert outcome.status == JOB_DONE
+    assert outcome.new_path == 'track.flac'
+    assert not old_track.exists()
+    assert (ctx.download_dir / 'track.flac').is_file()
+
+
+def test_format_upgrade_slskd_fails_falls_back_to_ytm(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    from downtify.library_upgrade import CATEGORY_FORMAT, JOB_DONE
+
+    ctx = _context(tmp_path)
+    old_track = _write_track(ctx.download_dir / 'track.mp3')
+
+    monkeypatch.setattr(
+        'downtify.library_upgrade.download_from_slskd',
+        lambda song, settings, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        'downtify.library_upgrade.find_match_youtube_music_only',
+        lambda song: ('video_match_123', None),
+    )
+    monkeypatch.setattr(
+        'downtify.library_upgrade._audio_length', lambda _p: 180.0
+    )
+    monkeypatch.setattr(
+        'downtify.library_upgrade.embed_metadata', lambda *a, **k: None
+    )
+
+    class FakeDownloader:
+        def fetch_audio(self, video_id, target_dir, basename, **kwargs):
+            staged = target_dir / f'{basename}.mp3'
+            staged.write_bytes(b'MP3_YTM_DATA')
+            return staged
+
+    deps = UpgradeDeps(
+        context=lambda: ctx,
+        settings=lambda: {
+            'redownload_improper_format': True,
+            'audio_providers': ['slskd', 'youtube-music'],
+            'slskd': {'enabled': True},
+        },
+        downloader=lambda: FakeDownloader(),
+    )
+    options = UpgradeOptions(
+        categories=(CATEGORY_FORMAT,),
+        check_format=True,
+        source_targets={
+            'slskd': [{'format': 'flac', 'bitrate': 'lossless'}],
+            'youtube-music': [{'format': 'mp3', 'bitrate': '320'}],
+        },
+        audio_providers=['slskd', 'youtube-music'],
+    )
+
+    outcome = upgrade_track('track.mp3', deps=deps, options=options)
+    assert outcome.status == JOB_DONE
+    assert (ctx.download_dir / 'track.mp3').is_file()
+
+

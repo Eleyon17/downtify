@@ -7,6 +7,18 @@ import { needsLanguageSync, splitUiLanguage } from '/src/lib/uiLanguage'
 
 const settings = ref({
   audio_providers: ['youtube-music'],
+  source_targets: {
+    slskd: [
+      { format: 'flac', bitrate: 'lossless' },
+      { format: 'mp3', bitrate: '320' },
+    ],
+    'youtube-music': [
+      { format: 'mp3', bitrate: '320' },
+    ],
+    youtube: [
+      { format: 'mp3', bitrate: '320' },
+    ],
+  },
   slskd: {
     enabled: false,
     base_url: '',
@@ -88,6 +100,8 @@ const settingsOptions = {
   lyrics_providers: ['lrclib', 'genius', 'musixmatch', 'azlyrics'],
   format: ['mp3', 'flac', 'ogg', 'opus', 'm4a'],
   bitrate: ['128', '192', '256', '320'],
+  source_formats: ['flac', 'mp3', 'ogg', 'opus', 'm4a'],
+  source_bitrates: ['lossless', '320', '256', '192', '128'],
   max_parallel_downloads_presets: [1, 2, 3, 5, 8],
   max_parallel_downloads_min: MIN_PARALLEL_DOWNLOADS,
   max_parallel_downloads_max: MAX_PARALLEL_DOWNLOADS,

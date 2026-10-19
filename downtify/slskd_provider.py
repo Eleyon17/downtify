@@ -782,14 +782,30 @@ def _collect_matching_files(
 
 
 def _select_download_candidates(
-    ranked: list[dict[str, Any]], settings: dict[str, Any]
+    ranked: list[dict[str, Any]],
+    settings: dict[str, Any],
+    *,
+    target_format: Optional[str] = None,
+    min_bitrate: Optional[int] = None,
 ) -> list[dict[str, Any]]:
-    """Pick up to download_attempts files, preferring extension order at equal score."""
-    raw_ext = settings.get('extensions') or ['mp3', 'flac']
-    extensions = [
-        str(e).strip().lower().lstrip('.') for e in raw_ext if str(e).strip()
-    ] or ['mp3', 'flac']
-    min_bitrate = int(settings.get('min_bitrate') or 0)
+    """Pick up to download_attempts files, filtering by target_format and
+    min_bitrate if specified.
+    """
+    if target_format:
+        extensions = [str(target_format).strip().lower().lstrip('.')]
+    else:
+        raw_ext = settings.get('extensions') or ['mp3', 'flac']
+        extensions = [
+            str(e).strip().lower().lstrip('.')
+            for e in raw_ext
+            if str(e).strip()
+        ] or ['mp3', 'flac']
+
+    if min_bitrate is not None:
+        eff_min_bitrate = int(min_bitrate)
+    else:
+        eff_min_bitrate = int(settings.get('min_bitrate') or 0)
+
     max_files = int(settings.get('download_attempts') or 5)
 
     by_score: dict[int, list[dict[str, Any]]] = {}
@@ -809,25 +825,37 @@ def _select_download_candidates(
                     )
                 except (TypeError, ValueError):
                     bitrate = 0
-                if min_bitrate and bitrate and bitrate < min_bitrate:
+                if (
+                    ext != 'flac'
+                    and eff_min_bitrate
+                    and bitrate
+                    and bitrate < eff_min_bitrate
+                ):
                     continue
                 selected.append(file_row)
                 if len(selected) >= max_files:
                     return selected
-        for file_row in bucket:
-            if file_row in selected:
-                continue
-            try:
-                bitrate = int(
-                    file_row.get('bitRate') or file_row.get('bitrate') or 0
-                )
-            except (TypeError, ValueError):
-                bitrate = 0
-            if min_bitrate and bitrate and bitrate < min_bitrate:
-                continue
-            selected.append(file_row)
-            if len(selected) >= max_files:
-                return selected
+        if not target_format:
+            for file_row in bucket:
+                if file_row in selected:
+                    continue
+                try:
+                    bitrate = int(
+                        file_row.get('bitRate') or file_row.get('bitrate') or 0
+                    )
+                except (TypeError, ValueError):
+                    bitrate = 0
+                ext = _file_extension(str(file_row.get('filename') or ''))
+                if (
+                    ext != 'flac'
+                    and eff_min_bitrate
+                    and bitrate
+                    and bitrate < eff_min_bitrate
+                ):
+                    continue
+                selected.append(file_row)
+                if len(selected) >= max_files:
+                    return selected
     return selected
 
 
@@ -1223,6 +1251,9 @@ def download_from_slskd(  # noqa: PLR0914  # search, rank, enqueue, poll, finali
     song: dict[str, Any],
     settings: dict[str, Any],
     progress_cb: Optional[ProgressCallback] = None,
+    target_format: Optional[str] = None,
+    min_bitrate: Optional[int] = None,
+    targets: Optional[list[dict[str, Any]]] = None,
 ) -> Optional[Path]:
     if not bool(settings.get('enabled')):
         return None
@@ -1360,7 +1391,40 @@ def download_from_slskd(  # noqa: PLR0914  # search, rank, enqueue, poll, finali
                 search_id = ''
                 continue
 
-            selected = _select_download_candidates(qualified, settings)
+            eff_targets = targets
+            if not eff_targets and target_format:
+                eff_targets = [{
+                    'format': target_format,
+                    'bitrate': min_bitrate or 0,
+                }]
+
+            if eff_targets:
+                selected = []
+                for tgt in eff_targets:
+                    t_fmt = str(tgt.get('format') or '').lower().lstrip('.')
+                    t_br_raw = tgt.get('bitrate') or tgt.get('quality') or 0
+                    try:
+                        t_br = int(t_br_raw) if str(t_br_raw).isdigit() else 0
+                    except (TypeError, ValueError):
+                        t_br = 0
+                    selected = _select_download_candidates(
+                        qualified,
+                        settings,
+                        target_format=t_fmt,
+                        min_bitrate=t_br,
+                    )
+                    if selected:
+                        logger.info(
+                            'slskd: found {} candidates matching format={!r} '
+                            'bitrate={}',
+                            len(selected),
+                            t_fmt,
+                            t_br,
+                        )
+                        break
+            else:
+                selected = _select_download_candidates(qualified, settings)
+
             if not selected:
                 logger.info(
                     'slskd: no files passed quality filters for query={!r} '

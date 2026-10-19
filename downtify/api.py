@@ -497,8 +497,33 @@ MAX_TRACK_DURATION_SETTING_SECONDS = 6 * 3600
 MIN_COVER_RESOLUTION = 300
 MAX_COVER_RESOLUTION = 1200
 
+DEFAULT_SOURCE_TARGETS: dict[str, list[dict[str, str]]] = {
+    'slskd': [
+        {'format': 'flac', 'bitrate': 'lossless'},
+        {'format': 'mp3', 'bitrate': '320'},
+    ],
+    'youtube-music': [
+        {'format': 'mp3', 'bitrate': '320'},
+    ],
+    'youtube': [
+        {'format': 'mp3', 'bitrate': '320'},
+    ],
+}
+
 DEFAULT_SETTINGS: dict[str, Any] = {
     'audio_providers': ['youtube-music'],
+    'source_targets': {
+        'slskd': [
+            {'format': 'flac', 'bitrate': 'lossless'},
+            {'format': 'mp3', 'bitrate': '320'},
+        ],
+        'youtube-music': [
+            {'format': 'mp3', 'bitrate': '320'},
+        ],
+        'youtube': [
+            {'format': 'mp3', 'bitrate': '320'},
+        ],
+    },
     'lyrics_providers': list(lyrics.PROVIDER_ORDER),
     'download_lyrics': True,
     'lyrics_lrc_beside': True,
@@ -598,6 +623,7 @@ _NESTED_SETTINGS = (
     'navidrome',
     'library_upgrade',
     'external_library',
+    'source_targets',
 )
 
 
@@ -803,6 +829,19 @@ def _effective_audio_providers(settings: dict[str, Any]) -> list[str]:
     if out == ['slskd']:
         out += ['youtube-music', 'youtube']
     return out
+
+
+def _effective_source_targets(
+    settings: dict[str, Any],
+) -> dict[str, list[dict[str, str]]]:
+    """Format and bitrate targets per audio provider in preference order."""
+
+    return Downloader._normalize_source_targets(
+        settings.get('source_targets'),
+        default_format=str(settings.get('format') or 'mp3'),
+        default_bitrate=str(settings.get('bitrate') or '320'),
+        slskd_settings=_effective_slskd_settings(settings),
+    )
 
 
 def _validate_integration_settings(
@@ -2384,6 +2423,7 @@ def _load_settings(path: Path) -> dict[str, Any]:
             )
             merged['ui_language'] = _clean_ui_language(merged['ui_language'])
             merged['external_library'] = effective_external_library(merged)
+            merged['source_targets'] = _effective_source_targets(merged)
             normalize_lyrics_location(merged)
             return merged
     except Exception:
@@ -5756,6 +5796,8 @@ def _upgrade_options(
         merged['target_bitrate'] = int(state.settings.get('bitrate') or 320)
     except (TypeError, ValueError):
         merged['target_bitrate'] = 320
+    merged['source_targets'] = _effective_source_targets(state.settings)
+    merged['audio_providers'] = _effective_audio_providers(state.settings)
     return library_upgrade.options_from(merged)
 
 
@@ -7080,6 +7122,15 @@ async def update_settings_endpoint(
                 state.settings[key] = lyrics.coerce_bool(raw_value, True)
             elif key == 'lyrics_lrc_dir':
                 state.settings[key] = str(raw_value or '').strip()
+            elif key == 'source_targets':
+                state.settings[key] = (
+                    _effective_source_targets({
+                        'source_targets': raw_value,
+                        **state.settings,
+                    })
+                    if isinstance(raw_value, dict)
+                    else dict(DEFAULT_SOURCE_TARGETS)
+                )
             else:
                 state.settings[key] = raw_value
         if {'audio_providers', 'slskd'} & set(payload):
@@ -7087,9 +7138,14 @@ async def update_settings_endpoint(
                 state.settings
             )
         if state.downloader is not None:
-            if {'audio_providers', 'slskd', 'max_parallel_downloads'} & set(
-                payload
-            ):
+            if {
+                'audio_providers',
+                'slskd',
+                'max_parallel_downloads',
+                'source_targets',
+                'format',
+                'bitrate',
+            } & set(payload):
                 state.downloader.slskd_settings = (
                     state.downloader._normalize_slskd_settings(
                         _effective_slskd_settings(state.settings)
@@ -7099,6 +7155,9 @@ async def update_settings_endpoint(
                     state.downloader.download_dir
                 )
                 state.downloader.audio_providers = _effective_audio_providers(
+                    state.settings
+                )
+                state.downloader.source_targets = _effective_source_targets(
                     state.settings
                 )
             fmt = payload.get('format')

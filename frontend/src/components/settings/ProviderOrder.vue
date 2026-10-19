@@ -53,6 +53,12 @@
         :aria-label="row.title"
         @update:model-value="(on) => toggle(row.id, on)"
       />
+      <div
+        v-if="$slots.extra && row.enabled"
+        class="mt-1 w-full border-t border-line-2/60 pt-3 pl-1"
+      >
+        <slot name="extra" :row="row" />
+      </div>
     </li>
   </ol>
 </template>

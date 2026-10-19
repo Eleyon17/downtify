@@ -1311,6 +1311,29 @@ def find_match(
     return yt_video_id, None
 
 
+def find_match_youtube_music_only(
+    song: dict[str, Any],
+) -> tuple[Optional[str], Optional[dict[str, Any]]]:
+    """YouTube Music-only match, for the ``youtube-music`` audio provider.
+
+    Does not fall back to standard YouTube. Returns ``(videoId, match)`` or
+    ``(None, None)``.
+    """
+
+    video_id, match = _find_youtube_music_match(song)
+    if not video_id:
+        return None, None
+    ytm_diff = _duration_diff(song, match)
+    if ytm_diff is not None and ytm_diff > _YOUTUBE_MAX_DURATION_DIFF:
+        logger.info(
+            'find_match_youtube_music_only: rejected videoId={} off by {}s',
+            video_id,
+            ytm_diff,
+        )
+        return None, None
+    return video_id, match
+
+
 def _duration_diff(
     song: dict[str, Any], result: Optional[dict[str, Any]]
 ) -> Optional[int]:

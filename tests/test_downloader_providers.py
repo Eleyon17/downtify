@@ -226,3 +226,84 @@ def test_audio_providers_are_normalized():
         'slskd',
         'youtube',
     ]) == ['slskd', 'youtube']
+
+
+def test_source_targets_slskd_passes_targets_and_falls_back_to_ytm(
+    tmp_path, monkeypatch, no_youtube
+):
+    captured_targets = []
+
+    def fake_slskd(song, settings, progress_cb=None, targets=None, **kwargs):
+        captured_targets.append(targets)
+        return None
+
+    monkeypatch.setattr(downloader_mod, 'download_from_slskd', fake_slskd)
+    monkeypatch.setattr(
+        downloader_mod,
+        'find_match_youtube_music_only',
+        lambda song: ('ytm_video_123', {'title': 'Track'}),
+    )
+
+    d = Downloader(
+        tmp_path,
+        audio_providers=['slskd', 'youtube-music'],
+        source_targets={
+            'slskd': [
+                {'format': 'flac', 'bitrate': 'lossless'},
+                {'format': 'mp3', 'bitrate': '320'},
+            ],
+            'youtube-music': [{'format': 'mp3', 'bitrate': '320'}],
+        },
+        slskd_settings={'enabled': True},
+    )
+
+    assert d.download(dict(_SONG)) == 'Artist - Track.mp3'
+    assert len(captured_targets) == 1
+    assert captured_targets[0] == [
+        {'format': 'flac', 'bitrate': 'lossless'},
+        {'format': 'mp3', 'bitrate': '320'},
+    ]
+    assert no_youtube == ['https://music.youtube.com/watch?v=ytm_video_123']
+
+
+def test_source_targets_ytm_fails_falls_back_to_youtube(
+    tmp_path, monkeypatch, no_youtube
+):
+    monkeypatch.setattr(
+        downloader_mod,
+        'find_match_youtube_music_only',
+        lambda song: (None, None),
+    )
+    monkeypatch.setattr(
+        downloader_mod, 'find_match_youtube_only', lambda song: 'yt_video_456'
+    )
+
+    d = Downloader(
+        tmp_path,
+        audio_providers=['youtube-music', 'youtube'],
+        source_targets={
+            'youtube-music': [{'format': 'flac', 'bitrate': 'lossless'}],
+            'youtube': [{'format': 'mp3', 'bitrate': '320'}],
+        },
+    )
+
+    assert d.download(dict(_SONG)) == 'Artist - Track.mp3'
+    assert no_youtube == ['https://www.youtube.com/watch?v=yt_video_456']
+
+
+def test_downloader_normalizes_source_targets():
+    norm = Downloader._normalize_source_targets(
+        {
+            'slskd': ['flac', {'format': 'mp3', 'bitrate': '256'}],
+            'youtube-music': [{'format': 'ogg', 'bitrate': '192'}],
+        },
+        default_format='mp3',
+        default_bitrate='320',
+    )
+    assert norm['slskd'] == [
+        {'format': 'flac', 'bitrate': 'lossless'},
+        {'format': 'mp3', 'bitrate': '256'},
+    ]
+    assert norm['youtube-music'] == [{'format': 'ogg', 'bitrate': '192'}]
+    assert norm['youtube'] == [{'format': 'mp3', 'bitrate': '320'}]
+

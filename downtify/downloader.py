@@ -366,6 +366,7 @@ class Downloader:
         audio_providers: Optional[list[str]] = None,
         slskd_settings: Optional[dict[str, Any]] = None,
         max_track_duration_seconds: int = MAX_TRACK_DURATION_SECONDS,
+        source_targets: Optional[dict[str, list[dict[str, Any]]]] = None,
     ):
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
@@ -379,6 +380,12 @@ class Downloader:
         self.cookies_store = cookies_store
         self.audio_format = audio_format
         self.audio_bitrate = audio_bitrate
+        self.source_targets = self._normalize_source_targets(
+            source_targets,
+            self.audio_format,
+            self.audio_bitrate,
+            slskd_settings=self.slskd_settings,
+        )
         self.output_template = output_template
         self.lyrics_providers = list(lyrics_providers or [])
         # Optional LyricsLookupCache: skips providers that already came
@@ -392,6 +399,77 @@ class Downloader:
         self.max_track_duration_seconds = max_track_duration_seconds
         self._target_locks: dict[str, threading.Lock] = {}
         self._target_locks_guard = threading.Lock()
+
+    @staticmethod
+    def _normalize_source_targets(
+        targets: Optional[dict[str, Any]],
+        default_format: str = 'mp3',
+        default_bitrate: str = '320',
+        slskd_settings: Optional[dict[str, Any]] = None,
+    ) -> dict[str, list[dict[str, str]]]:
+        """Normalize format and quality/bitrate targets per audio provider."""
+
+        raw = targets if isinstance(targets, dict) else {}
+        out: dict[str, list[dict[str, str]]] = {}
+        for provider in AUDIO_PROVIDERS:
+            prov_list = raw.get(provider)
+            cleaned: list[dict[str, str]] = []
+            if isinstance(prov_list, list):
+                for item in prov_list:
+                    if isinstance(item, dict):
+                        fmt = str(
+                            item.get('format') or default_format
+                        ).strip().lower().lstrip('.')
+                        if fmt not in _AUDIO_EXTENSIONS:
+                            fmt = default_format
+                        br = str(
+                            item.get('bitrate')
+                            or item.get('quality')
+                            or ('lossless' if fmt == 'flac' else default_bitrate)
+                        ).strip()
+                        if fmt == 'flac':
+                            br = 'lossless'
+                        entry = {'format': fmt, 'bitrate': br}
+                        if entry not in cleaned:
+                            cleaned.append(entry)
+                    elif isinstance(item, str) and item.strip():
+                        fmt = item.strip().lower().lstrip('.')
+                        if fmt in _AUDIO_EXTENSIONS:
+                            br = (
+                                'lossless'
+                                if fmt == 'flac'
+                                else default_bitrate
+                            )
+                            entry = {'format': fmt, 'bitrate': br}
+                            if entry not in cleaned:
+                                cleaned.append(entry)
+            if not cleaned:
+                if provider == 'slskd':
+                    exts = (slskd_settings or {}).get('extensions') or [
+                        'flac',
+                        'mp3',
+                    ]
+                    min_br = str(
+                        (slskd_settings or {}).get('min_bitrate')
+                        or default_bitrate
+                    )
+                    for ext in exts:
+                        fmt = str(ext).strip().lower().lstrip('.')
+                        if fmt in _AUDIO_EXTENSIONS:
+                            br = 'lossless' if fmt == 'flac' else min_br
+                            entry = {'format': fmt, 'bitrate': br}
+                            if entry not in cleaned:
+                                cleaned.append(entry)
+                else:
+                    cleaned = [{
+                        'format': default_format,
+                        'bitrate': default_bitrate,
+                    }]
+            out[provider] = cleaned or [{
+                'format': default_format,
+                'bitrate': default_bitrate,
+            }]
+        return out
 
     @staticmethod
     def _normalize_audio_providers(
@@ -470,26 +548,48 @@ class Downloader:
         song: dict[str, Any],
         progress_cb: Optional[ProgressCallback],
     ) -> tuple[
-        Optional[str], Optional[dict[str, Any]], Optional[str], Optional[Path]
+        Optional[str],
+        Optional[dict[str, Any]],
+        Optional[str],
+        Optional[Path],
+        str,
+        str,
     ]:
         """Try each audio provider in order.
 
-        Returns ``(video_id, ytm_match, provider, local_path)``: a YouTube
-        video id (with its YouTube Music result, if any) or, for slskd, the
-        path of the already-downloaded file. All ``None`` when every
-        provider came up empty.
+        For each provider, tries its configured format and quality targets in
+        order. If music cannot be found with that source with the selected
+        format, moves to the next source in order.
+
+        Returns ``(video_id, ytm_match, provider, local_path, selected_format,
+        selected_bitrate)``.
         """
 
         youtube_searched = False
         for provider in self.audio_providers:
+            targets = self.source_targets.get(provider) or [{
+                'format': self.audio_format,
+                'bitrate': self.audio_bitrate,
+            }]
             if provider == 'slskd':
                 if not self.slskd_settings.get('enabled'):
                     continue
                 local = download_from_slskd(
-                    song, self.slskd_settings, progress_cb=progress_cb
+                    song,
+                    self.slskd_settings,
+                    progress_cb=progress_cb,
+                    targets=targets,
                 )
                 if local is not None:
-                    return None, None, 'slskd', local
+                    fmt = local.suffix.lower().lstrip('.') or self.audio_format
+                    return (
+                        None,
+                        None,
+                        'slskd',
+                        local,
+                        fmt,
+                        self.audio_bitrate,
+                    )
                 logger.info(
                     'Audio provider slskd: no match for {!r}', song.get('name')
                 )
@@ -500,18 +600,63 @@ class Downloader:
                 video_id, match = find_match(song)
                 youtube_searched = True
                 if video_id:
+                    chosen_provider = (
+                        'youtube-music' if match is not None else 'youtube'
+                    )
+                    prov_targets = (
+                        self.source_targets.get(chosen_provider) or targets
+                    )
+                    first_target = prov_targets[0] if prov_targets else {
+                        'format': self.audio_format,
+                        'bitrate': self.audio_bitrate,
+                    }
+                    target_fmt = (
+                        first_target.get('format') or self.audio_format
+                    )
+                    target_bitrate = str(
+                        first_target.get('bitrate') or self.audio_bitrate
+                    )
                     return (
                         video_id,
                         match,
-                        'youtube-music' if match is not None else 'youtube',
+                        chosen_provider,
                         None,
+                        target_fmt,
+                        target_bitrate,
                     )
+                logger.info(
+                    'Audio provider youtube-music: no match for {!r}',
+                    song.get('name'),
+                )
+                _report(progress_cb, 0.0, 'Trying next source', 'youtube-music')
             elif provider == 'youtube' and not youtube_searched:
                 video_id = find_match_youtube_only(song)
                 youtube_searched = True
                 if video_id:
-                    return video_id, None, 'youtube', None
-        return None, None, None, None
+                    first_target = targets[0] if targets else {
+                        'format': self.audio_format,
+                        'bitrate': self.audio_bitrate,
+                    }
+                    target_fmt = (
+                        first_target.get('format') or self.audio_format
+                    )
+                    target_bitrate = str(
+                        first_target.get('bitrate') or self.audio_bitrate
+                    )
+                    return (
+                        video_id,
+                        None,
+                        'youtube',
+                        None,
+                        target_fmt,
+                        target_bitrate,
+                    )
+                logger.info(
+                    'Audio provider youtube: no match for {!r}',
+                    song.get('name'),
+                )
+                _report(progress_cb, 0.0, 'Trying next source', 'youtube')
+        return None, None, None, None, self.audio_format, self.audio_bitrate
 
     def _resolve_cookies_file(self) -> str:
         """Path to the cookies.txt yt-dlp should use, or ``''``.
@@ -814,13 +959,20 @@ class Downloader:
         match: Optional[dict[str, Any]] = None
         provider: Optional[str] = 'youtube-music' if video_id else None
         local_source: Optional[Path] = None
+        selected_fmt = self.audio_format
+        selected_bitrate = self.audio_bitrate
         if not video_id:
             # Playlist rows lack year/track number; the per-track embed has
             # them, and they can feed the output path and the slskd match.
             song = spotify_mod.enrich_track_from_spotify_if_sparse(song)
-            video_id, match, provider, local_source = self._resolve_source(
-                song, progress_cb
-            )
+            (
+                video_id,
+                match,
+                provider,
+                local_source,
+                selected_fmt,
+                selected_bitrate,
+            ) = self._resolve_source(song, progress_cb)
         elif not song.get('album_name') or not song.get('cover_url'):
             # We already have a target video, but the metadata is incomplete.
             # Look up the YT Music entry for THIS specific videoId so we
@@ -861,7 +1013,13 @@ class Downloader:
             return self._downloaded(
                 song,
                 self._fetch_and_tag(
-                    song, video_id, progress_cb, subdir, provider
+                    song,
+                    video_id,
+                    progress_cb,
+                    subdir,
+                    provider,
+                    audio_format=selected_fmt,
+                    audio_bitrate=selected_bitrate,
                 ),
             )
 
@@ -877,7 +1035,13 @@ class Downloader:
             return self._downloaded(
                 song,
                 self._fetch_and_tag(
-                    song, video_id, progress_cb, subdir, provider
+                    song,
+                    video_id,
+                    progress_cb,
+                    subdir,
+                    provider,
+                    audio_format=selected_fmt,
+                    audio_bitrate=selected_bitrate,
                 ),
             )
 
@@ -1176,6 +1340,8 @@ class Downloader:
         progress_cb: Optional[ProgressCallback],
         subdir: Optional[str],
         provider: Optional[str] = None,
+        audio_format: Optional[str] = None,
+        audio_bitrate: Optional[str] = None,
     ) -> str:
         target_dir, rel_prefix, basename = self._target_location(song, subdir)
 
@@ -1190,6 +1356,8 @@ class Downloader:
                 song=song,
                 progress_cb=progress_cb,
                 provider=provider,
+                audio_format=audio_format,
+                audio_bitrate=audio_bitrate,
             )
             found = lookups.collect()
         finally:

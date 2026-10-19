@@ -14,6 +14,7 @@ from starlette.requests import Request
 from downtify import api
 from downtify.api import (
     DEFAULT_SETTINGS,
+    DEFAULT_SOURCE_TARGETS,
     MAX_COVER_RESOLUTION,
     MAX_DOWNLOAD_DELAY_SECONDS,
     MAX_PARALLEL_DOWNLOADS,
@@ -29,6 +30,7 @@ from downtify.api import (
     _effective_audio_providers,
     _effective_lyrics_providers,
     _effective_slskd_settings,
+    _effective_source_targets,
     _load_settings,
     artist_info_endpoint,
     artist_similar_endpoint,
@@ -46,6 +48,7 @@ _REQUEST = Request({'type': 'http', 'headers': []})
 def test_default_settings_has_required_keys():
     required = {
         'audio_providers',
+        'source_targets',
         'lyrics_providers',
         'download_lyrics',
         'lyrics_lrc_beside',
@@ -775,6 +778,33 @@ def test_effective_audio_providers_skips_slskd_when_disabled():
 
 def test_effective_audio_providers_defaults_when_missing():
     assert _effective_audio_providers({}) == ['youtube-music']
+
+
+def test_effective_source_targets_defaults():
+    targets = _effective_source_targets({})
+    assert 'slskd' in targets
+    assert 'youtube-music' in targets
+    assert 'youtube' in targets
+    assert targets['slskd'][0]['format'] == 'flac'
+    assert targets['slskd'][0]['bitrate'] == 'lossless'
+    assert targets['slskd'][1]['format'] == 'mp3'
+
+
+def test_effective_source_targets_custom_order():
+    custom = {
+        'source_targets': {
+            'slskd': [
+                {'format': 'mp3', 'bitrate': '320'},
+                {'format': 'flac', 'bitrate': 'lossless'},
+            ],
+            'youtube-music': [{'format': 'opus', 'bitrate': '160'}],
+        }
+    }
+    targets = _effective_source_targets(custom)
+    assert targets['slskd'][0] == {'format': 'mp3', 'bitrate': '320'}
+    assert targets['slskd'][1] == {'format': 'flac', 'bitrate': 'lossless'}
+    assert targets['youtube-music'] == [{'format': 'opus', 'bitrate': '160'}]
+    assert targets['youtube'] == [{'format': 'mp3', 'bitrate': '320'}]
 
 
 def test_effective_slskd_settings_defaults_when_missing():

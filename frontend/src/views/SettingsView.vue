@@ -138,6 +138,7 @@
             >
               <SourceOrder
                 v-model="s.audio_providers"
+                v-model:targets="s.source_targets"
                 @enable-slskd="s.slskd.enabled = true"
               />
             </SettingGroup>

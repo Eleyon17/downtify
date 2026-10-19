@@ -805,6 +805,14 @@ export default {
     sourceYtmHint: 'Best metadata matches',
     sourceYt: 'YouTube',
     sourceYtHint: 'Fallback for songs missing from YouTube Music',
+    sourceTargetsOrder: 'Format & quality preference',
+    sourceTargetsHint:
+      'Preferred formats and bitrates for this source, checked in order.',
+    addTarget: 'Add format',
+    removeTarget: 'Remove',
+    formatLabel: 'Format',
+    bitrateLabel: 'Quality / Bitrate',
+    losslessBitrate: 'Lossless',
     slskdTitle: 'slskd',
     slskdHint:
       'Download from Soulseek through your slskd server. Tracks it can’t find fall through to the next source.',

@@ -635,6 +635,7 @@ def build_app() -> FastAPI:
             api.state.settings.get('overwrite_existing_files', True)
         ),
         audio_providers=api._effective_audio_providers(api.state.settings),
+        source_targets=api._effective_source_targets(api.state.settings),
         slskd_settings=api._effective_slskd_settings(api.state.settings),
         max_track_duration_seconds=api._max_track_duration_seconds(),
     )
