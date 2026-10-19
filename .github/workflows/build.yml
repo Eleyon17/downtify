@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - custom
+      - v3
+      - 'v*'
+    tags:
+      - 'v*'
   workflow_dispatch:
   release:
     types: [published]
@@ -24,7 +28,15 @@ jobs:
 
       - name: Extract version from git tags
         id: version
-        run: echo "VERSION=$(git describe --tags --always | cut -d'-' -f1)" >> "$GITHUB_OUTPUT"
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "VERSION=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref_name }}" =~ ^v[0-9]+ ]]; then
+            echo "VERSION=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            V=$(git describe --tags --match "v[0-9]*" --always | cut -d'-' -f1)
+            echo "VERSION=${V}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Prepare lowercase image name
         run: |
@@ -65,6 +77,8 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            VERSION=${{ steps.version.outputs.VERSION }}
           tags: |
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}

@@ -21,8 +21,8 @@ current_version() {
 }
 
 validate_semver() {
-  if ! echo "$1" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-    echo "Error: '$1' is not a valid semver version (expected X.Y.Z)." >&2
+  if ! echo "$1" | grep -qE '^v?[0-9]+(\.[0-9]+)*$'; then
+    echo "Error: '$1' is not a valid version (expected X.Y.Z or vX)." >&2
     exit 1
   fi
 }
@@ -75,6 +75,7 @@ echo "  updated Makefile"
 # Dockerfile
 
 sed -i \
+  -e "s/ARG VERSION=${OLD_VERSION}/ARG VERSION=${NEW_VERSION}/" \
   -e "s/LABEL version=\"${OLD_VERSION}\"/LABEL version=\"${NEW_VERSION}\"/" \
   -e "s/org.opencontainers.image.version=\"${OLD_VERSION}\"/org.opencontainers.image.version=\"${NEW_VERSION}\"/" \
   "$REPO_ROOT/Dockerfile"

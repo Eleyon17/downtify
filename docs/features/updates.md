@@ -4,7 +4,7 @@ icon: lucide/download
 
 # Update Notifications
 
-Downtify checks its own [GitHub Releases page](https://github.com/henriquesebastiao/downtify/releases) once an hour. When a newer version is out, a notice appears at the bottom of the sidebar on every page — on phones, a dot on the **More** tab and a line at the top of its sheet — and in **Settings → About**:
+Downtify checks its own [GitHub Releases page](https://github.com/Eleyon17/downtify/releases) once an hour. When a newer version is out, a notice appears at the bottom of the sidebar on every page — on phones, a dot on the **More** tab and a line at the top of its sheet — and in **Settings → About**:
 
 > ✦ Update 3.0.1 available
 

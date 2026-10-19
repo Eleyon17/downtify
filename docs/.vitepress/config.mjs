@@ -19,7 +19,7 @@ const repoRoot = path.resolve(srcDir, '..')
 // a base of '/downtify/' would point every asset at a path that 404s.
 const SITE_URL = 'https://downtify.henriquesebastiao.com/'
 const BASE = '/'
-const REPO = 'https://github.com/henriquesebastiao/downtify'
+const REPO = 'https://github.com/Eleyon17/downtify'
 const DESCRIPTION =
   'Self-hosted music downloader. Paste a Spotify link, get a perfectly tagged audio file — no API keys, no account, no hassle.'
 

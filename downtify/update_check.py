@@ -82,8 +82,21 @@ class UpdateChecker:
                 headers={'Accept': 'application/vnd.github+json'},
                 timeout=REQUEST_TIMEOUT,
             )
-            response.raise_for_status()
-            data = response.json()
+            if response.status_code == 404:
+                # Fall back to list of releases on the fork (including pre-releases)
+                rel_resp = httpx.get(
+                    f'https://api.github.com/repos/{self._repo}/releases',
+                    headers={'Accept': 'application/vnd.github+json'},
+                    timeout=REQUEST_TIMEOUT,
+                )
+                if rel_resp.status_code == 200 and rel_resp.json():
+                    data = rel_resp.json()[0]
+                else:
+                    response.raise_for_status()
+                    data = {}
+            else:
+                response.raise_for_status()
+                data = response.json()
             tag = str(data.get('tag_name') or '').strip()
             if not tag:
                 raise ValueError('release response has no tag_name')

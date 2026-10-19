@@ -735,7 +735,7 @@
                 <UiButton
                   variant="ghost"
                   icon="arrow-up-right"
-                  href="https://henriquesebastiao.github.io/downtify/"
+                  href="https://github.com/Eleyon17/downtify#readme"
                 >
                   {{ t('settings.openDocs') }}
                 </UiButton>

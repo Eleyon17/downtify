@@ -1,6 +1,6 @@
 #!make
 
-DOWNTIFY_VERSION := 3.0.0
+DOWNTIFY_VERSION := v3
 TARGET := Eleyon17/downtify
 
 all: build up
@@ -33,7 +33,7 @@ export:
 	uv export --no-hashes --no-dev -o requirements.txt
 
 changelog:
-	github_changelog_generator -u henriquesebastiao -p downtify -o CHANGELOG --no-verbose
+	github_changelog_generator -u Eleyon17 -p downtify -o CHANGELOG --no-verbose
 	@echo "Changelog generated at CHANGELOG"
 
 test:
