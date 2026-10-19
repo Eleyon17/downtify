@@ -569,6 +569,13 @@ export default {
     unhiddenToast: 'Visível “{name}”',
     showHidden: 'Ocultas ({count})',
     showingHidden: 'Mostrando playlists ocultas ({count})',
+    changeOwner: 'Alterar proprietário',
+    changeOwnerTitle: 'Alterar proprietário da playlist',
+    changeOwnerHint:
+      'Selecione uma conta de usuário para transferir a propriedade desta playlist.',
+    changeOwnerSubmit: 'Transferir propriedade',
+    newOwner: 'Novo proprietário',
+    ownerChanged: 'Playlist transferida para {owner}',
   },
   track: {
     title: 'Título',

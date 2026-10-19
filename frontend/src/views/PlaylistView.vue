@@ -111,6 +111,14 @@
             {{ t('playlists.rename') }}
           </UiButton>
           <UiButton
+            v-if="auth.isAdmin.value && !playlist.liked"
+            variant="ghost"
+            icon="user"
+            @click="playlistActions.openChangeOwner(playlist)"
+          >
+            {{ t('playlists.changeOwner') }}
+          </UiButton>
+          <UiButton
             v-if="!playlist.isOwner && !playlist.liked"
             variant="secondary"
             icon="copy"
@@ -231,6 +239,7 @@ import { useLibrary } from '/src/model/library'
 import { usePlayer } from '/src/model/player'
 import { usePlaylistActions } from '/src/model/playlistActions'
 import { useTrackActions } from '/src/model/trackActions'
+import { useAuth } from '/src/model/auth'
 import { splitLength } from '/src/lib/format'
 import { useI18n } from '/src/i18n'
 
@@ -239,6 +248,7 @@ const route = useRoute()
 const router = useRouter()
 const library = useLibrary()
 const player = usePlayer()
+const auth = useAuth()
 const actions = useTrackActions()
 const playlistActions = usePlaylistActions()
 

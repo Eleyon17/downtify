@@ -564,6 +564,13 @@ export default {
     unhiddenToast: 'Показан „{name}“',
     showHidden: 'Скрити ({count})',
     showingHidden: 'Показване на скрити плейлисти ({count})',
+    changeOwner: 'Смяна на собственика',
+    changeOwnerTitle: 'Смяна на собственика на плейлиста',
+    changeOwnerHint:
+      'Изберете потребителски акаунт за прехвърляне на собствеността на този плейлист.',
+    changeOwnerSubmit: 'Прехвърляне на собствеността',
+    newOwner: 'Нов собственик',
+    ownerChanged: 'Плейлистът е прехвърлен на {owner}',
   },
   track: {
     title: 'Заглавие',

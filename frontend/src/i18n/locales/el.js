@@ -571,6 +571,13 @@ export default {
     unhiddenToast: 'Εμφανίστηκε η «{name}»',
     showHidden: 'Κρυφές ({count})',
     showingHidden: 'Εμφάνιση κρυφών λιστών ({count})',
+    changeOwner: 'Αλλαγή κατόχου',
+    changeOwnerTitle: 'Αλλαγή κατόχου λίστας αναπαραγωγής',
+    changeOwnerHint:
+      'Επιλέξτε έναν λογαριασμό χρήστη για μεταβίβαση της κυριότητας αυτής της λίστας.',
+    changeOwnerSubmit: 'Μεταβίβαση κυριότητας',
+    newOwner: 'Νέος κάτοχος',
+    ownerChanged: 'Η λίστα μεταβιβάστηκε σε {owner}',
   },
   track: {
     title: 'Τίτλος',

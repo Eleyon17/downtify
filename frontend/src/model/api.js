@@ -447,6 +447,13 @@ function hidePlaylist(name, hidden = true) {
   })
 }
 
+function changePlaylistOwner(name, userId) {
+  return API.post('/api/library/playlists/owner', {
+    name,
+    user_id: Number(userId),
+  })
+}
+
 function getPlaylistSuggestions(name, dismissed = [], limit = 30) {
   return API.post('/api/playlists/suggestions', {
     name,
@@ -884,6 +891,7 @@ export default {
   setPlaylistVisibility,
   clonePlaylist,
   hidePlaylist,
+  changePlaylistOwner,
   createShare,
   listShares,
   deleteShare,
@@ -977,4 +985,5 @@ export default {
   getVersion,
   getPlaylistSuggestions,
   addTrackToPlaylist,
+  changePlaylistOwner,
 }

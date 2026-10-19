@@ -15,6 +15,7 @@ import { useHistory } from '/src/model/history'
 import { useI18n } from '/src/i18n'
 import { itemTrackCount } from '/src/lib/library'
 import { useShares } from '/src/model/shares'
+import { useAuth } from '/src/model/auth'
 
 const createOpen = ref(false)
 const createFiles = ref([])
@@ -22,8 +23,11 @@ const addOpen = ref(false)
 const addPlaylist = ref(null)
 const renameOpen = ref(false)
 const renamePlaylist = ref(null)
+const changeOwnerOpen = ref(false)
+const changeOwnerPlaylist = ref(null)
 
 export function usePlaylistActions() {
+  const auth = useAuth()
   const library = useLibrary()
   const likes = useLikes()
   const tracks = useTrackActions()
@@ -81,6 +85,28 @@ export function usePlaylistActions() {
   function openRename(playlist) {
     renamePlaylist.value = playlist
     renameOpen.value = true
+  }
+
+  function openChangeOwner(playlist) {
+    changeOwnerPlaylist.value = playlist
+    changeOwnerOpen.value = true
+  }
+
+  async function changeOwner(playlist, targetUserId) {
+    try {
+      const res = await API.changePlaylistOwner(playlist.name, targetUserId)
+      const newOwner = res.data?.owner || t('playlists.newOwner')
+      await library.load({ force: true })
+      ui.toast(t('playlists.ownerChanged', { owner: newOwner }), {
+        kind: 'success',
+      })
+      return res.data
+    } catch (err) {
+      ui.toast(err?.response?.data?.detail || t('toast.actionFailed'), {
+        kind: 'error',
+      })
+      throw err
+    }
   }
 
   async function createNamed(name, files = []) {
@@ -435,12 +461,21 @@ export function usePlaylistActions() {
         icon: 'share',
         action: () => shares.sharePlaylist(playlist),
       },
-      { divider: true, hidden: !isOwner && !playlist.liked },
+      {
+        label: t('playlists.changeOwner'),
+        icon: 'user',
+        hidden: !auth.isAdmin.value || playlist.liked,
+        action: () => openChangeOwner(playlist),
+      },
+      {
+        divider: true,
+        hidden: !isOwner && !auth.isAdmin.value && !playlist.liked,
+      },
       {
         label: playlist.liked ? t('likes.removeAll') : t('playlists.delete'),
         icon: 'trash',
         danger: true,
-        hidden: !isOwner && !playlist.liked,
+        hidden: !isOwner && !auth.isAdmin.value && !playlist.liked,
         action: () => remove(playlist),
       },
     ]
@@ -458,7 +493,9 @@ export function usePlaylistActions() {
     openCreate,
     openAddSongs,
     openRename,
-     rename: openRename,
+    rename: openRename,
+    openChangeOwner,
+    changeOwner,
     createNamed,
     renameNamed,
     addFiles,
@@ -473,5 +510,7 @@ export function usePlaylistActions() {
     addPlaylist,
     renameOpen,
     renamePlaylist,
+    changeOwnerOpen,
+    changeOwnerPlaylist,
   }
 }

@@ -571,6 +571,13 @@ export default {
     unhiddenToast: '“{name}” gösterildi',
     showHidden: 'Gizlenenler ({count})',
     showingHidden: 'Gizlenen listeler ({count})',
+    changeOwner: 'Sahibi değiştir',
+    changeOwnerTitle: 'Çalma listesi sahibini değiştir',
+    changeOwnerHint:
+      'Bu çalma listesinin sahipliğini aktarmak için bir kullanıcı hesabı seçin.',
+    changeOwnerSubmit: 'Sahipliği aktar',
+    newOwner: 'Yeni sahip',
+    ownerChanged: 'Çalma listesi {owner} kullanıcısına aktarıldı',
   },
   track: {
     title: 'Başlık',

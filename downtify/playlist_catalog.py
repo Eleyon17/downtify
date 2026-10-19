@@ -126,6 +126,18 @@ class PlaylistCatalog:
                 (pl_name, sid, _now_iso(), owner),
             )
 
+    def set_owner(self, name: str, user_id: int) -> None:
+        """Assign or reassign playlist owner."""
+
+        pl_name = str(name or '').strip()
+        if not pl_name:
+            return
+        with self._connect() as conn:
+            conn.execute(
+                'UPDATE playlists SET user_id = ? WHERE name = ? COLLATE NOCASE',
+                (int(user_id or 0), pl_name),
+            )
+
     def upsert_track(
         self,
         playlist_name: str,
@@ -568,7 +580,7 @@ class ManualPlaylistOwners:
         """Claim a Library-created playlist for *user_id*."""
 
         key = self._key(name)
-        if not key or not user_id:
+        if not key or user_id is None:
             return
         with self._connect() as conn:
             conn.execute(
@@ -577,7 +589,7 @@ class ManualPlaylistOwners:
                    VALUES (?, ?, ?)
                    ON CONFLICT(name_key) DO UPDATE SET
                    name=excluded.name, user_id=excluded.user_id""",
-                (key, str(name or '').strip(), int(user_id)),
+                (key, str(name or '').strip(), int(user_id or 0)),
             )
 
     def owner(self, name: str) -> Optional[int]:

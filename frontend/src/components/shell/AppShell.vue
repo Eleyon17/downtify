@@ -29,6 +29,7 @@
     <UiDialog />
     <CreatePlaylistModal />
     <RenamePlaylistModal />
+    <ChangePlaylistOwnerModal v-if="auth.isAdmin.value" />
     <AddTracksToPlaylistModal />
     <ShareModal />
     <DefaultPasswordPrompt />
@@ -49,6 +50,7 @@ import UiToasts from '../ui/UiToasts.vue'
 import UiDialog from '../ui/UiDialog.vue'
 import CreatePlaylistModal from '../library/CreatePlaylistModal.vue'
 import RenamePlaylistModal from '../library/RenamePlaylistModal.vue'
+import ChangePlaylistOwnerModal from '../library/ChangePlaylistOwnerModal.vue'
 import AddTracksToPlaylistModal from '../library/AddTracksToPlaylistModal.vue'
 import ShareModal from '../library/ShareModal.vue'
 import SignIn from './SignIn.vue'

@@ -571,6 +571,13 @@ export default {
     unhiddenToast: '„{name}” megjelenítve',
     showHidden: 'Rejtett ({count})',
     showingHidden: 'Rejtett listák ({count})',
+    changeOwner: 'Tulajdonos módosítása',
+    changeOwnerTitle: 'Lejátszási lista tulajdonosának módosítása',
+    changeOwnerHint:
+      'Válasszon egy felhasználói fiókot a lejátszási lista tulajdonjogának átruházásához.',
+    changeOwnerSubmit: 'Tulajdonjog átruházása',
+    newOwner: 'Új tulajdonos',
+    ownerChanged: 'Lejátszási lista átadva neki: {owner}',
   },
   track: {
     title: 'Cím',

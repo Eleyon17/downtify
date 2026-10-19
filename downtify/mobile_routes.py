@@ -157,6 +157,7 @@ async def playlists(request: Request) -> list[dict[str, Any]]:
             'owner_id': int(p.get('owner_id') or 0),
             'is_owner': bool(p.get('is_owner')),
             'can_edit': bool(p.get('can_edit')),
+            'can_change_owner': bool(p.get('can_change_owner')),
             'hidden': bool(p.get('hidden')),
             'count': p['count'],
             'cover': p['cover'],
@@ -367,6 +368,46 @@ async def mobile_set_playlist_hidden(
     return await asyncio.to_thread(
         api.set_playlist_hidden_sync, name, hidden, request
     )
+
+
+@router.delete('/playlists/{name}')
+async def mobile_delete_playlist(
+    name: str,
+    request: Request,
+) -> dict[str, Any]:
+    """Delete an owned playlist (or any playlist if admin) on mobile."""
+
+    clean_name = str(name or '').strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail='Playlist name is required')
+    if api.is_liked_playlist(clean_name):
+        raise HTTPException(
+            status_code=400, detail='Liked songs cannot be deleted'
+        )
+    result = await api._delete_playlist_by_name(request, clean_name)
+    await api.log_activity(request, 'playlist_delete', clean_name)
+    return result
+
+
+@router.put('/playlists/{name}/owner')
+async def mobile_change_playlist_owner(
+    name: str,
+    request: Request,
+) -> dict[str, Any]:
+    """Change ownership of a playlist (admin only) on mobile."""
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    target_user_id = int((payload or {}).get('user_id', 0) or 0)
+    result = await asyncio.to_thread(
+        api.change_playlist_owner_sync, name, target_user_id, request
+    )
+    await api.log_activity(
+        request, 'playlist_owner_change', f'{name} -> {result.get("owner")}'
+    )
+    return result
 
 
 @router.get('/likes')

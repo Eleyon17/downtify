@@ -544,6 +544,14 @@ class PlaylistMonitorDB:
             ).fetchone()
             return _row_to_playlist(row) if row else None
 
+    def set_playlist_owner_by_name(self, name: str, user_id: int) -> None:
+        """Update owner for a monitored playlist matching *name*."""
+        with self._connect() as conn:
+            conn.execute(
+                'UPDATE monitored_playlists SET user_id = ? WHERE name = ? COLLATE NOCASE',
+                (int(user_id or 0), str(name or '').strip()),
+            )
+
     def retarget_playlist(
         self, playlist_id: int, spotify_id: str, name: str, url: str
     ) -> Optional[MonitoredPlaylist]:
