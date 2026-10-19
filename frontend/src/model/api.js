@@ -426,6 +426,27 @@ function renameLibraryPlaylist(name, newName) {
   })
 }
 
+function setPlaylistVisibility(name, isPublic) {
+  return API.post('/api/library/playlists/visibility', {
+    name,
+    public: Boolean(isPublic),
+  })
+}
+
+function clonePlaylist(name, newName = null) {
+  return API.post('/api/library/playlists/clone', {
+    name,
+    new_name: newName,
+  })
+}
+
+function hidePlaylist(name, hidden = true) {
+  return API.post('/api/library/playlists/hide', {
+    name,
+    hidden: Boolean(hidden),
+  })
+}
+
 function getPlaylistSuggestions(name, dismissed = [], limit = 30) {
   return API.post('/api/playlists/suggestions', {
     name,
@@ -860,6 +881,9 @@ export default {
   createLibraryPlaylist,
   editLibraryPlaylistTracks,
   renameLibraryPlaylist,
+  setPlaylistVisibility,
+  clonePlaylist,
+  hidePlaylist,
   createShare,
   listShares,
   deleteShare,

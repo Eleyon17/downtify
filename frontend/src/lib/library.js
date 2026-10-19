@@ -206,6 +206,9 @@ export function buildPlaylists(playlists, tracksByFile, batches = []) {
     // Mosaic from the M3U paths so the sidebar does not wait for
     // GET /tracks rows. `/cover?file=` reads tags on its own.
     const covers = [...new Set(files.map((file) => coverURL(file)))].slice(0, 4)
+    const isOwner =
+      playlist.is_owner != null ? Boolean(playlist.is_owner) : true
+    const liked = Boolean(playlist.liked)
     return {
       key: playlist.name.toLowerCase(),
       name: playlist.name,
@@ -213,8 +216,18 @@ export function buildPlaylists(playlists, tracksByFile, batches = []) {
       // songs playlist is given a translated title by the model.
       title: playlist.name,
       // The playlist of hearted songs, not a downloaded one.
-      liked: Boolean(playlist.liked),
+      liked,
       manual: Boolean(playlist.manual),
+      public: Boolean(playlist.public),
+      monitored: Boolean(playlist.monitored),
+      owner: String(playlist.owner || ''),
+      ownerId: Number(playlist.owner_id || 0),
+      isOwner,
+      canEdit:
+        playlist.can_edit != null
+          ? Boolean(playlist.can_edit)
+          : isOwner && !liked,
+      hidden: Boolean(playlist.hidden),
       fileCount: playlist.count != null ? Number(playlist.count) : files.length,
       tracks,
       // Downloaded playlists keep their own artwork. Manual ones leave
@@ -239,6 +252,13 @@ export function buildPlaylists(playlists, tracksByFile, batches = []) {
       title: String(batch.playlist_name || ''),
       liked: false,
       manual: false,
+      public: false,
+      monitored: false,
+      owner: '',
+      ownerId: 0,
+      isOwner: true,
+      canEdit: true,
+      hidden: false,
       fileCount: 0,
       tracks: [],
       cover: '',

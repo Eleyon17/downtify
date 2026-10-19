@@ -498,3 +498,25 @@ class LibrarySync:
                 ).fetchall():
                     found[row['path']] = row['track_id']
         return found
+
+    def keys_for_paths(self, paths: Iterable[str]) -> set[str]:
+        """Content keys for the given library paths that are known."""
+
+        wanted = [p for p in paths if p]
+        found: set[str] = set()
+        if not wanted:
+            return found
+        with self._connect() as conn:
+            for start in range(0, len(wanted), 500):
+                chunk = wanted[start : start + 500]
+                marks = ','.join('?' * len(chunk))
+                for row in conn.execute(
+                    f'SELECT content_key FROM sync_tracks '
+                    f'WHERE deleted_at IS NULL AND path IN ({marks})',
+                    chunk,
+                ).fetchall():
+                    key = str(row['content_key'] or '')
+                    if key:
+                        found.add(key)
+        return found
+

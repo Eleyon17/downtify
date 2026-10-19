@@ -42,6 +42,8 @@ export function usePlaylistActions() {
       covers: playlist.covers || [],
       route: { name: 'Playlist', query: { name: playlist.name } },
       manual: Boolean(playlist.manual),
+      canEdit: Boolean(playlist.canEdit),
+      isOwner: Boolean(playlist.isOwner),
       playlistName: playlist.name,
     }
   }
@@ -53,7 +55,15 @@ export function usePlaylistActions() {
   }
 
   function manuals() {
-    return library.playlists.value.filter((item) => item.manual)
+    return library.playlists.value.filter(
+      (item) => item.manual && item.isOwner
+    )
+  }
+
+  function editables() {
+    return library.playlists.value.filter(
+      (item) => item.canEdit && !item.liked
+    )
   }
 
   function openCreate(files = []) {
@@ -153,9 +163,68 @@ export function usePlaylistActions() {
     try {
       await API.editLibraryPlaylistTracks(playlist.name, { remove: names })
       await library.load({ force: true })
+      await library.loadPlaylistTracks(playlist.name)
       ui.toast(t('playlists.removedTrack', { name: playlist.title }), {
         kind: 'success',
       })
+    } catch (err) {
+      ui.toast(err?.response?.data?.detail || t('toast.actionFailed'), {
+        kind: 'error',
+      })
+    }
+  }
+
+  async function toggleVisibility(playlist) {
+    const nextPublic = !playlist.public
+    try {
+      await API.setPlaylistVisibility(playlist.name, nextPublic)
+      await library.load({ force: true })
+      ui.toast(
+        t(nextPublic ? 'playlists.madePublic' : 'playlists.madePrivate', {
+          name: playlist.title,
+        }),
+        { kind: 'success' }
+      )
+    } catch (err) {
+      ui.toast(err?.response?.data?.detail || t('toast.actionFailed'), {
+        kind: 'error',
+      })
+    }
+  }
+
+  async function clone(playlist) {
+    try {
+      const res = await API.clonePlaylist(playlist.name)
+      const clonedName = res.data?.name || `${playlist.name} (Copy)`
+      await library.load({ force: true })
+      ui.toast(t('playlists.cloned', { name: clonedName }), {
+        kind: 'success',
+        action: {
+          label: t('likes.open'),
+          run: () =>
+            router.push({ name: 'Playlist', query: { name: clonedName } }),
+        },
+      })
+      return clonedName
+    } catch (err) {
+      ui.toast(err?.response?.data?.detail || t('toast.actionFailed'), {
+        kind: 'error',
+      })
+      return null
+    }
+  }
+
+  async function toggleHidden(playlist) {
+    const nextHidden = !playlist.hidden
+    try {
+      await API.hidePlaylist(playlist.name, nextHidden)
+      await library.load({ force: true })
+      ui.toast(
+        t(nextHidden ? 'playlists.hiddenToast' : 'playlists.unhiddenToast', {
+          name: playlist.title,
+        }),
+        { kind: 'success' }
+      )
     } catch (err) {
       ui.toast(err?.response?.data?.detail || t('toast.actionFailed'), {
         kind: 'error',
@@ -167,7 +236,7 @@ export function usePlaylistActions() {
     const list = Array.isArray(files) ? files : [files]
     const items = [
       { heading: t('playlists.addTo') },
-      ...manuals().map((playlist) => ({
+      ...editables().map((playlist) => ({
         label: playlist.title,
         icon: 'playlist',
         action: () => addFiles(playlist, list),
@@ -277,6 +346,8 @@ export function usePlaylistActions() {
   function menuFor(playlist, { hide = [] } = {}) {
     const batch = playlist.batch
     const empty = !itemTrackCount(playlist)
+    const isOwner = Boolean(playlist.isOwner)
+    const canEdit = Boolean(playlist.canEdit)
     return [
       {
         label: t('actions.play'),
@@ -306,13 +377,13 @@ export function usePlaylistActions() {
           count: batch?.missing_count || 0,
         }),
         icon: 'download',
-        hidden: !batch?.missing_count,
+        hidden: !isOwner || !batch?.missing_count,
         action: () => downloadMissing(playlist),
       },
       {
         label: t('playlists.watch'),
         icon: 'radar',
-        hidden: !batch?.playlist_url || hide.includes('watch'),
+        hidden: !isOwner || !batch?.playlist_url || hide.includes('watch'),
         action: () => watch(playlist),
       },
       {
@@ -324,14 +395,34 @@ export function usePlaylistActions() {
       {
         label: t('playlists.addSongs'),
         icon: 'plus',
-        hidden: !playlist.manual,
+        hidden: !canEdit,
         action: () => openAddSongs(playlist),
+      },
+      {
+        label: playlist.public
+          ? t('playlists.makePrivate')
+          : t('playlists.makePublic'),
+        icon: playlist.public ? 'lock' : 'globe',
+        hidden: !isOwner || playlist.liked || playlist.monitored,
+        action: () => toggleVisibility(playlist),
       },
       {
         label: t('playlists.rename'),
         icon: 'pencil',
-        hidden: !playlist.manual,
+        hidden: !isOwner || !playlist.manual,
         action: () => openRename(playlist),
+      },
+      {
+        label: t('playlists.clone'),
+        icon: 'copy',
+        hidden: playlist.liked,
+        action: () => clone(playlist),
+      },
+      {
+        label: playlist.hidden ? t('playlists.unhide') : t('playlists.hide'),
+        icon: 'eye',
+        hidden: isOwner || playlist.liked,
+        action: () => toggleHidden(playlist),
       },
       {
         label: t('library.downloadZip'),
@@ -344,11 +435,12 @@ export function usePlaylistActions() {
         icon: 'share',
         action: () => shares.sharePlaylist(playlist),
       },
-      { divider: true },
+      { divider: true, hidden: !isOwner && !playlist.liked },
       {
         label: playlist.liked ? t('likes.removeAll') : t('playlists.delete'),
         icon: 'trash',
         danger: true,
+        hidden: !isOwner && !playlist.liked,
         action: () => remove(playlist),
       },
     ]
@@ -362,13 +454,18 @@ export function usePlaylistActions() {
     remove,
     menuFor,
     manuals,
+    editables,
     openCreate,
     openAddSongs,
     openRename,
+     rename: openRename,
     createNamed,
     renameNamed,
     addFiles,
     removeFiles,
+    toggleVisibility,
+    clone,
+    toggleHidden,
     addMenuItems,
     createOpen,
     createFiles,

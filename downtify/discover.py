@@ -1040,6 +1040,7 @@ def collections(
     owned_albums: Iterable[dict[str, Any]] = (),
     owned_playlists: Iterable[str] = (),
     *,
+    user_id: int = 0,
     lookup_id: Callable[[str], Optional[str]] = deezer.lookup_artist_id,
     fetch_related: Callable[[str, int], Related] = deezer.related_artists,
     search: Callable[[str], dict[str, Any]] = spotify.search,
@@ -1059,6 +1060,7 @@ def collections(
     ranked = recommendations(
         store,
         library,
+        user_id=user_id,
         lookup_id=lookup_id,
         fetch_related=fetch_related,
         now=now,
@@ -1250,6 +1252,7 @@ def deezer_collections(
     owned_albums: Iterable[dict[str, Any]] = (),
     owned_playlists: Iterable[str] = (),
     *,
+    user_id: int = 0,
     lookup_id: Callable[[str], Optional[str]] = deezer.lookup_artist_id,
     fetch_related: Callable[[str, int], Related] = deezer.related_artists,
     fetch_albums: Callable[
@@ -1275,6 +1278,7 @@ def deezer_collections(
     ranked = recommendations(
         store,
         library,
+        user_id=user_id,
         lookup_id=lookup_id,
         fetch_related=fetch_related,
         now=now,
@@ -1423,6 +1427,7 @@ def spotify_collections(
     owned_playlists: Iterable[str] = (),
     shown: Iterable[str] = (),
     *,
+    user_id: int = 0,
     lookup_id: Callable[[str], Optional[str]] = deezer.lookup_artist_id,
     fetch_related: Callable[[str, int], Related] = deezer.related_artists,
     search: Callable[[str], dict[str, Any]] = spotify.search,
@@ -1450,6 +1455,7 @@ def spotify_collections(
         library,
         owned_albums,
         owned_playlists,
+        user_id=user_id,
         lookup_id=lookup_id,
         fetch_related=fetch_related,
         search=search,

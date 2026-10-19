@@ -426,6 +426,7 @@ from .likes import (
 from .lyrics_cache import LyricsLookupCache
 from .manual_playlists import (
     ManualPlaylistError,
+    clone_playlist_m3u,
     create_manual_playlist,
     edit_manual_playlist,
     rename_manual_playlist,
@@ -1132,18 +1133,139 @@ def _playlist_owner_maps() -> tuple[dict[str, int], dict[str, int]]:
     return catalog_names, manual
 
 
+def _playlist_meta_maps() -> tuple[
+    dict[str, int],
+    dict[str, int],
+    dict[str, int],
+    dict[str, bool],
+    dict[int, str],
+]:
+    """Return ``(catalog_owners, manual_owners, monitored_owners, visibility_map, user_names)``."""
+
+    catalog_names, manual_owners = _playlist_owner_maps()
+    monitored_owners: dict[str, int] = {}
+    visibility: dict[str, bool] = {}
+    user_names: dict[int, str] = {}
+    try:
+        if state.monitor_db is not None:
+            for watch in state.monitor_db.list_playlists(None):
+                w_uid = int(getattr(watch, 'user_id', 0) or 0)
+                raw_name = str(getattr(watch, 'name', '') or '').strip()
+                if raw_name:
+                    monitored_owners.setdefault(raw_name.casefold(), w_uid)
+                    sanitized = (
+                        m3u.sanitize_playlist_name(raw_name).strip().casefold()
+                    )
+                    if sanitized:
+                        monitored_owners.setdefault(sanitized, w_uid)
+    except Exception:
+        logger.opt(exception=True).debug('Could not read monitored playlists')
+    try:
+        if state.manual_playlist_owners is not None:
+            visibility = state.manual_playlist_owners.visibility_map()
+    except Exception:
+        logger.opt(exception=True).debug('Could not read playlist visibility')
+    try:
+        users = state.auth.users if state.auth is not None else None
+        if users is not None:
+            for u in users.list():
+                uid = int(u.get('id') or 0)
+                uname = str(u.get('username') or '').strip()
+                if uid and uname:
+                    user_names[uid] = uname
+    except Exception:
+        logger.opt(exception=True).debug('Could not read usernames')
+    return (
+        catalog_names,
+        manual_owners,
+        monitored_owners,
+        visibility,
+        user_names,
+    )
+
+
+def _resolve_playlist_info(
+    name: str,
+    *,
+    liked: bool,
+    manual: bool,
+    request: Optional[Request],
+    catalog_names: dict[str, int],
+    manual_owners: dict[str, int],
+    monitored_owners: dict[str, int],
+    visibility: dict[str, bool],
+    user_names: dict[int, str],
+    hidden_keys: set[str],
+) -> dict[str, Any]:
+    """Compute ownership, visibility, editability and hidden state for a playlist."""
+
+    user_id = request_user_id(request)
+    is_admin = request_is_admin(request)
+    key = str(name or '').strip().casefold()
+    if liked:
+        owner_id = user_id
+        monitored = False
+        public = False
+        is_owner = True
+        can_edit = False
+        hidden = False
+        owner_name = user_names.get(user_id, '') if user_id else ''
+    else:
+        monitored = key in monitored_owners
+        if manual:
+            owner_id = int(manual_owners.get(key, 0) or 0)
+        else:
+            owner_id = int(
+                catalog_names.get(key, 0) or monitored_owners.get(key, 0) or 0
+            )
+        if key in visibility:
+            public = bool(visibility[key])
+        else:
+            public = bool(monitored)
+        is_owner = bool(
+            (user_id > 0 and owner_id == user_id)
+            or (owner_id == 0 and is_admin)
+        )
+        can_edit = is_owner
+        hidden = False if is_owner else (key in hidden_keys)
+        if owner_id and owner_id in user_names:
+            owner_name = user_names[owner_id]
+        elif owner_id == 0:
+            owner_name = 'Admin'
+        else:
+            owner_name = f'User {owner_id}'
+    return {
+        'owner_id': owner_id,
+        'owner': owner_name,
+        'public': public,
+        'monitored': monitored,
+        'is_owner': is_owner,
+        'can_edit': can_edit,
+        'hidden': hidden,
+    }
+
+
 def _playlist_visible(
     name: str, *, liked: bool, manual: bool, user_id: int
 ) -> bool:
-    """Whether *user_id* may open a playlist (admins bypass this)."""
+    """Whether *user_id* may open a playlist."""
 
-    if liked or not user_id:
+    if liked:
         return False
-    catalog_names, manual_owners = _playlist_owner_maps()
+    catalog_names, manual_owners, monitored_owners, visibility, user_names = (
+        _playlist_meta_maps()
+    )
     key = str(name or '').strip().casefold()
+    monitored = key in monitored_owners
+    public = bool(visibility[key]) if key in visibility else bool(monitored)
+    if public:
+        return True
+    if not user_id:
+        return False
     if manual:
         return manual_owners.get(key) == user_id
-    return catalog_names.get(key) == user_id
+    owner_id = catalog_names.get(key, 0) or monitored_owners.get(key, 0)
+    return owner_id == user_id
 
 
 def _filter_playlists_for(
@@ -1151,34 +1273,67 @@ def _filter_playlists_for(
 ) -> list[dict[str, Any]]:
     """Playlists *request* may open, with a personal liked entry.
 
-    Admins see everything as before. Anyone else sees playlists they
-    own (downloaded or Library-created); the shared liked-songs file
-    is swapped for their own hearts (which live in the database only).
+    Every user sees playlists they own plus playlists that are Public
+    (including Monitored playlists, which are global/Public by default).
+    The shared liked-songs file is swapped for each user's own hearts.
     """
 
-    if request_is_admin(request):
-        return playlists
     user_id = request_user_id(request)
-    kept = [
-        playlist
-        for playlist in playlists
-        if not playlist.get('liked')
-        and _playlist_visible(
-            str(playlist.get('name') or ''),
+    is_admin = request_is_admin(request)
+    catalog_names, manual_owners, monitored_owners, visibility, user_names = (
+        _playlist_meta_maps()
+    )
+    hidden_keys: set[str] = set()
+    if user_id and state.manual_playlist_owners is not None:
+        try:
+            hidden_keys = state.manual_playlist_owners.hidden_set(user_id)
+        except Exception:
+            logger.opt(exception=True).debug('Could not read hidden playlists')
+
+    kept: list[dict[str, Any]] = []
+    for playlist in playlists:
+        if playlist.get('liked'):
+            continue
+        name = str(playlist.get('name') or '')
+        info = _resolve_playlist_info(
+            name,
             liked=False,
             manual=bool(playlist.get('manual')),
-            user_id=user_id,
+            request=request,
+            catalog_names=catalog_names,
+            manual_owners=manual_owners,
+            monitored_owners=monitored_owners,
+            visibility=visibility,
+            user_names=user_names,
+            hidden_keys=hidden_keys,
         )
-    ]
-    if user_id and state.likes is not None:
+        if info['is_owner'] or info['public']:
+            kept.append({**playlist, **info})
+
+    liked_scope: Optional[int] = (
+        user_id if user_id else (0 if is_admin else None)
+    )
+    if liked_scope is not None and state.likes is not None:
         try:
-            liked_files = state.likes.paths(user_id)
+            liked_files = state.likes.paths(liked_scope)
         except Exception:
             logger.opt(exception=True).debug(
                 'Could not read likes for playlist listing'
             )
             liked_files = []
         if liked_files:
+            liked_info = _resolve_playlist_info(
+                LIKED_PLAYLIST_NAME,
+                liked=True,
+                manual=False,
+                request=request,
+                catalog_names=catalog_names,
+                manual_owners=manual_owners,
+                monitored_owners=monitored_owners,
+                visibility=visibility,
+                user_names=user_names,
+                hidden_keys=hidden_keys,
+            )
             kept.append({
                 'name': LIKED_PLAYLIST_NAME,
                 'files': liked_files,
@@ -1187,6 +1342,7 @@ def _filter_playlists_for(
                 'cover': '',
                 'liked': True,
                 'manual': False,
+                **liked_info,
             })
     kept.sort(
         key=lambda item: (
@@ -1212,17 +1368,26 @@ def _filter_entries_for(
     if allowed is None:
         return entries
     user_id = request_user_id(request)
-    catalog_names, manual_owners = _playlist_owner_maps()
-    owned = {name for name, uid in catalog_names.items() if uid == user_id} | {
-        key for key, uid in manual_owners.items() if uid == user_id
-    }
+    catalog_names, manual_owners, monitored_owners, visibility, _ = (
+        _playlist_meta_maps()
+    )
+    visible_playlists = (
+        {name for name, uid in catalog_names.items() if uid == user_id}
+        | {key for key, uid in manual_owners.items() if uid == user_id}
+        | {key for key, pub in visibility.items() if pub}
+        | {
+            key
+            for key in monitored_owners
+            if visibility.get(key, True)
+        }
+    )
 
     def _scrubbed(row: dict[str, Any], names: Any) -> dict[str, Any]:
         kept = [
             str(raw)
             for raw in names
             if is_liked_playlist(raw)
-            or str(raw or '').strip().casefold() in owned
+            or str(raw or '').strip().casefold() in visible_playlists
         ]
         return {**row, 'playlists': kept}
 
@@ -1277,15 +1442,19 @@ def playlist_entry_for_request(
     """The listing entry for *name* when *request* may open it.
 
     Falls back to the playlist catalog when the M3U is gone (a delete
-    still has tracks to take): admins see every catalog entry, anyone
-    else only entries they own.
+    still has tracks to take).
     """
 
     wanted = str(name or '').strip()
     if not wanted:
         return None
-    for playlist in playlists_for_request(request):
+    visible_list = playlists_for_request(request)
+    for playlist in visible_list:
         if str(playlist.get('name') or '') == wanted:
+            return playlist
+    wanted_key = wanted.casefold()
+    for playlist in visible_list:
+        if str(playlist.get('name') or '').strip().casefold() == wanted_key:
             return playlist
     catalog = state.playlist_catalog
     if catalog is None:
@@ -1296,17 +1465,30 @@ def playlist_entry_for_request(
         return None
     if not rows:
         return None
-    if not request_is_admin(request):
-        user_id = request_user_id(request)
+    catalog_names, manual_owners, monitored_owners, visibility, user_names = (
+        _playlist_meta_maps()
+    )
+    user_id = request_user_id(request)
+    hidden_keys: set[str] = set()
+    if user_id and state.manual_playlist_owners is not None:
         try:
-            owner = catalog.playlist_owner_map().get(wanted)
+            hidden_keys = state.manual_playlist_owners.hidden_set(user_id)
         except Exception:
-            logger.opt(exception=True).debug(
-                'Could not read owner for playlist {!r}', wanted
-            )
-            owner = None
-        if not user_id or int(owner or 0) != user_id:
-            return None
+            pass
+    info = _resolve_playlist_info(
+        wanted,
+        liked=False,
+        manual=False,
+        request=request,
+        catalog_names=catalog_names,
+        manual_owners=manual_owners,
+        monitored_owners=monitored_owners,
+        visibility=visibility,
+        user_names=user_names,
+        hidden_keys=hidden_keys,
+    )
+    if not (info['is_owner'] or info['public']):
+        return None
     return {
         'name': wanted,
         'files': [str(row.get('filename') or '') for row in rows],
@@ -1315,6 +1497,7 @@ def playlist_entry_for_request(
         'cover': '',
         'liked': False,
         'manual': False,
+        **info,
     }
 
 
@@ -1323,6 +1506,22 @@ def require_playlist_visible(name: str, request: Optional[Request]) -> None:
 
     if playlist_entry_for_request(name, request) is None:
         raise HTTPException(status_code=404, detail='Playlist not found')
+
+
+def require_playlist_owner(
+    name: str, request: Optional[Request]
+) -> dict[str, Any]:
+    """Return the playlist entry if *request* owns it; 404 if not visible, 403 if not owner."""
+
+    entry = playlist_entry_for_request(name, request)
+    if entry is None:
+        raise HTTPException(status_code=404, detail='Playlist not found')
+    if not entry.get('is_owner'):
+        raise HTTPException(
+            status_code=403,
+            detail='Only the playlist owner can modify this playlist',
+        )
+    return entry
 
 
 def claim_manual_playlist(name: str, request: Optional[Request]) -> None:
@@ -5847,30 +6046,58 @@ async def create_library_playlist_endpoint(request: Request) -> dict[str, Any]:
 async def edit_library_playlist_tracks_endpoint(
     request: Request,
 ) -> dict[str, Any]:
-    """Add or remove library files on a manual playlist."""
+    """Add or remove library files on a playlist owned by the user."""
 
     payload = await _json_object(request)
     name = str(payload.get('name') or '').strip()
-    require_playlist_visible(name, request)
+    match = require_playlist_owner(name, request)
+    actual_name = str(match.get('name') or name).strip()
     add = payload.get('add') if isinstance(payload.get('add'), list) else []
     remove = (
         payload.get('remove')
         if isinstance(payload.get('remove'), list)
         else []
     )
+    add_list = [str(item) for item in add if str(item).strip()]
+    remove_list = [str(item) for item in remove if str(item).strip()]
     ctx = library_context()
-    try:
-        result = await asyncio.to_thread(
-            edit_manual_playlist,
+
+    def _run() -> dict[str, Any]:
+        res = edit_manual_playlist(
             ctx,
-            name,
-            add=[str(item) for item in add],
-            remove=[str(item) for item in remove],
+            actual_name,
+            add=add_list,
+            remove=remove_list,
+            allow_imported=True,
         )
+        if state.playlist_catalog is not None and not match.get('manual'):
+            for rem in remove_list:
+                state.playlist_catalog.remove_track_by_filename(
+                    actual_name, rem
+                )
+            for added_file in add_list:
+                clean_f = str(added_file).strip().replace('\\', '/')
+                full = resolve_library_file(clean_f, ctx)
+                if full is not None and full.is_file():
+                    meta = read_audio_metadata(full)
+                    song = {
+                        'name': meta.get('title') or full.stem,
+                        'artists': [meta.get('artist') or ''],
+                        'duration': meta.get('duration') or 0,
+                    }
+                    state.playlist_catalog.upsert_track(
+                        actual_name, song, clean_f, full
+                    )
+        return res
+
+    try:
+        result = await asyncio.to_thread(_run)
     except ManualPlaylistError as exc:
         raise HTTPException(
             status_code=exc.status_code, detail=str(exc)
         ) from exc
+    if state.library_sync is not None:
+        await asyncio.to_thread(state.library_sync.touch_all)
     invalidate_library_paths_cache()
     return result
 
@@ -5882,7 +6109,7 @@ async def rename_library_playlist_endpoint(request: Request) -> dict[str, Any]:
     payload = await _json_object(request)
     name = str(payload.get('name') or '').strip()
     new_name = str(payload.get('new_name') or '').strip()
-    require_playlist_visible(name, request)
+    require_playlist_owner(name, request)
     ctx = library_context()
     try:
         result = await asyncio.to_thread(
@@ -5905,6 +6132,140 @@ async def rename_library_playlist_endpoint(request: Request) -> dict[str, Any]:
             )
     invalidate_library_paths_cache()
     return result
+
+
+def set_playlist_visibility_sync(
+    name: str, is_public: bool, request: Request
+) -> dict[str, Any]:
+    """Set whether an owned playlist is Public or Private."""
+
+    clean_name = str(name or '').strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail='Playlist name is required')
+    if is_liked_playlist(clean_name):
+        raise HTTPException(
+            status_code=400, detail='Liked songs cannot be made public'
+        )
+    match = require_playlist_owner(clean_name, request)
+    actual_name = str(match.get('name') or clean_name).strip()
+    if state.manual_playlist_owners is None:
+        raise HTTPException(status_code=500, detail='Playlist store not ready')
+    state.manual_playlist_owners.set_public(actual_name, bool(is_public))
+    if state.library_sync is not None:
+        state.library_sync.touch_all()
+    invalidate_library_paths_cache()
+    return {
+        'ok': True,
+        'name': actual_name,
+        'public': bool(is_public),
+    }
+
+
+@router.post('/api/library/playlists/visibility')
+async def set_playlist_visibility_endpoint(request: Request) -> dict[str, Any]:
+    """Toggle a playlist between Public and Private (owner only)."""
+
+    payload = await _json_object(request)
+    name = str(payload.get('name') or '').strip()
+    is_public = bool(payload.get('public', False))
+    return await asyncio.to_thread(
+        set_playlist_visibility_sync, name, is_public, request
+    )
+
+
+def clone_playlist_sync(
+    name: str, new_name: Optional[str], request: Request
+) -> dict[str, Any]:
+    """Clone a visible playlist into a new Private manual playlist owned by *request*."""
+
+    clean_name = str(name or '').strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail='Playlist name is required')
+    match = playlist_entry_for_request(clean_name, request)
+    if match is None:
+        raise HTTPException(status_code=404, detail='Playlist not found')
+    source_name = str(match.get('name') or clean_name).strip()
+    files = [str(f) for f in (match.get('files') or []) if str(f).strip()]
+    ctx = library_context()
+    try:
+        cloned = clone_playlist_m3u(ctx, source_name, files, new_name=new_name)
+    except ManualPlaylistError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=str(exc)
+        ) from exc
+    cloned_name = str(cloned.get('name') or '').strip()
+    claim_manual_playlist(cloned_name, request)
+    if state.manual_playlist_owners is not None:
+        try:
+            state.manual_playlist_owners.set_public(cloned_name, False)
+        except Exception:
+            pass
+    user_id = request_user_id(request)
+    if user_id and state.track_owners is not None:
+        for stored in cloned.get('files') or []:
+            _note_download_owner(str(stored), user_id)
+    if state.library_sync is not None:
+        state.library_sync.touch_all()
+    invalidate_library_paths_cache()
+    entry = playlist_entry_for_request(cloned_name, request)
+    if entry is not None:
+        return entry
+    return {
+        **cloned,
+        'public': False,
+        'monitored': False,
+        'is_owner': True,
+        'can_edit': True,
+        'hidden': False,
+    }
+
+
+@router.post('/api/library/playlists/clone')
+async def clone_playlist_endpoint(request: Request) -> dict[str, Any]:
+    """Clone any visible playlist into a new Private playlist owned by the user."""
+
+    payload = await _json_object(request)
+    name = str(payload.get('name') or '').strip()
+    new_name = str(payload.get('new_name') or '').strip() or None
+    return await asyncio.to_thread(
+        clone_playlist_sync, name, new_name, request
+    )
+
+
+def set_playlist_hidden_sync(
+    name: str, hidden: bool, request: Request
+) -> dict[str, Any]:
+    """Hide or unhide a public playlist for *request*."""
+
+    clean_name = str(name or '').strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail='Playlist name is required')
+    match = playlist_entry_for_request(clean_name, request)
+    if match is None:
+        raise HTTPException(status_code=404, detail='Playlist not found')
+    actual_name = str(match.get('name') or clean_name).strip()
+    user_id = request_user_id(request)
+    if state.manual_playlist_owners is None:
+        raise HTTPException(status_code=500, detail='Playlist store not ready')
+    state.manual_playlist_owners.set_hidden(user_id, actual_name, bool(hidden))
+    announce_library_changed()
+    return {
+        'ok': True,
+        'name': actual_name,
+        'hidden': bool(hidden),
+    }
+
+
+@router.post('/api/library/playlists/hide')
+async def hide_playlist_endpoint(request: Request) -> dict[str, Any]:
+    """Hide or unhide a public playlist for the current user."""
+
+    payload = await _json_object(request)
+    name = str(payload.get('name') or '').strip()
+    hidden = bool(payload.get('hidden', True))
+    return await asyncio.to_thread(
+        set_playlist_hidden_sync, name, hidden, request
+    )
 
 
 @router.delete('/api/library/playlist')
@@ -5946,7 +6307,27 @@ async def _delete_playlist_by_name(
 ) -> dict[str, Any]:
     """Shared core of both playlist delete endpoints."""
 
-    if request_is_admin(request):
+    match = playlist_entry_for_request(playlist_name, request)
+    if match is not None and not match.get('is_owner'):
+        raise HTTPException(
+            status_code=403,
+            detail='Only the playlist owner can delete this playlist',
+        )
+    if match is not None and int(match.get('owner_id') or 0) > 0:
+        result = await _delete_owned_playlist(request, match)
+    elif request_is_admin(request):
+        catalog_names, manual_owners, monitored_owners, _, _ = (
+            _playlist_meta_maps()
+        )
+        key = str(playlist_name or '').strip().casefold()
+        owner_id = (
+            manual_owners.get(key, 0)
+            or catalog_names.get(key, 0)
+            or monitored_owners.get(key, 0)
+        )
+        user_id = request_user_id(request)
+        if owner_id and owner_id != user_id:
+            raise HTTPException(status_code=404, detail='Playlist not found')
 
         def _run() -> dict[str, Any]:
             assert state.downloader is not None
@@ -5959,7 +6340,6 @@ async def _delete_playlist_by_name(
 
         result = await asyncio.to_thread(_run)
     else:
-        match = playlist_entry_for_request(playlist_name, request)
         if match is None:
             raise HTTPException(status_code=404, detail='Playlist not found')
         result = await _delete_owned_playlist(request, match)
@@ -6124,7 +6504,8 @@ async def add_track_to_playlist_endpoint(request: Request) -> dict[str, Any]:
         raise HTTPException(
             status_code=400, detail='playlist_name and file are required'
         )
-    require_playlist_visible(name, request)
+    if not is_liked_playlist(name):
+        require_playlist_owner(name, request)
     user_id = request_user_id(request)
     try:
         result = await asyncio.to_thread(
@@ -6885,9 +7266,9 @@ def _clear_likes(user_id: Optional[int] = None) -> int:
 
 
 def likes_scope(request: Request) -> Optional[int]:
-    """Whose likes *request* sees: ``None`` (everyone's) for an admin."""
+    """Whose likes *request* sees: strictly the signed-in user's own likes."""
 
-    return None if request_is_admin(request) else request_user_id(request)
+    return request_user_id(request)
 
 
 @router.get('/api/likes')
@@ -6895,7 +7276,7 @@ def get_likes(request: Request) -> dict[str, Any]:
     """The liked files, newest like first, and the playlist's name.
 
     ``files`` are library paths, the same ones ``GET /tracks`` uses.
-    A user sees their own hearts; an admin sees everyone's.
+    Every user sees strictly their own hearts.
     """
 
     likes = _require_likes()
@@ -6957,14 +7338,12 @@ async def apply_like(
     if changed:
         await asyncio.to_thread(_sync_liked_playlist)
         _announce_likes()
-    scope = None if user_id in _admin_like_scope() else user_id
-    return {'file': file, 'liked': liked, 'count': likes.count(scope)}
+    return {'file': file, 'liked': liked, 'count': likes.count(user_id)}
 
 
 @router.post('/api/likes/clear')
 async def clear_likes_endpoint(request: Request) -> dict[str, Any]:
-    """Unlike everything of one's own (everything for an admin), which
-    also takes the playlist away.
+    """Unlike everything of one's own, which also takes the playlist away.
 
     Only the hearts and the playlist file go; no song is deleted.
     """
@@ -6978,6 +7357,65 @@ def _require_discover() -> DiscoverStore:
     if state.discover is None:
         raise HTTPException(status_code=500, detail='Discover store not ready')
     return state.discover
+
+
+def _split_artist_names(raw: str) -> list[str]:
+    text = str(raw or '').strip()
+    if not text:
+        return []
+    for sep in (';', ' / ', ', '):
+        if sep in text:
+            return [part.strip() for part in text.split(sep) if part.strip()]
+    return [text]
+
+
+def _enrich_discover_library_with_likes(
+    library: list[Any], user_id: int
+) -> list[dict[str, Any]]:
+    """Ensure the user's liked songs always contribute to their Discover
+    seed weights, even if the client omitted ``liked`` counts or the liked
+    song came from a shared public playlist."""
+
+    liked_counts: dict[str, int] = {}
+    liked_names: dict[str, str] = {}
+    if state.likes is not None:
+        try:
+            for row in state.likes.rows(user_id):
+                for artist in _split_artist_names(row.get('artist') or ''):
+                    key = artist.casefold()
+                    if key:
+                        liked_counts[key] = liked_counts.get(key, 0) + 1
+                        liked_names.setdefault(key, artist)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Could not enrich discover seeds with user likes'
+            )
+
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in library:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get('name') or '').strip()
+        if not name:
+            continue
+        key = name.casefold()
+        seen.add(key)
+        client_tracks = max(0, int(item.get('tracks') or 0))
+        client_liked = max(0, int(item.get('liked') or 0))
+        server_liked = liked_counts.get(key, 0)
+        liked = max(client_liked, server_liked)
+        tracks = max(client_tracks, liked)
+        out.append({'name': name, 'tracks': tracks, 'liked': liked})
+
+    for key, count in liked_counts.items():
+        if key not in seen and count > 0:
+            out.append({
+                'name': liked_names[key],
+                'tracks': count,
+                'liked': count,
+            })
+    return out
 
 
 @router.post('/api/discover')
@@ -6997,8 +7435,13 @@ async def discover_endpoint(request: Request) -> dict[str, Any]:
     library = payload.get('library')
     if not isinstance(library, list):
         raise HTTPException(status_code=400, detail='library is required')
+    uid = request_user_id(request)
     return await asyncio.to_thread(
-        recommendations, store, library, user_id=request_user_id(request)
+        lambda: recommendations(
+            store,
+            _enrich_discover_library_with_likes(library, uid),
+            user_id=uid,
+        )
     )
 
 
@@ -7019,12 +7462,15 @@ async def discover_collections_endpoint(request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail='library is required')
     albums = payload.get('albums')
     playlist_ids = payload.get('playlist_ids')
+    uid = request_user_id(request)
     return await asyncio.to_thread(
-        collections,
-        store,
-        library,
-        albums if isinstance(albums, list) else [],
-        playlist_ids if isinstance(playlist_ids, list) else [],
+        lambda: collections(
+            store,
+            _enrich_discover_library_with_likes(library, uid),
+            albums if isinstance(albums, list) else [],
+            playlist_ids if isinstance(playlist_ids, list) else [],
+            user_id=uid,
+        )
     )
 
 
@@ -7050,12 +7496,15 @@ async def discover_deezer_collections_endpoint(
     library = payload.get('library')
     if not isinstance(library, list):
         raise HTTPException(status_code=400, detail='library is required')
+    uid = request_user_id(request)
     return await asyncio.to_thread(
-        deezer_collections,
-        store,
-        library,
-        _list_field(payload, 'albums'),
-        _list_field(payload, 'playlist_names'),
+        lambda: deezer_collections(
+            store,
+            _enrich_discover_library_with_likes(library, uid),
+            _list_field(payload, 'albums'),
+            _list_field(payload, 'playlist_names'),
+            user_id=uid,
+        )
     )
 
 
@@ -7076,13 +7525,16 @@ async def discover_spotify_collections_endpoint(
     library = payload.get('library')
     if not isinstance(library, list):
         raise HTTPException(status_code=400, detail='library is required')
+    uid = request_user_id(request)
     return await asyncio.to_thread(
-        spotify_collections,
-        store,
-        library,
-        _list_field(payload, 'albums'),
-        _list_field(payload, 'playlist_ids'),
-        _list_field(payload, 'shown'),
+        lambda: spotify_collections(
+            store,
+            _enrich_discover_library_with_likes(library, uid),
+            _list_field(payload, 'albums'),
+            _list_field(payload, 'playlist_ids'),
+            _list_field(payload, 'shown'),
+            user_id=uid,
+        )
     )
 
 

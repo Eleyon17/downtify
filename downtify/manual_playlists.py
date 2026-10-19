@@ -39,7 +39,13 @@ def _entries_for(files: list[str]) -> list[dict[str, str]]:
     return [{'filename': name} for name in files]
 
 
-def _write(ctx: LibraryContext, files: list[str], path: Path) -> Path:
+def _write(
+    ctx: LibraryContext,
+    files: list[str],
+    path: Path,
+    *,
+    manual: bool = True,
+) -> Path:
     content, _kept = m3u.build_m3u_content(
         _entries_for(files),
         download_dir=ctx.download_dir,
@@ -48,12 +54,17 @@ def _write(ctx: LibraryContext, files: list[str], path: Path) -> Path:
         extra_dirs=tuple(ctx.extra_dirs or ()),
     )
     lines = content.splitlines()
-    if lines[:1] == ['#EXTM3U'] and m3u.MANUAL_M3U_MARKER not in lines[:4]:
+    if (
+        manual
+        and lines[:1] == ['#EXTM3U']
+        and m3u.MANUAL_M3U_MARKER not in lines[:4]
+    ):
         lines.insert(1, m3u.MANUAL_M3U_MARKER)
         content = '\n'.join(lines) + '\n'
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding='utf-8', newline='\n')
-    refresh_manual_playlist_cover(ctx, path, files)
+    if manual:
+        refresh_manual_playlist_cover(ctx, path, files)
     invalidate_library_paths_cache()
     return path
 
@@ -107,19 +118,72 @@ def create_manual_playlist(ctx: LibraryContext, name: str) -> dict[str, Any]:
     }
 
 
+def clone_playlist_m3u(
+    ctx: LibraryContext,
+    source_name: str,
+    files: list[str],
+    new_name: Optional[str] = None,
+) -> dict[str, Any]:
+    """Clone *files* into a new manual M3U playlist."""
+
+    taken = existing_playlist_names(ctx.download_dir)
+    wanted = str(new_name or '').strip()
+    if wanted:
+        safe = _validated_name(wanted)
+        if safe.casefold() in taken:
+            raise ManualPlaylistError(
+                f'A playlist named {safe!r} already exists', status_code=409
+            )
+    else:
+        base = _validated_name(source_name)
+        idx = 1
+        while True:
+            suffix = ' (Copy)' if idx == 1 else f' (Copy {idx})'
+            trimmed = base[: max(1, MAX_PLAYLIST_NAME_LEN - len(suffix))]
+            candidate = _validated_name(f'{trimmed}{suffix}')
+            if candidate.casefold() not in taken:
+                safe = candidate
+                break
+            idx += 1
+
+    valid_files: list[str] = []
+    seen: set[str] = set()
+    for raw in files or []:
+        stored = str(raw or '').strip().replace('\\', '/')
+        if not stored or stored in seen:
+            continue
+        if resolve_library_file(stored, ctx) is not None:
+            valid_files.append(stored)
+            seen.add(stored)
+
+    path = m3u.m3u_path_for(ctx.download_dir, safe)
+    written = _write(ctx, valid_files, path, manual=True)
+    kept = _read_files(ctx, written)
+    logger.info('Cloned playlist {!r} to {!r} ({} tracks)', source_name, safe, len(kept))
+    return {
+        'name': written.stem,
+        'manual': True,
+        'files': kept,
+        'count': len(kept),
+    }
+
+
 def edit_manual_playlist(
     ctx: LibraryContext,
     name: str,
     *,
     add: Optional[list[str]] = None,
     remove: Optional[list[str]] = None,
+    allow_imported: bool = False,
 ) -> dict[str, Any]:
     path = m3u.find_m3u_for_name(ctx.download_dir, name)
     if path is None:
         raise ManualPlaylistError(
             f'Playlist {name!r} was not found', status_code=404
         )
-    _require_manual(path, path.stem)
+    is_manual = m3u.is_manual_m3u(path)
+    if not allow_imported:
+        _require_manual(path, path.stem)
     current = _read_files(ctx, path)
     seen = set(current)
     drop = {
@@ -142,11 +206,11 @@ def edit_manual_playlist(
         files.append(stored)
         seen.add(stored)
         added += 1
-    written = _write(ctx, files, path)
+    written = _write(ctx, files, path, manual=is_manual)
     kept = _read_files(ctx, written)
     return {
         'name': written.stem,
-        'manual': True,
+        'manual': is_manual,
         'files': kept,
         'count': len(kept),
         'added': added,

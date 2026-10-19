@@ -375,11 +375,15 @@ function openMenu(event, row) {
 }
 
 function menuItems(row) {
+  const hideList = [...(props.hideMenu || [])]
+  if (props.context?.type === 'playlist' && props.context?.isOwner === false) {
+    hideList.push('delete')
+  }
   const items = actions.menuFor(row.track, {
     list: props.tracks,
     index: row.index,
     context: props.context,
-    hide: props.hideMenu,
+    hide: hideList,
   })
   const addItems = playlistActions.addMenuItems([row.track])
   if (addItems.length) {
@@ -387,9 +391,12 @@ function menuItems(row) {
     const at = queueAt >= 0 ? queueAt + 1 : 3
     items.splice(at, 0, { divider: true }, ...addItems)
   }
-  if (props.context?.manual && props.context?.playlistName) {
+  if (
+    (props.context?.canEdit || props.context?.manual) &&
+    props.context?.playlistName
+  ) {
     const playlist = playlistActions
-      .manuals()
+      .editables()
       .find((item) => item.name === props.context.playlistName)
     if (playlist) {
       const trashAt = items.findIndex((item) => item.danger)

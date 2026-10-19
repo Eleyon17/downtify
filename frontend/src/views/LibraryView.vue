@@ -44,6 +44,21 @@
       />
       <div class="ml-auto flex items-center gap-2">
         <UiButton
+          v-if="
+            tab === 'playlists' &&
+            (hiddenPlaylistCount > 0 || showHiddenPlaylists)
+          "
+          :variant="showHiddenPlaylists ? 'secondary' : 'ghost'"
+          icon="eye"
+          @click="showHiddenPlaylists = !showHiddenPlaylists"
+        >
+          {{
+            showHiddenPlaylists
+              ? t('playlists.showingHidden', { count: hiddenPlaylistCount })
+              : t('playlists.showHidden', { count: hiddenPlaylistCount })
+          }}
+        </UiButton>
+        <UiButton
           v-if="tab === 'playlists'"
           variant="primary"
           icon="plus"
@@ -357,10 +372,20 @@ const filter = ref('')
 const format = ref('all')
 const selected = ref(new Set())
 const zipping = ref(false)
+const showHiddenPlaylists = ref(false)
+const hiddenPlaylistCount = computed(
+  () => library.playlists.value.filter((p) => p.hidden).length
+)
+watch(hiddenPlaylistCount, (count) => {
+  if (count === 0 && showHiddenPlaylists.value) {
+    showHiddenPlaylists.value = false
+  }
+})
 watch(tab, () => {
   filter.value = ''
   format.value = 'all'
   selected.value = new Set()
+  showHiddenPlaylists.value = false
 })
 
 const tabs = computed(() => [
@@ -379,7 +404,7 @@ const tabs = computed(() => [
   {
     id: 'playlists',
     label: t('library.playlists'),
-    count: library.playlists.value.length,
+    count: library.playlists.value.filter((p) => !p.hidden).length,
     to: { name: 'Library', params: { tab: 'playlists' } },
   },
   {
@@ -453,8 +478,11 @@ const items = computed(() => {
       sortKey.value
     )
   }
+  const visiblePlaylists = library.playlists.value.filter((playlist) =>
+    showHiddenPlaylists.value ? playlist.hidden : !playlist.hidden
+  )
   return sortItems(
-    filterItems(library.playlists.value, filter.value, ['title', 'name']),
+    filterItems(visiblePlaylists, filter.value, ['title', 'name', 'owner']),
     sortKey.value
   )
 })
@@ -526,14 +554,31 @@ function tileProps(item) {
 }
 
 function playlistSubtitle(item) {
+  const parts = []
+  if (!item.liked) {
+    if (item.monitored) {
+      parts.push(t('playlists.monitoredBadge'))
+    } else if (item.public) {
+      parts.push(t('playlists.publicBadge'))
+    } else {
+      parts.push(t('playlists.privateBadge'))
+    }
+    if (item.owner && (!item.isOwner || item.public)) {
+      parts.push(t('playlists.byOwner', { owner: item.owner }))
+    }
+  }
   const batch = item.batch
   if (batch?.expected_count) {
-    return t('playlists.progress', {
-      have: batch.downloaded_count,
-      total: batch.expected_count,
-    })
+    parts.push(
+      t('playlists.progress', {
+        have: batch.downloaded_count,
+        total: batch.expected_count,
+      })
+    )
+  } else {
+    parts.push(t('common.tracks', { count: itemTrackCount(item) }))
   }
-  return t('common.tracks', { count: itemTrackCount(item) })
+  return parts.join(' · ')
 }
 
 function asideFor(item) {

@@ -223,7 +223,7 @@ const labelClass = computed(() =>
 
 const recentPlaylists = computed(() =>
   [...library.playlists.value]
-    .filter((playlist) => itemTrackCount(playlist))
+    .filter((playlist) => !playlist.hidden && itemTrackCount(playlist))
     // The liked songs stay at the top; the rest are the newest.
     .sort((a, b) => Number(b.liked) - Number(a.liked) || b.added - a.added)
     .slice(0, 6)

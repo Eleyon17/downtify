@@ -97,6 +97,18 @@ async def library(
         # Found something new on disk: other apps should sync too.
         api.announce_library_changed()
     allowed = api.allowed_entry_keys(request)
+    if allowed is not None:
+        visible_playlists = await asyncio.to_thread(
+            api.playlists_for_request, request
+        )
+        playlist_paths = [
+            f for p in visible_playlists for f in (p.get('files') or [])
+        ]
+        if playlist_paths:
+            extra_keys = await asyncio.to_thread(
+                _sync().keys_for_paths, playlist_paths
+            )
+            allowed = set(allowed) | extra_keys
     scope = 'a' if allowed is None else api.request_user_id(request)
     etag = f'"lib-{cursor}-{since}-{scope}"'
     if request.headers.get('if-none-match') == etag:
@@ -124,10 +136,11 @@ def track_lyrics(track_id: str) -> dict[str, Any]:
 
 @router.get('/playlists')
 async def playlists(request: Request) -> list[dict[str, Any]]:
-    """Downloaded playlists as ``{name, liked, count, track_ids, cover}``
+    """Downloaded playlists as ``{name, liked, manual, public, monitored,
+    owner, owner_id, is_owner, can_edit, hidden, count, track_ids, cover}``
     - ``cover`` is a path for ``GET /playlist-cover?file=`` or ``''``.
-    A user sees their own playlists (and their own liked songs as the
-    liked one) only."""
+    A user sees their own playlists, their own liked songs, and any
+    Public/Monitored playlists."""
 
     await asyncio.to_thread(_refresh)
     found = await asyncio.to_thread(api.playlists_for_request, request)
@@ -138,12 +151,43 @@ async def playlists(request: Request) -> list[dict[str, Any]]:
             'name': p['name'],
             'liked': p['liked'],
             'manual': bool(p.get('manual')),
+            'public': bool(p.get('public')),
+            'monitored': bool(p.get('monitored')),
+            'owner': str(p.get('owner') or ''),
+            'owner_id': int(p.get('owner_id') or 0),
+            'is_owner': bool(p.get('is_owner')),
+            'can_edit': bool(p.get('can_edit')),
+            'hidden': bool(p.get('hidden')),
             'count': p['count'],
             'cover': p['cover'],
             'track_ids': [ids[f] for f in p['files'] if f in ids],
         }
         for p in found
     ]
+
+
+@router.post('/playlists')
+async def mobile_create_playlist(request: Request) -> dict[str, Any]:
+    """Create a new manual playlist for the signed-in user."""
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    name = str((payload or {}).get('name') or '').strip()
+    if not name:
+        raise HTTPException(status_code=400, detail='name is required')
+    ctx = api.library_context()
+    try:
+        result = await asyncio.to_thread(api.create_manual_playlist, ctx, name)
+    except api.ManualPlaylistError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=str(exc)
+        ) from exc
+    api.claim_manual_playlist(str(result.get('name') or name), request)
+    invalidate_library_paths_cache()
+    await api.log_activity(request, 'playlist_create', result.get('name') or name)
+    return result
 
 
 @router.get('/playlists/{name}/suggestions')
@@ -188,7 +232,7 @@ async def mobile_add_playlist_track(
     name: str,
     request: Request,
 ) -> dict[str, Any]:
-    """Add a library track by track_id to playlist on mobile."""
+    """Add a library track by track_id to an owned playlist on mobile."""
 
     try:
         payload = await request.json()
@@ -197,7 +241,8 @@ async def mobile_add_playlist_track(
     track_id = str((payload or {}).get('track_id') or '').strip()
     if not track_id:
         raise HTTPException(status_code=400, detail='track_id is required')
-    api.require_playlist_visible(name, request)
+    if not api.is_liked_playlist(name):
+        api.require_playlist_owner(name, request)
     row = await asyncio.to_thread(_sync().row_for, track_id)
     if row is None:
         raise HTTPException(status_code=404, detail='Track not found')
@@ -206,9 +251,122 @@ async def mobile_add_playlist_track(
         result = await asyncio.to_thread(
             api.add_track_to_playlist_internal_sync, name, row['file'], user_id
         )
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {'status': 'ok', 'playlist': name, 'track_id': track_id, 'result': result}
+
+
+@router.post('/playlists/{name}/tracks/remove')
+async def mobile_remove_playlist_track(
+    name: str,
+    request: Request,
+) -> dict[str, Any]:
+    """Remove a track by track_id from an owned playlist on mobile."""
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    track_id = str((payload or {}).get('track_id') or '').strip()
+    if not track_id:
+        raise HTTPException(status_code=400, detail='track_id is required')
+    row = await asyncio.to_thread(_sync().row_for, track_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail='Track not found')
+    if api.is_liked_playlist(name):
+        await api.apply_like(
+            row['file'], False, user_id=api.request_user_id(request)
+        )
+        return {'status': 'ok', 'playlist': name, 'track_id': track_id}
+    match = api.require_playlist_owner(name, request)
+    actual_name = str(match.get('name') or name).strip()
+    ctx = api.library_context()
+    try:
+        await asyncio.to_thread(
+            lambda: api.edit_manual_playlist(
+                ctx,
+                actual_name,
+                remove=[row['file']],
+                allow_imported=True,
+            )
+        )
+    except api.ManualPlaylistError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=str(exc)
+        ) from exc
+    if api.state.playlist_catalog is not None:
+        await asyncio.to_thread(
+            api.state.playlist_catalog.remove_track_by_filename,
+            actual_name,
+            Path(row['file']).name,
+        )
+    if api.state.library_sync is not None:
+        await asyncio.to_thread(api.state.library_sync.touch_all)
+    invalidate_library_paths_cache()
+    return {'status': 'ok', 'playlist': actual_name, 'track_id': track_id}
+
+
+@router.put('/playlists/{name}/visibility')
+async def mobile_set_playlist_visibility(
+    name: str,
+    request: Request,
+) -> dict[str, Any]:
+    """Set whether an owned playlist is Public or Private."""
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    is_public = bool((payload or {}).get('public'))
+    result = await asyncio.to_thread(
+        api.set_playlist_visibility_sync, name, is_public, request
+    )
+    await api.log_activity(
+        request,
+        'playlist_visibility',
+        f'{name} -> {"public" if result["public"] else "private"}',
+    )
+    return result
+
+
+@router.post('/playlists/{name}/clone')
+async def mobile_clone_playlist(
+    name: str,
+    request: Request,
+) -> dict[str, Any]:
+    """Clone a visible playlist into a new Private playlist owned by the caller."""
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    new_name = str((payload or {}).get('new_name') or '').strip() or None
+    result = await asyncio.to_thread(
+        api.clone_playlist_sync, name, new_name, request
+    )
+    await api.log_activity(
+        request, 'playlist_clone', f'{name} -> {result["name"]}'
+    )
+    return result
+
+
+@router.put('/playlists/{name}/hide')
+async def mobile_set_playlist_hidden(
+    name: str,
+    request: Request,
+) -> dict[str, Any]:
+    """Hide or unhide a public playlist belonging to another user."""
+
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    hidden = bool((payload or {}).get('hidden', True))
+    return await asyncio.to_thread(
+        api.set_playlist_hidden_sync, name, hidden, request
+    )
 
 
 @router.get('/likes')

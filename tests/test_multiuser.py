@@ -613,10 +613,34 @@ def test_playlist_listing_is_scoped_with_a_personal_liked(
     assert liked['files'] == ['a.mp3']
     assert not liked['cover']
 
-    assert api._filter_playlists_for(found, _request(7)) == [
-        p for p in found if p['name'] == 'Theirs'
+    theirs = api._filter_playlists_for(found, _request(7))
+    assert [p['name'] for p in theirs] == ['Theirs']
+    assert theirs[0]['is_owner'] is True
+    assert theirs[0]['public'] is False
+
+    # Making 'Theirs' public makes it visible to user 5 (with can_edit=False),
+    # and user 5 can hide/unhide it.
+    manual.set_public('Theirs', True)
+    mine_with_public = api._filter_playlists_for(found, _request(5))
+    assert [p['name'] for p in mine_with_public] == [
+        'Downtify Liked Songs',
+        'Mine',
+        'Theirs',
+        'My Mix',
     ]
-    assert api._filter_playlists_for(found, _admin_request()) == found
+    theirs_for_5 = next(p for p in mine_with_public if p['name'] == 'Theirs')
+    assert theirs_for_5['public'] is True
+    assert theirs_for_5['is_owner'] is False
+    assert theirs_for_5['can_edit'] is False
+    assert theirs_for_5['hidden'] is False
+
+    manual.set_hidden(5, 'Theirs', True)
+    theirs_hidden = next(
+        p for p in api._filter_playlists_for(found, _request(5))
+        if p['name'] == 'Theirs'
+    )
+    assert theirs_hidden['hidden'] is True
+
 
 
 # ── first-start backfill ─────────────────────────────────────────────

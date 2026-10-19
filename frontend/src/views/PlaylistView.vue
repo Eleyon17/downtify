@@ -22,6 +22,36 @@
           >
             <AppIcon name="spotify" :size="14" />Spotify
           </span>
+          <span
+            v-if="!playlist.liked"
+            class="mr-1.5 inline-flex translate-y-0.5 items-center gap-1 rounded-full border border-line-3 px-2 py-0.5 text-[11px] font-semibold"
+            :class="
+              playlist.monitored || playlist.public
+                ? 'border-accent/40 bg-accent/10 text-accent'
+                : 'text-muted'
+            "
+          >
+            <AppIcon
+              :name="
+                playlist.monitored
+                  ? 'radar'
+                  : playlist.public
+                    ? 'globe'
+                    : 'lock'
+              "
+              :size="12"
+            />
+            {{
+              playlist.monitored
+                ? t('playlists.monitoredBadge')
+                : playlist.public
+                  ? t('playlists.publicBadge')
+                  : t('playlists.privateBadge')
+            }}
+          </span>
+          <span v-if="playlist.owner && !playlist.liked" class="mr-1.5 font-medium text-fg-2">
+            {{ t('playlists.byOwner', { owner: playlist.owner }) }} ·
+          </span>
           {{ facts }}
         </template>
         <template #actions>
@@ -45,7 +75,7 @@
             @click="playlistActions.play(playlist, { shuffled: true })"
           />
           <UiButton
-            v-if="batch?.missing_count"
+            v-if="playlist.isOwner && batch?.missing_count"
             variant="primary"
             icon="download"
             @click="playlistActions.downloadMissing(playlist)"
@@ -53,7 +83,7 @@
             {{ t('playlists.downloadMissing', { count: batch.missing_count }) }}
           </UiButton>
           <UiButton
-            v-if="playlist.manual"
+            v-if="playlist.canEdit"
             variant="secondary"
             icon="plus"
             @click="playlistActions.openAddSongs(playlist)"
@@ -61,12 +91,42 @@
             {{ t('playlists.addSongs') }}
           </UiButton>
           <UiButton
-            v-if="playlist.manual"
+            v-if="playlist.isOwner && !playlist.liked && !playlist.monitored"
+            variant="ghost"
+            :icon="playlist.public ? 'lock' : 'globe'"
+            @click="playlistActions.toggleVisibility(playlist)"
+          >
+            {{
+              playlist.public
+                ? t('playlists.makePrivate')
+                : t('playlists.makePublic')
+            }}
+          </UiButton>
+          <UiButton
+            v-if="playlist.isOwner && playlist.manual"
             variant="ghost"
             icon="pencil"
             @click="playlistActions.rename(playlist)"
           >
             {{ t('playlists.rename') }}
+          </UiButton>
+          <UiButton
+            v-if="!playlist.isOwner && !playlist.liked"
+            variant="secondary"
+            icon="copy"
+            @click="playlistActions.clone(playlist)"
+          >
+            {{ t('playlists.clone') }}
+          </UiButton>
+          <UiButton
+            v-if="!playlist.isOwner && !playlist.liked"
+            variant="ghost"
+            icon="eye"
+            @click="playlistActions.toggleHidden(playlist)"
+          >
+            {{
+              playlist.hidden ? t('playlists.unhide') : t('playlists.hide')
+            }}
           </UiButton>
           <UiButton
             v-if="playlist.tracks.length"
@@ -94,14 +154,14 @@
           icon="download"
           :title="t('playlists.nothingYet')"
           :body="
-            playlist.manual
+            playlist.canEdit
               ? t('playlists.nothingYetManualHint')
               : t('playlists.nothingYetHint')
           "
         />
 
         <UiPanel
-          v-if="batch?.missing_count"
+          v-if="playlist.isOwner && batch?.missing_count"
           :title="t('playlists.missingTitle', { count: batch.missing_count })"
           :description="t('playlists.missingHint')"
         >
@@ -141,7 +201,7 @@
         </UiPanel>
 
         <PlaylistSuggestions
-          v-if="playlist"
+          v-if="playlist && playlist.canEdit"
           :playlist="playlist"
         />
       </div>

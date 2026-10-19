@@ -65,6 +65,20 @@ class PlaylistCatalog:
                 )
             """)
             conn.execute("""
+                CREATE TABLE IF NOT EXISTS playlist_visibility (
+                    name_key TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    is_public INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS playlist_hidden (
+                    user_id INTEGER NOT NULL,
+                    name_key TEXT NOT NULL,
+                    PRIMARY KEY (user_id, name_key)
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS playlist_tracks (
                     playlist_name TEXT NOT NULL,
                     track_spotify_id TEXT NOT NULL,
@@ -414,6 +428,21 @@ class PlaylistCatalog:
             )
             return cur.rowcount > 0
 
+    def remove_track_by_filename(
+        self, playlist_name: str, filename: str
+    ) -> bool:
+        pl_name = str(playlist_name or '').strip()
+        name = _norm_path(filename)
+        if not pl_name or not name:
+            return False
+        with self._connect() as conn:
+            cur = conn.execute(
+                """DELETE FROM playlist_tracks
+                   WHERE playlist_name = ? AND filename = ?""",
+                (pl_name, name),
+            )
+            return cur.rowcount > 0
+
     def reassign_legacy(self, user_id: int) -> int:
         """Give pre-feature playlists (``user_id`` ``0``) to *user_id*.
 
@@ -436,6 +465,7 @@ class PlaylistCatalog:
         pl_name = str(playlist_name or '').strip()
         if not pl_name:
             return []
+        key = pl_name.casefold()
         with self._connect() as conn:
             rows = conn.execute(
                 """SELECT filename FROM playlist_tracks
@@ -450,6 +480,12 @@ class PlaylistCatalog:
                 )
             )
             conn.execute('DELETE FROM playlists WHERE name = ?', (pl_name,))
+            conn.execute(
+                'DELETE FROM playlist_visibility WHERE name_key = ?', (key,)
+            )
+            conn.execute(
+                'DELETE FROM playlist_hidden WHERE name_key = ?', (key,)
+            )
         return filenames
 
     def remove_tracks_for_filename(self, filename: str) -> list[str]:
@@ -509,6 +545,20 @@ class ManualPlaylistOwners:
                     user_id INTEGER NOT NULL
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS playlist_visibility (
+                    name_key TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    is_public INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS playlist_hidden (
+                    user_id INTEGER NOT NULL,
+                    name_key TEXT NOT NULL,
+                    PRIMARY KEY (user_id, name_key)
+                )
+            """)
 
     @staticmethod
     def _key(name: str) -> str:
@@ -547,19 +597,44 @@ class ManualPlaylistOwners:
         return int(row['user_id'] or 0) or None
 
     def forget_owner(self, name: str) -> None:
+        key = self._key(name)
         with self._connect() as conn:
             conn.execute(
                 'DELETE FROM manual_playlist_owners WHERE name_key = ?',
-                (self._key(name),),
+                (key,),
+            )
+            conn.execute(
+                'DELETE FROM playlist_visibility WHERE name_key = ?',
+                (key,),
+            )
+            conn.execute(
+                'DELETE FROM playlist_hidden WHERE name_key = ?',
+                (key,),
             )
 
     def rename_owner(self, name: str, new_name: str) -> None:
         """Move a manual playlist's owner to its new name (if any)."""
 
+        old_key = self._key(name)
+        new_key = self._key(new_name)
         owner = self.owner(name)
+        pub = self.is_public(name)
+        with self._connect() as conn:
+            hidden_users = [
+                int(row['user_id'])
+                for row in conn.execute(
+                    'SELECT user_id FROM playlist_hidden WHERE name_key = ?',
+                    (old_key,),
+                ).fetchall()
+            ]
         self.forget_owner(name)
         if owner is not None:
             self.set_owner(new_name, owner)
+        if pub is not None:
+            self.set_public(new_name, pub)
+        for uid in hidden_users:
+            if new_key:
+                self.set_hidden(uid, new_name, True)
 
     def owner_map(self) -> dict[str, int]:
         """``{casefolded name: user_id}`` (one query)."""
@@ -570,11 +645,88 @@ class ManualPlaylistOwners:
             ).fetchall()
         return {str(row['name_key']): int(row['user_id'] or 0) for row in rows}
 
+    def set_public(self, name: str, is_public: bool) -> None:
+        """Set whether *name* is visible to all users on the server."""
+
+        key = self._key(name)
+        if not key:
+            return
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO playlist_visibility (name_key, name, is_public)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(name_key) DO UPDATE SET
+                   name=excluded.name, is_public=excluded.is_public""",
+                (key, str(name or '').strip(), 1 if is_public else 0),
+            )
+
+    def is_public(self, name: str) -> Optional[bool]:
+        """Explicit visibility for *name*, or ``None`` if not set."""
+
+        key = self._key(name)
+        if not key:
+            return None
+        with self._connect() as conn:
+            row = conn.execute(
+                'SELECT is_public FROM playlist_visibility WHERE name_key = ?',
+                (key,),
+            ).fetchone()
+        if row is None:
+            return None
+        return bool(int(row['is_public'] or 0))
+
+    def visibility_map(self) -> dict[str, bool]:
+        """``{casefolded name: is_public}`` for explicitly configured playlists."""
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                'SELECT name_key, is_public FROM playlist_visibility'
+            ).fetchall()
+        return {
+            str(row['name_key']): bool(int(row['is_public'] or 0))
+            for row in rows
+        }
+
+    def set_hidden(self, user_id: int, name: str, hidden: bool) -> None:
+        """Hide or unhide a playlist for *user_id*."""
+
+        key = self._key(name)
+        if not key or not user_id:
+            return
+        with self._connect() as conn:
+            if hidden:
+                conn.execute(
+                    """INSERT OR IGNORE INTO playlist_hidden (user_id, name_key)
+                       VALUES (?, ?)""",
+                    (int(user_id), key),
+                )
+            else:
+                conn.execute(
+                    'DELETE FROM playlist_hidden WHERE user_id = ? AND name_key = ?',
+                    (int(user_id), key),
+                )
+
+    def hidden_set(self, user_id: int) -> set[str]:
+        """Casefolded names hidden by *user_id*."""
+
+        if not user_id:
+            return set()
+        with self._connect() as conn:
+            rows = conn.execute(
+                'SELECT name_key FROM playlist_hidden WHERE user_id = ?',
+                (int(user_id),),
+            ).fetchall()
+        return {str(row['name_key']) for row in rows}
+
     def remove_user(self, user_id: int) -> None:
         """Release a deleted account's playlists (files stay put)."""
 
         with self._connect() as conn:
             conn.execute(
                 'DELETE FROM manual_playlist_owners WHERE user_id = ?',
+                (int(user_id),),
+            )
+            conn.execute(
+                'DELETE FROM playlist_hidden WHERE user_id = ?',
                 (int(user_id),),
             )
