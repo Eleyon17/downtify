@@ -95,7 +95,10 @@ def get_me(request: Request) -> dict[str, Any]:
     user = _users().get(me.user_id)
     if user is None:
         raise HTTPException(status_code=401, detail='Sign in required')
-    return {'user': user, 'preferences': _users().preferences(me.user_id)}
+    prefs = _users().preferences(me.user_id)
+    if 'hide_public_playlists_by_default' not in prefs:
+        prefs['hide_public_playlists_by_default'] = True
+    return {'user': user, 'preferences': prefs}
 
 
 @router.patch('/api/me')
@@ -161,20 +164,26 @@ async def change_my_password(request: Request) -> dict[str, Any]:
 
 @router.get('/api/me/preferences')
 def get_my_preferences(request: Request) -> dict[str, Any]:
-    return _users().preferences(_me(request).user_id)
+    prefs = _users().preferences(_me(request).user_id)
+    if 'hide_public_playlists_by_default' not in prefs:
+        prefs['hide_public_playlists_by_default'] = True
+    return prefs
 
 
 @router.put('/api/me/preferences')
 async def set_my_preferences(request: Request) -> dict[str, Any]:
-    """Merge ``{theme, locale, show_lyrics, search_albums}`` (any of them)
+    """Merge ``{theme, locale, show_lyrics, search_albums, hide_public_playlists_by_default}`` (any of them)
     into your preferences; the result. Yours only - nobody else's
     Downtify changes."""
 
     me = _me(request)
     payload = await _json(request)
-    return await asyncio.to_thread(
+    result = await asyncio.to_thread(
         _users().set_preferences, me.user_id, payload
     )
+    if payload.get('hide_public_playlists_by_default') is True:
+        await asyncio.to_thread(api.apply_hide_public_playlists, me.user_id)
+    return result
 
 
 @router.post('/api/me/sign-out-everywhere')
@@ -232,6 +241,7 @@ async def create_user(request: Request) -> dict[str, Any]:
         request, 'user_created', user['username'], {'role': user['role']}
     )
     logger.info('Created user {} ({})', user['username'], user['role'])
+    await asyncio.to_thread(api.apply_hide_public_playlists, user['id'])
     return user
 
 

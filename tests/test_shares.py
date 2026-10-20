@@ -132,8 +132,17 @@ def test_public_share_endpoints(app, tmp_path, monkeypatch):
     # Stream out of bounds
     assert client.get(f'/api/share/{share["id"]}/stream/5').status_code == 404
 
-    # 3. Non-existent share
+    # 3. Export as CSV
+    export_res = client.get(f'/api/share/{share["id"]}/export.csv')
+    assert export_res.status_code == 200
+    assert 'text/csv' in export_res.headers['content-type']
+    assert 'Great Track.csv' in export_res.headers['content-disposition']
+    assert 'Title,Artist,Album' in export_res.text
+    assert 'Great Track' in export_res.text
+
+    # 4. Non-existent share
     assert client.get('/api/share/missing12345').status_code == 404
+    assert client.get('/api/share/missing12345/export.csv').status_code == 404
 
 
 def test_shares_api_authenticated(app, tmp_path, monkeypatch):
@@ -204,3 +213,35 @@ def test_mobile_shares_endpoints(app, tmp_path):
     del_res = client.delete(f'/api/v1/shares/{data["id"]}')
     assert del_res.status_code == 200
     assert del_res.json()['deleted'] is True
+
+
+def test_resolve_downtify_share_url(app, tmp_path, monkeypatch):
+    client = TestClient(app, base_url='http://testserver')
+    client.post(
+        '/api/auth/login', json={'username': 'admin', 'password': 'downtify'}
+    )
+
+    class MockRemoteResponse:
+        status_code = 200
+        def json(self):
+            return {
+                'id': 'abc12345',
+                'title': 'Remote Shared Playlist',
+                'tracks': [
+                    {'title': 'Song 1', 'artist': 'Artist 1', 'album': 'Album 1', 'duration': 180},
+                    {'title': 'Song 2', 'artist': 'Artist 2', 'album': 'Album 2', 'duration': 200},
+                ],
+            }
+
+    import requests
+    monkeypatch.setattr(requests, 'get', lambda url, **kwargs: MockRemoteResponse())
+
+    res = client.get('/api/url/resolve', params={'url': 'https://remote-downtify.org/share/abc12345'})
+    assert res.status_code == 200
+    data = res.json()
+    assert data['type'] == 'playlist'
+    assert data['name'] == 'Remote Shared Playlist'
+    assert len(data['tracks']) == 2
+    assert data['tracks'][0]['name'] == 'Song 1'
+    assert data['tracks'][0]['artists'] == ['Artist 1']
+    assert data['tracks'][0]['album_name'] == 'Album 1'

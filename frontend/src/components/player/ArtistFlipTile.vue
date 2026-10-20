@@ -137,10 +137,10 @@
                 <button
                   type="button"
                   class="flex size-7 shrink-0 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/15 hover:text-white"
-                  :title="t('actions.addToQueue')"
+                  :title="t('actions.playNext')"
                   @click.stop="queueSong(song)"
                 >
-                  <AppIcon name="plus" :size="15" />
+                  <AppIcon name="play-next" :size="15" />
                 </button>
               </div>
             </div>
@@ -189,10 +189,10 @@
                 <button
                   type="button"
                   class="flex size-7 shrink-0 items-center justify-center rounded-full text-white/50 transition-colors hover:bg-white/15 hover:text-white"
-                  :title="t('actions.addToQueue')"
+                  :title="t('actions.playNext')"
                   @click.stop="queueAlbum(album)"
                 >
-                  <AppIcon name="plus" :size="15" />
+                  <AppIcon name="play-next" :size="15" />
                 </button>
               </div>
             </div>
@@ -536,13 +536,13 @@ function albumFallbackCover(album) {
 function queueSong(song) {
   const resolvedSong = song.cover_url ? song : { ...song, cover_url: songCover(song) }
   const playerTrack = songToPlayerTrack(resolvedSong, library.findTrack)
-  actions.enqueue([playerTrack])
+  actions.playNext([playerTrack])
 }
 
 async function queueAlbum(album) {
   const local = library.findAlbum(album.artist || currentArtist.value, album.name)
   if (local?.tracks?.length) {
-    actions.enqueue(local.tracks)
+    actions.playNext(local.tracks)
     return
   }
   if (album.url) {
@@ -552,7 +552,7 @@ async function queueAlbum(album) {
         songToPlayerTrack(s, library.findTrack)
       )
       if (tracks.length) {
-        actions.enqueue(tracks)
+        actions.playNext(tracks)
       } else {
         ui.toast(t('toast.actionFailed'), { kind: 'error' })
       }

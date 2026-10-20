@@ -298,7 +298,9 @@ import base64
 import concurrent.futures.thread as cf_thread
 import contextlib
 import copy
+import csv
 import hashlib
+import io
 import json
 import mimetypes
 import re
@@ -1553,6 +1555,70 @@ def require_playlist_owner(
     return entry
 
 
+def apply_hide_public_playlists(user_id: int) -> None:
+    """Put all playlists not belonging to user_id into the hidden section."""
+    if not user_id or state.manual_playlist_owners is None:
+        return
+    try:
+        catalog_names, manual_owners, monitored_owners, _, _ = _playlist_meta_maps()
+        ctx = library_context()
+        found = list_library_playlists(
+            ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs
+        )
+        non_owned: set[str] = set()
+        for p in found:
+            if p.get('liked'):
+                continue
+            name = str(p.get('name') or '').strip()
+            key = name.casefold()
+            is_manual = bool(p.get('manual'))
+            if is_manual:
+                owner_id = int(
+                    manual_owners.get(key, 0) or catalog_names.get(key, 0) or 0
+                )
+            else:
+                owner_id = int(
+                    catalog_names.get(key, 0)
+                    or monitored_owners.get(key, 0)
+                    or manual_owners.get(key, 0)
+                    or 0
+                )
+            if owner_id != user_id:
+                non_owned.add(key)
+        for key, oid in catalog_names.items():
+            if oid != user_id and key != 'downtify liked songs':
+                non_owned.add(key)
+        for key, oid in monitored_owners.items():
+            if oid != user_id and key != 'downtify liked songs':
+                non_owned.add(key)
+        for key, oid in manual_owners.items():
+            if oid != user_id and key != 'downtify liked songs':
+                non_owned.add(key)
+        state.manual_playlist_owners.hide_all_non_owned_for_user(user_id, non_owned)
+    except Exception:
+        logger.opt(exception=True).debug(
+            'Could not apply hide public playlists for user {}', user_id
+        )
+
+
+def auto_hide_new_playlist_for_others(name: str, owner_id: int) -> None:
+    """For any user with hide_public_playlists_by_default, put this new playlist in hidden."""
+    if not name or state.manual_playlist_owners is None or state.auth is None:
+        return
+    try:
+        users = state.auth.users
+        for u in users.list():
+            uid = int(u.get('id') or 0)
+            if uid and uid != owner_id:
+                prefs = users.preferences(uid)
+                if prefs.get('hide_public_playlists_by_default', True):
+                    state.manual_playlist_owners.set_hidden(uid, name, True)
+    except Exception:
+        logger.opt(exception=True).debug(
+            'Could not auto-hide new playlist {!r}', name
+        )
+
+
 def claim_manual_playlist(name: str, request: Optional[Request]) -> None:
     """Record a Library-created playlist's owner (best effort)."""
 
@@ -1561,6 +1627,7 @@ def claim_manual_playlist(name: str, request: Optional[Request]) -> None:
         return
     try:
         state.manual_playlist_owners.set_owner(name, user_id)
+        auto_hide_new_playlist_for_others(name, user_id)
     except Exception:
         logger.opt(exception=True).debug(
             'Could not record owner for playlist {!r}', name
@@ -1586,11 +1653,14 @@ def user_preferences(request: Request) -> dict[str, Any]:
     """The signed-in user's own preferences (Settings > General)."""
 
     if state.auth is None:
-        return {}
+        return {'hide_public_playlists_by_default': True}
     principal = principal_of(request)
     if principal is None or not principal.user_id:
-        return {}
-    return state.auth.users.preferences(principal.user_id)
+        return {'hide_public_playlists_by_default': True}
+    prefs = state.auth.users.preferences(principal.user_id)
+    if 'hide_public_playlists_by_default' not in prefs:
+        prefs['hide_public_playlists_by_default'] = True
+    return prefs
 
 
 async def log_activity(
@@ -2266,6 +2336,8 @@ def add_track_to_playlist_internal_sync(
             }
             state.playlist_catalog.ensure_playlist(clean_name, user_id=user_id)
             state.playlist_catalog.upsert_track(clean_name, song, clean_file, full)
+            if user_id:
+                auto_hide_new_playlist_for_others(clean_name, user_id)
         invalidate_library_paths_cache()
         announce_library_changed()
         return {
@@ -2284,6 +2356,8 @@ def add_track_to_playlist_internal_sync(
         }
         state.playlist_catalog.ensure_playlist(clean_name, user_id=user_id)
         state.playlist_catalog.upsert_track(clean_name, song, clean_file, full)
+        if user_id:
+            auto_hide_new_playlist_for_others(clean_name, user_id)
         invalidate_library_paths_cache()
         announce_library_changed()
         return {'playlist': clean_name, 'file': clean_file}
@@ -3385,6 +3459,77 @@ def _deezer_details(kind: str, did: str) -> dict[str, Any]:
     )
 
 
+def _parse_downtify_share_url(url: str) -> Optional[tuple[str, str]]:
+    """Return (base_url, share_id) if url is a Downtify share link."""
+    m = re.match(
+        r'^(https?://[^/]+)(?:/api)?/share/([a-zA-Z0-9_-]+)',
+        str(url or '').strip(),
+    )
+    if m:
+        return m.group(1), m.group(2)
+    return None
+
+
+def _downtify_share_details(base_url: str, share_id: str) -> dict[str, Any]:
+    import httpx
+
+    try:
+        resp = httpx.get(
+            f'{base_url}/api/share/{share_id}',
+            timeout=10.0,
+            follow_redirects=True,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        logger.warning(
+            'Failed to fetch remote Downtify share {}: {}', share_id, exc
+        )
+        raise HTTPException(
+            status_code=404, detail='Remote share not found'
+        ) from exc
+    kind = (
+        'playlist'
+        if str(data.get('kind') or '').lower() == 'playlist'
+        else 'track'
+    )
+    title = str(data.get('title') or 'Shared Content').strip()
+    raw_cover = str(data.get('cover_url') or '')
+    cover_url = f'{base_url}{raw_cover}' if raw_cover.startswith('/') else raw_cover
+    tracks = []
+    for idx, tr in enumerate(data.get('tracks') or []):
+        t_cover = str(tr.get('cover_url') or '')
+        if t_cover.startswith('/'):
+            t_cover = f'{base_url}{t_cover}'
+        artists = (
+            [str(tr.get('artist') or '').strip()]
+            if tr.get('artist')
+            else []
+        )
+        tracks.append({
+            'name': str(tr.get('title') or ''),
+            'artists': artists,
+            'album_name': str(tr.get('album') or '').strip(),
+            'duration': int((float(tr.get('duration') or 0)) * 1000),
+            'song_id': f'share:{share_id}:{idx}',
+            'cover_url': t_cover or cover_url,
+        })
+    sub = (
+        f'{len(tracks)} tracks'
+        if kind == 'playlist'
+        else (tracks[0].get('artists', [''])[0] if tracks else '')
+    )
+    return {
+        'kind': kind,
+        'name': title,
+        'subtitle': sub,
+        'cover_url': cover_url,
+        'year': '',
+        'tracks': tracks,
+        'albums': [],
+    }
+
+
 @router.get('/api/url/resolve')
 def url_resolve_endpoint(url: str = Query(...)) -> dict[str, Any]:
     """What a pasted link points at, with its tracks (or releases).
@@ -3404,14 +3549,26 @@ def url_resolve_endpoint(url: str = Query(...)) -> dict[str, Any]:
         if spotify_parsed or youtube_parsed
         else deezer.parse_deezer_url(url)
     )
-    if spotify_parsed is None and youtube_parsed is None and not deezer_parsed:
+    downtify_share = (
+        None
+        if (spotify_parsed or youtube_parsed or deezer_parsed)
+        else _parse_downtify_share_url(url)
+    )
+    if (
+        spotify_parsed is None
+        and youtube_parsed is None
+        and not deezer_parsed
+        and not downtify_share
+    ):
         raise HTTPException(status_code=400, detail='Invalid URL')
     try:
         if spotify_parsed is not None:
             return _spotify_details(*spotify_parsed)
         if youtube_parsed is not None:
             return _youtube_details(*youtube_parsed)
-        return _deezer_details(*deezer_parsed)
+        if deezer_parsed:
+            return _deezer_details(*deezer_parsed)
+        return _downtify_share_details(*downtify_share)
     except HTTPException:
         raise
     except ValueError as exc:
@@ -4488,6 +4645,10 @@ async def _finish_playlist_batch(
             cover_cache=state.cover_cache,
             metadata_cache=state.metadata_cache,
         )
+
+
+    if playlist_name:
+        auto_hide_new_playlist_for_others(playlist_name, user_id)
 
 
 def _rebuild_playlist_catalog_from_library(
@@ -8575,6 +8736,8 @@ async def add_monitor_playlist(request: Request) -> dict[str, Any]:
         user_id,
     )
     _start_initial_check(playlist, db)
+    if name:
+        auto_hide_new_playlist_for_others(name, user_id)
     return playlist.to_dict()
 
 
@@ -8988,6 +9151,37 @@ def share_playlist_cover_endpoint(share_id: str) -> FileResponse:
         headers={
             'Cache-Control': 'public, max-age=86400',
             'ETag': f'"{int(full.stat().st_mtime)}"',
+        },
+    )
+
+
+@router.get('/api/share/{share_id}/export.csv')
+def share_export_csv_endpoint(share_id: str) -> Response:
+    """Export public shared tracks as a CSV file compatible with Downtify CSV import."""
+    share = _require_shares().get_share(share_id)
+    if not share:
+        raise HTTPException(status_code=404, detail='Share not found')
+    files, title, _ = _resolve_share_files(share)
+    if not files:
+        raise HTTPException(status_code=404, detail='No tracks found for share')
+    ctx = library_context()
+    entries = list_entries_for_stored_paths(ctx, files)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Title', 'Artist', 'Album'])
+    for entry in entries:
+        t_title = str(entry.get('title') or '').strip()
+        t_artist = str(entry.get('artist') or '').strip()
+        t_album = str(entry.get('album') or '').strip()
+        writer.writerow([t_title, t_artist, t_album])
+    safe_title = (
+        re.sub(r'[/\\?%*:|"<>]+', '_', title).strip() or 'shared-tracks'
+    )
+    return Response(
+        content=output.getvalue(),
+        media_type='text/csv; charset=utf-8',
+        headers={
+            'Content-Disposition': f'attachment; filename="{safe_title}.csv"'
         },
     )
 

@@ -402,6 +402,25 @@ def test_a_users_own_search_albums_choice_wins(client, monkeypatch):
     assert calls == ['x']
 
 
+def test_hide_public_playlists_preference(client):
+    api.state.auth.users.create('maria', PASSWORD)
+    _sign_in(client, 'maria', PASSWORD)
+
+    # Defaults to True in get /api/me/preferences
+    prefs = client.get('/api/me/preferences').json()
+    assert prefs.get('hide_public_playlists_by_default') is True
+
+    # Can be toggled to False
+    updated = client.put(
+        '/api/me/preferences', json={'hide_public_playlists_by_default': False}
+    ).json()
+    assert updated.get('hide_public_playlists_by_default') is False
+
+    # Stored and returned as False
+    prefs2 = client.get('/api/me/preferences').json()
+    assert prefs2.get('hide_public_playlists_by_default') is False
+
+
 def test_sign_out_everywhere(client):
     store = api.state.auth
     maria = store.users.create('maria', PASSWORD)

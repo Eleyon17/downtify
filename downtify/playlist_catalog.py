@@ -730,6 +730,19 @@ class ManualPlaylistOwners:
             ).fetchall()
         return {str(row['name_key']) for row in rows}
 
+    def hide_all_non_owned_for_user(
+        self, user_id: int, non_owned_keys: set[str]
+    ) -> None:
+        """Add all non-owned playlist keys to playlist_hidden for user_id."""
+        if not user_id or not non_owned_keys:
+            return
+        with self._connect() as conn:
+            conn.executemany(
+                """INSERT OR IGNORE INTO playlist_hidden (user_id, name_key)
+                   VALUES (?, ?)""",
+                [(int(user_id), self._key(key)) for key in non_owned_keys if self._key(key)],
+            )
+
     def remove_user(self, user_id: int) -> None:
         """Release a deleted account's playlists (files stay put)."""
 

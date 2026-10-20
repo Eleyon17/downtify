@@ -1,6 +1,6 @@
 #!make
 
-DOWNTIFY_VERSION := v3
+DOWNTIFY_VERSION := v4
 TARGET := Eleyon17/downtify
 
 all: build up

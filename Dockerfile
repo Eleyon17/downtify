@@ -27,16 +27,16 @@ RUN npm run build
 # Final minimal runtime image
 FROM python:3.15-alpine
 
-ARG VERSION=v3
+ARG VERSION=v4
 ENV DOWNTIFY_VERSION=${VERSION}
 
 LABEL maintainer="Eleyon17 <https://github.com/Eleyon17>"
-LABEL version="v3"
+LABEL version="v4"
 LABEL description="Self-hosted Spotify downloader"
 
 LABEL org.opencontainers.image.title="Downtify" \
     org.opencontainers.image.description="Download your Spotify playlists and songs along with album art and metadata in a self-hosted way via Docker." \
-    org.opencontainers.image.version="v3" \
+    org.opencontainers.image.version="v4" \
     org.opencontainers.image.authors="Eleyon17 <https://github.com/Eleyon17>" \
     org.opencontainers.image.url="https://github.com/Eleyon17/downtify" \
     org.opencontainers.image.source="https://github.com/Eleyon17/downtify" \

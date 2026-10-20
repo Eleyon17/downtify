@@ -643,6 +643,35 @@ def test_playlist_listing_is_scoped_with_a_personal_liked(
     assert theirs_hidden['hidden'] is True
 
 
+def test_hide_public_playlists_by_default(tmp_path, monkeypatch):
+    manual = ManualPlaylistOwners(tmp_path / 'manual.db')
+    users = UserStore(tmp_path / 'auth.db')
+    users.ensure_default_admin()
+    user2 = users.create('user2', 'password123')
+    user3 = users.create('user3', 'password123')
+
+    manual.set_owner('PlaylistA', user2['id'])
+    manual.set_owner('PlaylistB', user3['id'])
+    manual.set_public('PlaylistA', True)
+    manual.set_public('PlaylistB', True)
+
+    auth = _auth_with(users)
+    monkeypatch.setattr(api.state, 'manual_playlist_owners', manual)
+    monkeypatch.setattr(api.state, 'auth', auth)
+
+    manual.hide_all_non_owned_for_user(user2['id'], {'playlistb'})
+    assert manual.hidden_set(user2['id']) == {'playlistb'}
+    assert manual.hidden_set(user3['id']) == set()
+
+    api.auto_hide_new_playlist_for_others('PlaylistC', user3['id'])
+    assert 'playlistc' in manual.hidden_set(user2['id'])
+    assert 'playlistc' not in manual.hidden_set(user3['id'])
+
+    users.set_preferences(user2['id'], {'hide_public_playlists_by_default': False})
+    api.auto_hide_new_playlist_for_others('PlaylistD', user3['id'])
+    assert 'playlistd' not in manual.hidden_set(user2['id'])
+
+
 
 # ── first-start backfill ─────────────────────────────────────────────
 

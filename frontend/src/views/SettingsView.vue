@@ -114,6 +114,17 @@
                 />
               </SettingRow>
             </SettingGroup>
+            <SettingGroup :title="t('settings.playlistsGroup')">
+              <SettingRow
+                :label="t('settings.hidePublicPlaylists')"
+                :description="t('settings.hidePublicPlaylistsHint')"
+              >
+                <UiSwitch
+                  v-model="account.hidePublicPlaylists.value"
+                  :aria-label="t('settings.hidePublicPlaylists')"
+                />
+              </SettingRow>
+            </SettingGroup>
             <SettingGroup :title="t('settings.shortcutsGroup')">
               <SettingRow
                 :label="t('shortcuts.title')"

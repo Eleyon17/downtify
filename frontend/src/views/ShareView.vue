@@ -70,6 +70,15 @@
               >
                 {{ isCurrentPlaying ? t('actions.pause') : t('actions.play') }}
               </UiButton>
+              <UiButton
+                variant="secondary"
+                icon="download"
+                size="lg"
+                class="min-w-[120px]"
+                @click="exportShare"
+              >
+                {{ t('share.export') }}
+              </UiButton>
             </div>
           </div>
         </div>
@@ -373,6 +382,46 @@ function moveTrack(from, to) {
 
 function removeTrack(idx) {
   player.removeAt(idx)
+}
+
+function exportShare() {
+  const shareId = route.params.id
+  const tracks = shareTracks.value.length
+    ? shareTracks.value
+    : share.value?.tracks || []
+  if (tracks.length > 0) {
+    const escapeCsv = (val) => {
+      const s = String(val ?? '').trim()
+      if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+        return `"${s.replace(/"/g, '""')}"`
+      }
+      return s
+    }
+    const rows = [['Title', 'Artist', 'Album']]
+    for (const tr of tracks) {
+      rows.push([
+        escapeCsv(tr.title),
+        escapeCsv(tr.artist),
+        escapeCsv(tr.album),
+      ])
+    }
+    const csvContent = rows.map((r) => r.join(',')).join('\r\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const safeTitle =
+      (share.value?.title || 'shared-tracks')
+        .replace(/[/\\?%*:|"<>]+/g, '_')
+        .trim() || 'shared-tracks'
+    a.href = url
+    a.download = `${safeTitle}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } else if (shareId) {
+    window.location.href = `/api/share/${encodeURIComponent(shareId)}/export.csv`
+  }
 }
 
 onMounted(async () => {

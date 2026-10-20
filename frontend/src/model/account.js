@@ -17,6 +17,7 @@ import { usePlayerPrefs } from '/src/model/playerPrefs'
 import { useTheme } from '/src/model/theme'
 
 const searchAlbums = ref(true)
+const hidePublicPlaylists = ref(true)
 const ready = ref(false)
 let started = false
 
@@ -28,6 +29,7 @@ function current() {
     locale: currentLocale.value,
     show_lyrics: showLyrics.value,
     search_albums: searchAlbums.value,
+    hide_public_playlists_by_default: hidePublicPlaylists.value,
   }
 }
 
@@ -41,6 +43,8 @@ function apply(prefs) {
     showLyrics.value = prefs.show_lyrics
   if (typeof prefs.search_albums === 'boolean')
     searchAlbums.value = prefs.search_albums
+  if (typeof prefs.hide_public_playlists_by_default === 'boolean')
+    hidePublicPlaylists.value = prefs.hide_public_playlists_by_default
 }
 
 async function save() {
@@ -65,10 +69,10 @@ async function start() {
   apply(prefs)
   ready.value = true
   // An account without them adopts this browser's.
-  if (Object.keys(prefs).length < 4) save()
+  if (Object.keys(prefs).length < 5) save()
   const theme = useTheme()
   const { showLyrics } = usePlayerPrefs()
-  watch([theme.mode, currentLocale, showLyrics, searchAlbums], () => save(), {
+  watch([theme.mode, currentLocale, showLyrics, searchAlbums, hidePublicPlaylists], () => save(), {
     flush: 'post',
   })
 }
@@ -124,5 +128,12 @@ function startPlaybackReports() {
 
 export function useAccount() {
   const auth = useAuth()
-  return { searchAlbums, ready, start, startPlaybackReports, user: auth.user }
+  return {
+    searchAlbums,
+    hidePublicPlaylists,
+    ready,
+    start,
+    startPlaybackReports,
+    user: auth.user,
+  }
 }

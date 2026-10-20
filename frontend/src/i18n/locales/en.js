@@ -791,6 +791,10 @@ export default {
     searchAlbums: 'Show albums in search results',
     searchAlbumsHint:
       'Also look up albums when searching, with an option to download the whole thing.',
+    playlistsGroup: 'Playlists',
+    hidePublicPlaylists: 'Hide public playlists by default',
+    hidePublicPlaylistsHint:
+      'Automatically move playlists created by other users to the hidden section.',
     shortcutsGroup: 'Keyboard',
     shortcutsHint: 'Control playback and move around without the mouse.',
     showShortcuts: 'Show shortcuts',
@@ -1465,5 +1469,7 @@ export default {
     playingShared: 'Shared with Downtify',
     queue: 'Queue',
     removeFromQueue: 'Remove from queue',
+    export: 'Export CSV',
+    exported: 'Playlist exported to CSV',
   },
 }
