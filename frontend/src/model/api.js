@@ -382,8 +382,8 @@ function lookupLibrarySongs(songs) {
   return API.post('/api/library/lookup', { songs })
 }
 
-function getLyrics(file) {
-  return API.get('/lyrics', { params: { file } })
+function getLyrics(file, lang) {
+  return API.get('/lyrics', { params: { file, ...(lang ? { lang } : {}) } })
 }
 
 function deleteDownload(file) {

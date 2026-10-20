@@ -588,6 +588,7 @@ export default {
     queue: 'Queue',
     upNext: 'Up next',
     lyrics: 'Lyrics',
+    translate: 'Translate',
     details: 'Details',
     playing: 'Playing',
     play: 'Play',
@@ -787,6 +788,9 @@ export default {
     showLyrics: 'Show lyrics in the player',
     showLyricsHint:
       'Turn off to hide the lyrics panel, its button and its shortcut. Your files keep their lyrics, and downloads still fetch them.',
+    translateLyrics: 'Translate lyrics',
+    translateLyricsHint:
+      'Show translated text beneath lyrics in a foreign language based on your app language.',
     searchGroup: 'Search',
     searchAlbums: 'Show albums in search results',
     searchAlbumsHint:
@@ -871,6 +875,27 @@ export default {
     playlistCover: 'Save playlist cover art',
     playlistCoverHint:
       "Write the playlist's own artwork next to its .m3u, so media servers show it instead of a generic icon.",
+    autoUpgradeGroup: 'Automated library upgrades',
+    autoUpgradeGroupHint:
+      'Periodically scan and upgrade artwork, lyrics, metadata and formats in the background.',
+    autoUpgrade: 'Automatically upgrade library',
+    autoUpgradeHint:
+      'Run scheduled upgrades without having to manually start them.',
+    autoUpgradeCategories: 'Upgrade tasks',
+    autoUpgradeCategoriesHint:
+      'Select the upgrade actions to perform automatically.',
+    autoUpgradeInterval: 'Upgrade frequency',
+    autoUpgradeIntervalHint:
+      'How often the automated upgrade checks your library.',
+    autoUpgradeRecheck: 'Skip recently checked tracks',
+    autoUpgradeRecheckHint:
+      'Ignore tracks verified within this timeframe to save processing and network requests.',
+    recheckNever: 'Always rescan all tracks',
+    recheck7Days: 'Tracks not checked in 7 days',
+    recheck14Days: 'Tracks not checked in 14 days',
+    recheck30Days: 'Tracks not checked in 30 days',
+    recheck60Days: 'Tracks not checked in 60 days',
+    recheck90Days: 'Tracks not checked in 90 days',
     pacingGroup: 'Pacing',
     parallel: 'Parallel downloads',
     parallelHint: 'How many songs download or sync at the same time.',

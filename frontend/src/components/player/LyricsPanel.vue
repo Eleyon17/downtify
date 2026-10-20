@@ -1,5 +1,26 @@
 <template>
-  <div class="flex h-full min-h-0 flex-col">
+  <div class="relative flex h-full min-h-0 flex-col">
+    <!-- Quick translate toggle button -->
+    <div
+      v-if="hasTranslations"
+      class="absolute top-2 right-2 z-10"
+    >
+      <button
+        type="button"
+        class="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-all backdrop-blur-md"
+        :class="
+          translateLyrics
+            ? 'border border-accent/40 bg-accent/25 text-white'
+            : 'border border-white/10 bg-white/10 text-white/50 hover:text-white'
+        "
+        :title="t('settings.translateLyrics')"
+        @click="translateLyrics = !translateLyrics"
+      >
+        <AppIcon name="globe" :size="13" />
+        <span v-if="!compact">{{ t('player.translate') }}</span>
+      </button>
+    </div>
+
     <div
       v-if="loading"
       class="flex flex-1 flex-col justify-center gap-5 px-2"
@@ -36,7 +57,14 @@
         ]"
         @click="player.seek(line.time)"
       >
-        {{ line.text || '♪' }}
+        <span class="block">{{ line.text || '♪' }}</span>
+        <span
+          v-if="translateLyrics && line.translation && line.translation !== line.text"
+          class="mt-1 block font-normal tracking-normal text-white/65"
+          :class="compact ? 'text-xs text-white/55' : 'text-sm text-white/65'"
+        >
+          {{ line.translation }}
+        </span>
       </button>
     </div>
 
@@ -44,7 +72,26 @@
       v-else-if="plain"
       class="flex-1 overflow-y-auto px-2 py-6 [scrollbar-width:thin]"
     >
+      <div v-if="translateLyrics && pairedPlainLines.length" class="space-y-4">
+        <div
+          v-for="(item, idx) in pairedPlainLines"
+          :key="idx"
+          class="leading-relaxed"
+        >
+          <p class="now-playing-lyric text-display font-medium text-white/80">
+            {{ item.original }}
+          </p>
+          <p
+            v-if="item.translation && item.translation !== item.original"
+            class="mt-1 font-normal tracking-normal text-white/60"
+            :class="compact ? 'text-xs' : 'text-sm'"
+          >
+            {{ item.translation }}
+          </p>
+        </div>
+      </div>
       <p
+        v-else
         class="now-playing-lyric text-display leading-relaxed font-medium whitespace-pre-line text-white/80"
       >
         {{ plain }}
@@ -71,39 +118,61 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import AppIcon from '../ui/AppIcon.vue'
 import { usePlayer } from '/src/model/player'
+import { usePlayerPrefs } from '/src/model/playerPrefs'
 import { loadLyrics } from '/src/model/lyrics'
 import { activeLineIndex } from '/src/lib/lrc'
-import { useI18n } from '/src/i18n'
+import { useI18n, currentLocale } from '/src/i18n'
 
 const props = defineProps({
   compact: { type: Boolean, default: false },
 })
 
 const player = usePlayer()
+const { translateLyrics } = usePlayerPrefs()
 const { t } = useI18n()
 const loading = ref(false)
 const lines = ref([])
 const plain = ref('')
+const translatedPlain = ref('')
 const scroller = ref(null)
 const lineEls = ref([])
 let manualUntil = 0
 
 watch(
-  () => player.currentTrack.value?.file,
-  async (file) => {
+  [() => player.currentTrack.value?.file, () => currentLocale.value],
+  async ([file, locale]) => {
     lines.value = []
     plain.value = ''
+    translatedPlain.value = ''
     lineEls.value = []
     if (!file) return
     loading.value = true
-    const result = await loadLyrics(file)
+    const result = await loadLyrics(file, locale)
     if (player.currentTrack.value?.file !== file) return
     lines.value = result.lines
     plain.value = result.plain
+    translatedPlain.value = result.translatedPlain || ''
     loading.value = false
   },
   { immediate: true }
 )
+
+const hasTranslations = computed(() => {
+  return (
+    lines.value.some((l) => Boolean(l.translation)) ||
+    Boolean(translatedPlain.value)
+  )
+})
+
+const pairedPlainLines = computed(() => {
+  if (!plain.value) return []
+  const orig = plain.value.split(/\r?\n/)
+  const trans = (translatedPlain.value || '').split(/\r?\n/)
+  return orig.map((line, idx) => ({
+    original: line,
+    translation: trans[idx] || '',
+  }))
+})
 
 const active = computed(() =>
   activeLineIndex(lines.value, player.currentTime.value + 0.25)

@@ -598,6 +598,7 @@ export default {
     queue: 'Sor',
     upNext: 'Következik',
     lyrics: 'Dalszöveg',
+    translate: 'Fordítás',
     details: 'Részletek',
     playing: 'Lejátszás',
     play: 'Lejátszás',
@@ -804,10 +805,17 @@ export default {
     showLyrics: 'Dalszövegek megjelenítése a lejátszóban',
     showLyricsHint:
       'Kikapcsolva elrejti a dalszöveg panelt, a gombját és a billentyűparancsát. A fájlok megtartják a dalszövegeket, a letöltések pedig továbbra is lekérik őket.',
+    translateLyrics: 'Dalszövegek fordítása',
+    translateLyricsHint:
+      'Lefordított szöveg megjelenítése az idegen nyelvű dalszöveg alatt az alkalmazás nyelve alapján.',
     searchGroup: 'Keresés',
     searchAlbums: 'Albumok a találatok között',
     searchAlbumsHint:
       'Albumokat is keres, és felkínálja a teljes album letöltését.',
+    playlistsGroup: 'Lejátszási listák',
+    hidePublicPlaylists: 'Nyilvános lejátszási listák elrejtése alapértelmezés szerint',
+    hidePublicPlaylistsHint:
+      'Más felhasználók által létrehozott lejátszási listák automatikus áthelyezése a rejtett szakaszba.',
     shortcutsGroup: 'Billentyűzet',
     shortcutsHint: 'Irányítsd a lejátszást és navigálj egér nélkül.',
     showShortcuts: 'Billentyűparancsok',
@@ -888,6 +896,27 @@ export default {
     playlistCover: 'Lejátszási lista borítójának mentése',
     playlistCoverHint:
       'A lista saját borítóját a .m3u mellé írja, így a médiaszerverek azt mutatják egy általános ikon helyett.',
+    autoUpgradeGroup: 'Automatikus könyvtárfrissítés',
+    autoUpgradeGroupHint:
+      'Borítók, dalszövegek, metaadatok és formátumok rendszeres keresése és frissítése a háttérben.',
+    autoUpgrade: 'Könyvtár automatikus frissítése',
+    autoUpgradeHint:
+      'Ütemezett frissítések futtatása kézi indítás nélkül.',
+    autoUpgradeCategories: 'Frissítési feladatok',
+    autoUpgradeCategoriesHint:
+      'Válassza ki az automatikusan végrehajtandó frissítési műveleteket.',
+    autoUpgradeInterval: 'Frissítés gyakorisága',
+    autoUpgradeIntervalHint:
+      'Milyen gyakran ellenőrizze az automatikus frissítés a könyvtárat.',
+    autoUpgradeRecheck: 'Nemrég ellenőrzött számok kihagyása',
+    autoUpgradeRecheckHint:
+      'Hagyja figyelmen kívül az ezen időszakon belül ellenőrzött számokat a feldolgozás és a hálózati kérések megtakarítása érdekében.',
+    recheckNever: 'Mindig vizsgálja felül az összes számot',
+    recheck7Days: '7 napja nem ellenőrzött számok',
+    recheck14Days: '14 napja nem ellenőrzött számok',
+    recheck30Days: '30 napja nem ellenőrzött számok',
+    recheck60Days: '60 napja nem ellenőrzött számok',
+    recheck90Days: '90 napja nem ellenőrzött számok',
     pacingGroup: 'Ütemezés',
     parallel: 'Párhuzamos letöltések',
     parallelHint: 'Hány dal töltődik le vagy szinkronizálódik egyszerre.',
@@ -1505,5 +1534,7 @@ export default {
     playingShared: 'Megosztva a Downtify segítségével',
     queue: 'Lejátszási sor',
     removeFromQueue: 'Eltávolítás a sorból',
+    export: 'Exportálás CSV-be',
+    exported: 'Lejátszási lista exportálva CSV-be',
   },
 }

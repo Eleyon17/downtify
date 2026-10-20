@@ -23,11 +23,12 @@ let started = false
 
 function current() {
   const theme = useTheme()
-  const { showLyrics } = usePlayerPrefs()
+  const { showLyrics, translateLyrics } = usePlayerPrefs()
   return {
     theme: theme.mode.value,
     locale: currentLocale.value,
     show_lyrics: showLyrics.value,
+    translate_lyrics: translateLyrics.value,
     search_albums: searchAlbums.value,
     hide_public_playlists_by_default: hidePublicPlaylists.value,
   }
@@ -35,12 +36,14 @@ function current() {
 
 function apply(prefs) {
   const theme = useTheme()
-  const { showLyrics } = usePlayerPrefs()
+  const { showLyrics, translateLyrics } = usePlayerPrefs()
   if (prefs.theme) theme.setMode(prefs.theme)
   if (prefs.locale && prefs.locale !== currentLocale.value)
     setLocale(prefs.locale)
   if (typeof prefs.show_lyrics === 'boolean')
     showLyrics.value = prefs.show_lyrics
+  if (typeof prefs.translate_lyrics === 'boolean')
+    translateLyrics.value = prefs.translate_lyrics
   if (typeof prefs.search_albums === 'boolean')
     searchAlbums.value = prefs.search_albums
   if (typeof prefs.hide_public_playlists_by_default === 'boolean')
@@ -71,10 +74,21 @@ async function start() {
   // An account without them adopts this browser's.
   if (Object.keys(prefs).length < 5) save()
   const theme = useTheme()
-  const { showLyrics } = usePlayerPrefs()
-  watch([theme.mode, currentLocale, showLyrics, searchAlbums, hidePublicPlaylists], () => save(), {
-    flush: 'post',
-  })
+  const { showLyrics, translateLyrics } = usePlayerPrefs()
+  watch(
+    [
+      theme.mode,
+      currentLocale,
+      showLyrics,
+      translateLyrics,
+      searchAlbums,
+      hidePublicPlaylists,
+    ],
+    () => save(),
+    {
+      flush: 'post',
+    }
+  )
 }
 
 // ── Playback reports ──────────────────────────────────────────────────

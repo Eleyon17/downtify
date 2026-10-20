@@ -65,6 +65,7 @@ PREFERENCES: dict[str, type] = {
     'theme': str,
     'locale': str,
     'show_lyrics': bool,
+    'translate_lyrics': bool,
     'search_albums': bool,
     'hide_public_playlists_by_default': bool,
 }
@@ -243,7 +244,7 @@ class UserStore:
 
     # First run and upgrades
 
-    def ensure_default_admin(self, *, existing_install: bool) -> bool:
+    def ensure_default_admin(self, *, existing_install: bool = False) -> bool:
         """Create the first admin when there are no users yet. Returns
         whether one was created.
 

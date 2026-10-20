@@ -599,6 +599,7 @@ export default {
     queue: 'Cola',
     upNext: 'A continuación',
     lyrics: 'Letra',
+    translate: 'Traducir',
     details: 'Detalles',
     playing: 'Reproduciendo',
     play: 'Reproducir',
@@ -805,10 +806,17 @@ export default {
     showLyrics: 'Mostrar letras en el reproductor',
     showLyricsHint:
       'Desactívalo para ocultar el panel de letras, su botón y su atajo. Tus archivos conservan las letras y las descargas siguen buscándolas.',
+    translateLyrics: 'Traducir letras',
+    translateLyricsHint:
+      'Mostrar texto traducido debajo de las letras en un idioma extranjero según el idioma de la aplicación.',
     searchGroup: 'Búsqueda',
     searchAlbums: 'Mostrar álbumes en los resultados',
     searchAlbumsHint:
       'Buscar también álbumes, con la opción de descargar el álbum completo.',
+    playlistsGroup: 'Listas de reproducción',
+    hidePublicPlaylists: 'Ocultar listas de reproducción públicas por defecto',
+    hidePublicPlaylistsHint:
+      'Mover automáticamente las listas de reproducción creadas por otros usuarios a la sección oculta.',
     shortcutsGroup: 'Teclado',
     shortcutsHint: 'Controla la reproducción y navega sin ratón.',
     showShortcuts: 'Ver atajos',
@@ -889,6 +897,27 @@ export default {
     playlistCover: 'Guardar la portada de la playlist',
     playlistCoverHint:
       'Escribe la portada de la propia playlist junto a su .m3u, para que los servidores multimedia la muestren en vez de un icono genérico.',
+    autoUpgradeGroup: 'Actualizaciones automáticas de biblioteca',
+    autoUpgradeGroupHint:
+      'Escanear y actualizar periódicamente carátulas, letras, metadatos y formatos en segundo plano.',
+    autoUpgrade: 'Actualizar biblioteca automáticamente',
+    autoUpgradeHint:
+      'Ejecutar actualizaciones programadas sin tener que iniciarlas manualmente.',
+    autoUpgradeCategories: 'Tareas de actualización',
+    autoUpgradeCategoriesHint:
+      'Seleccionar las acciones de actualización que se realizarán automáticamente.',
+    autoUpgradeInterval: 'Frecuencia de actualización',
+    autoUpgradeIntervalHint:
+      'Con qué frecuencia la actualización automática comprueba su biblioteca.',
+    autoUpgradeRecheck: 'Omitir pistas comprobadas recientemente',
+    autoUpgradeRecheckHint:
+      'Ignorar pistas verificadas dentro de este período para ahorrar procesamiento y solicitudes de red.',
+    recheckNever: 'Reescanear siempre todas las pistas',
+    recheck7Days: 'Pistas no comprobadas en 7 días',
+    recheck14Days: 'Pistas no comprobadas en 14 días',
+    recheck30Days: 'Pistas no comprobadas en 30 días',
+    recheck60Days: 'Pistas no comprobadas en 60 días',
+    recheck90Days: 'Pistas no comprobadas en 90 días',
     pacingGroup: 'Ritmo',
     parallel: 'Descargas simultáneas',
     parallelHint: 'Cuántas canciones se descargan o sincronizan a la vez.',
@@ -1508,5 +1537,7 @@ export default {
     playingShared: 'Compartido con Downtify',
     queue: 'Cola',
     removeFromQueue: 'Eliminar de la cola',
+    export: 'Exportar CSV',
+    exported: 'Lista de reproducción exportada a CSV',
   },
 }

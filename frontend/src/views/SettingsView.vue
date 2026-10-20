@@ -102,6 +102,15 @@
                   :aria-label="t('settings.showLyrics')"
                 />
               </SettingRow>
+              <SettingRow
+                :label="t('settings.translateLyrics')"
+                :description="t('settings.translateLyricsHint')"
+              >
+                <UiSwitch
+                  v-model="translateLyrics"
+                  :aria-label="t('settings.translateLyrics')"
+                />
+              </SettingRow>
             </SettingGroup>
             <SettingGroup :title="t('settings.searchGroup')">
               <SettingRow
@@ -482,6 +491,99 @@
                 />
               </SettingRow>
             </SettingGroup>
+
+            <!-- Auto-Upgrade Library (admin-only) -->
+            <SettingGroup
+              :title="t('settings.autoUpgradeGroup')"
+              :description="t('settings.autoUpgradeGroupHint')"
+            >
+              <SettingRow
+                :label="t('settings.autoUpgrade')"
+                :description="t('settings.autoUpgradeHint')"
+              >
+                <UiSwitch
+                  v-model="s.auto_upgrade_library"
+                  :aria-label="t('settings.autoUpgrade')"
+                />
+              </SettingRow>
+
+              <template v-if="s.auto_upgrade_library">
+                <SettingRow
+                  :label="t('settings.autoUpgradeCategories')"
+                  :description="t('settings.autoUpgradeCategoriesHint')"
+                  stacked
+                >
+                  <div
+                    class="grid w-full grid-cols-1 gap-2.5 pt-1 sm:grid-cols-2"
+                  >
+                    <label
+                      v-for="cat in UPGRADE_CATEGORIES"
+                      :key="cat"
+                      class="flex cursor-pointer select-none items-center gap-3 rounded-control border border-line-2 bg-surface-2 p-3 transition-colors hover:border-line-3"
+                    >
+                      <input
+                        type="checkbox"
+                        class="size-4.5 cursor-pointer rounded border-line-2 text-accent focus:ring-accent accent-accent"
+                        :checked="isAutoUpgradeCatChecked(cat)"
+                        @change="
+                          toggleAutoUpgradeCat(cat, $event.target.checked)
+                        "
+                      />
+                      <div class="min-w-0 flex-1">
+                        <span class="block text-sm font-semibold text-fg">
+                          {{ t(`upgrade.${cat}`) }}
+                        </span>
+                        <span class="block text-xs text-muted">
+                          {{ t(`upgrade.${cat}Hint`) }}
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </SettingRow>
+
+                <SettingRow
+                  :label="t('settings.autoUpgradeInterval')"
+                  :description="t('settings.autoUpgradeIntervalHint')"
+                  stacked
+                >
+                  <UiSelect
+                    v-model="s.auto_upgrade_interval"
+                    :options="
+                      intervalOptions(t, s.auto_upgrade_interval || 1440)
+                    "
+                    :label="t('settings.autoUpgradeInterval')"
+                    icon="clock"
+                  />
+                </SettingRow>
+
+                <SettingRow
+                  :label="t('settings.autoUpgradeRecheck')"
+                  :description="t('settings.autoUpgradeRecheckHint')"
+                  stacked
+                >
+                  <UiSelect
+                    v-model="s.auto_upgrade_recheck_days"
+                    :options="recheckDaysOptions"
+                    :label="t('settings.autoUpgradeRecheck')"
+                    icon="refresh"
+                  />
+                </SettingRow>
+
+                <SettingRow
+                  v-if="isAutoUpgradeCatChecked('artwork')"
+                  :label="t('upgrade.artworkMin')"
+                  :description="t('upgrade.artworkMinHint')"
+                  stacked
+                >
+                  <UiSelect
+                    v-model="s.auto_upgrade_artwork_min_px"
+                    :options="artworkSizeOptions"
+                    :label="t('upgrade.artworkMin')"
+                    icon="disc"
+                  />
+                </SettingRow>
+              </template>
+            </SettingGroup>
           </template>
 
           <!-- Tags, art, lyrics -->
@@ -836,6 +938,8 @@ import { useAccount } from '/src/model/account'
 import { useAuth } from '/src/model/auth'
 import { settingsSectionsFor } from '/src/lib/auth'
 import { usePlayerPrefs } from '/src/model/playerPrefs'
+import { intervalOptions } from '/src/components/monitor/intervals.js'
+import { CATEGORIES as UPGRADE_CATEGORIES, ARTWORK_SIZES } from '/src/lib/upgrade.js'
 import { useTheme } from '/src/model/theme'
 import { useUi } from '/src/model/ui'
 import { useUpdateCheck } from '/src/model/updateCheck'
@@ -847,7 +951,7 @@ const sm = useSettingsManager()
 const auth = useAuth()
 const account = useAccount()
 const theme = useTheme()
-const { showLyrics } = usePlayerPrefs()
+const { showLyrics, translateLyrics } = usePlayerPrefs()
 const ui = useUi()
 const player = usePlayer()
 const update = useUpdateCheck().status
@@ -855,6 +959,38 @@ const update = useUpdateCheck().status
 const hasTrack = computed(() => !!player.currentTrack.value)
 const s = sm.settings
 const version = localStorage.getItem('version')
+
+function isAutoUpgradeCatChecked(cat) {
+  const cats = s.value.auto_upgrade_categories || []
+  return cats.includes(cat)
+}
+
+function toggleAutoUpgradeCat(cat, checked) {
+  const current = [...(s.value.auto_upgrade_categories || [])]
+  if (checked && !current.includes(cat)) {
+    current.push(cat)
+  } else if (!checked && current.includes(cat)) {
+    const idx = current.indexOf(cat)
+    if (idx !== -1) current.splice(idx, 1)
+  }
+  s.value.auto_upgrade_categories = current
+}
+
+const recheckDaysOptions = computed(() => [
+  { value: 0, label: t('settings.recheckNever') },
+  { value: 7, label: t('settings.recheck7Days') },
+  { value: 14, label: t('settings.recheck14Days') },
+  { value: 30, label: t('settings.recheck30Days') },
+  { value: 60, label: t('settings.recheck60Days') },
+  { value: 90, label: t('settings.recheck90Days') },
+])
+
+const artworkSizeOptions = computed(() =>
+  ARTWORK_SIZES.map((size) => ({
+    value: size,
+    label: `${size}×${size} px`,
+  }))
+)
 
 // Normal users see General, Apps and About; the rest is the server's,
 // an admin's to change.

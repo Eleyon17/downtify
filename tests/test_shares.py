@@ -223,9 +223,12 @@ def test_resolve_downtify_share_url(app, tmp_path, monkeypatch):
 
     class MockRemoteResponse:
         status_code = 200
+        def raise_for_status(self):
+            pass
         def json(self):
             return {
                 'id': 'abc12345',
+                'kind': 'playlist',
                 'title': 'Remote Shared Playlist',
                 'tracks': [
                     {'title': 'Song 1', 'artist': 'Artist 1', 'album': 'Album 1', 'duration': 180},
@@ -234,12 +237,14 @@ def test_resolve_downtify_share_url(app, tmp_path, monkeypatch):
             }
 
     import requests
+    import httpx
     monkeypatch.setattr(requests, 'get', lambda url, **kwargs: MockRemoteResponse())
+    monkeypatch.setattr(httpx, 'get', lambda url, **kwargs: MockRemoteResponse())
 
     res = client.get('/api/url/resolve', params={'url': 'https://remote-downtify.org/share/abc12345'})
     assert res.status_code == 200
     data = res.json()
-    assert data['type'] == 'playlist'
+    assert data['kind'] == 'playlist'
     assert data['name'] == 'Remote Shared Playlist'
     assert len(data['tracks']) == 2
     assert data['tracks'][0]['name'] == 'Song 1'

@@ -596,6 +596,7 @@ export default {
     queue: 'Fila',
     upNext: 'A seguir',
     lyrics: 'Letra',
+    translate: 'Traduzir',
     details: 'Detalhes',
     playing: 'Tocando',
     play: 'Tocar',
@@ -802,10 +803,17 @@ export default {
     showLyrics: 'Mostrar letras no player',
     showLyricsHint:
       'Desative para esconder o painel de letras, o botão e o atalho. Seus arquivos mantêm as letras, e os downloads continuam buscando.',
+    translateLyrics: 'Traduzir letras',
+    translateLyricsHint:
+      'Mostrar texto traduzido abaixo das letras em idioma estrangeiro com base no idioma do aplicativo.',
     searchGroup: 'Busca',
     searchAlbums: 'Mostrar álbuns nos resultados',
     searchAlbumsHint:
       'Também buscar álbuns, com a opção de baixar o álbum inteiro.',
+    playlistsGroup: 'Playlists',
+    hidePublicPlaylists: 'Ocultar playlists públicas por padrão',
+    hidePublicPlaylistsHint:
+      'Mover automaticamente playlists criadas por outros usuários para a seção oculta.',
     shortcutsGroup: 'Teclado',
     shortcutsHint: 'Controle a reprodução e navegue sem o mouse.',
     showShortcuts: 'Ver atalhos',
@@ -885,6 +893,27 @@ export default {
     playlistCover: 'Salvar a capa da playlist',
     playlistCoverHint:
       'Grava a capa da própria playlist ao lado do .m3u, para os servidores de mídia mostrarem ela no lugar de um ícone genérico.',
+    autoUpgradeGroup: 'Atualizações automáticas da biblioteca',
+    autoUpgradeGroupHint:
+      'Verificar e atualizar periodicamente capas, letras, metadatos e formatos em segundo plano.',
+    autoUpgrade: 'Atualizar biblioteca automaticamente',
+    autoUpgradeHint:
+      'Executar atualizações programadas sem precisar iniciá-las manualmente.',
+    autoUpgradeCategories: 'Tarefas de atualização',
+    autoUpgradeCategoriesHint:
+      'Selecione as ações de atualização a serem executadas automaticamente.',
+    autoUpgradeInterval: 'Frequência de atualização',
+    autoUpgradeIntervalHint:
+      'Com que frequência a atualização automática verifica sua biblioteca.',
+    autoUpgradeRecheck: 'Ignorar faixas verificadas recentemente',
+    autoUpgradeRecheckHint:
+      'Ignorar faixas verificadas dentro deste período para economizar processamento e requisições de rede.',
+    recheckNever: 'Sempre verificar todas as faixas',
+    recheck7Days: 'Faixas não verificadas em 7 dias',
+    recheck14Days: 'Faixas não verificadas em 14 dias',
+    recheck30Days: 'Faixas não verificadas em 30 dias',
+    recheck60Days: 'Faixas não verificadas em 60 dias',
+    recheck90Days: 'Faixas não verificadas em 90 dias',
     pacingGroup: 'Ritmo',
     parallel: 'Downloads simultâneos',
     parallelHint:
@@ -1491,5 +1520,7 @@ export default {
     playingShared: 'Compartilhado com Downtify',
     queue: 'Fila',
     removeFromQueue: 'Remover da fila',
+    export: 'Exportar CSV',
+    exported: 'Playlist exportada para CSV',
   },
 }

@@ -30,6 +30,7 @@ the existing file untouched.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import shutil
 import threading
@@ -1109,6 +1110,7 @@ class LibraryUpgradeRunner:
         self._scanned = 0
         self._scan_total = 0
         self._last_publish = 0.0
+        self._auto_start_categories: Optional[list[str]] = None
 
     # -- helpers --
     def _publish(
@@ -1161,6 +1163,36 @@ class LibraryUpgradeRunner:
         with self._lock:
             if self.busy():
                 raise RuntimeError('A library upgrade is already running')
+            self._auto_start_categories = None
+            active_cats = [
+                c
+                for c in CATEGORIES
+                if c != CATEGORY_FORMAT or options.check_format
+            ]
+            run_id = self.db.create_run(active_cats, options.as_dict())
+            self._cancelled = False
+            self._stop.clear()
+            self._scanned = 0
+            self._scan_total = 0
+            self._worker = threading.Thread(
+                target=self._scan,
+                args=(run_id, options),
+                name='downtify-upgrade-scan',
+                daemon=True,
+            )
+            self._worker.start()
+        return self.status()
+
+    def start_auto_upgrade(
+        self,
+        categories: Sequence[str],
+        options: UpgradeOptions,
+    ) -> dict[str, Any]:
+        """Automatically scan and proceed directly to upgrading found tracks."""
+        with self._lock:
+            if self.busy():
+                return self.status()
+            self._auto_start_categories = list(categories)
             active_cats = [
                 c
                 for c in CATEGORIES
@@ -1248,6 +1280,24 @@ class LibraryUpgradeRunner:
             self.db.set_totals(run_id, len(entries), total_bytes)
             self.db.set_summary(run_id, _summarize(jobs, skipped))
             self.db.set_state(run_id, STATE_READY)
+
+            auto_cats = None
+            with self._lock:
+                if self._auto_start_categories:
+                    auto_cats = list(self._auto_start_categories)
+                    self._auto_start_categories = None
+
+            if auto_cats:
+                matching = [
+                    j
+                    for j in jobs
+                    if any(c in j.get('categories', []) for c in auto_cats)
+                ]
+                if matching:
+                    self.db.set_categories(run_id, auto_cats)
+                    self._begin(run_id, options)
+                    return
+                self.db.set_state(run_id, STATE_DONE)
         except Exception:
             logger.opt(exception=True).error('Library upgrade scan failed')
             self.db.set_state(run_id, STATE_CANCELLED)
@@ -1487,3 +1537,91 @@ class LibraryUpgradeRunner:
         )
         with self._lock:
             self._begin(run_id, options)
+
+
+async def auto_upgrade_loop(
+    get_runner: Callable[[], Optional[LibraryUpgradeRunner]],
+    settings: Callable[[], dict[str, Any]],
+    state_file: Path,
+) -> None:
+    """Periodically scan and automatically upgrade library tracks when enabled."""
+    logger.info('Auto-upgrade background loop initialized')
+    # Initial sleep on server startup to allow everything to settle
+    await asyncio.sleep(15)
+
+    while True:
+        try:
+            cfg = settings() or {}
+            enabled = bool(cfg.get('auto_upgrade_library', False))
+            if not enabled:
+                await asyncio.sleep(60)
+                continue
+
+            interval_min = int(cfg.get('auto_upgrade_interval') or 1440)
+            interval_sec = max(60, interval_min * 60)
+
+            last_run = 0.0
+            if state_file.is_file():
+                try:
+                    last_run = float(
+                        state_file.read_text(encoding='utf-8').strip() or 0
+                    )
+                except Exception:
+                    pass
+
+            now = time.time()
+            if (now - last_run) < interval_sec:
+                wait = min(60.0, max(5.0, interval_sec - (now - last_run)))
+                await asyncio.sleep(wait)
+                continue
+
+            runner = get_runner()
+            if runner is None or runner.busy():
+                await asyncio.sleep(60)
+                continue
+
+            categories = cfg.get('auto_upgrade_categories') or [
+                'artwork',
+                'lyrics',
+                'metadata',
+                'format',
+            ]
+            recheck_days = int(
+                cfg.get('auto_upgrade_recheck_days')
+                if cfg.get('auto_upgrade_recheck_days') is not None
+                else 30
+            )
+            artwork_min = int(cfg.get('auto_upgrade_artwork_min_px') or 600)
+            artwork_source = str(
+                cfg.get('auto_upgrade_artwork_source') or 'highest'
+            )
+            check_format = 'format' in categories
+
+            options = UpgradeOptions(
+                categories=tuple(categories),
+                artwork_min_px=artwork_min,
+                artwork_source=artwork_source,
+                recheck_days=recheck_days,
+                check_format=check_format,
+                target_format=str(cfg.get('format') or 'mp3'),
+                target_bitrate=int(cfg.get('bitrate') or 320),
+            )
+
+            try:
+                state_file.write_text(str(now), encoding='utf-8')
+            except Exception:
+                pass
+
+            logger.info(
+                'Starting scheduled library auto-upgrade: categories={}, interval={}m, recheck={}d',
+                categories,
+                interval_min,
+                recheck_days,
+            )
+            runner.start_auto_upgrade(categories, options)
+
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.opt(exception=True).error('Error in auto_upgrade_loop')
+            await asyncio.sleep(60)

@@ -604,12 +604,17 @@ def _embedded_lyrics(path: Path) -> str:
     return ''
 
 
-def read_track_lyrics(path: Path) -> dict[str, str]:
+def read_track_lyrics(
+    path: Path,
+    target_lang: Optional[str] = None,
+) -> dict[str, Any]:
     """Lyrics saved with a downloaded track.
 
     ``synced`` is the LRC text of the ``.lrc`` sidecar (empty when there
     is none); ``plain`` is the text embedded in the file's tags. Either
     can be empty. Unreadable files count as having no lyrics.
+    When *target_lang* is passed, cached or translated lyrics in that
+    language are attached under ``translated_synced`` and ``translated_plain``.
     """
 
     synced = ''
@@ -617,7 +622,19 @@ def read_track_lyrics(path: Path) -> dict[str, str]:
         synced = _read_lrc_text(sidecar)
         if synced:
             break
-    return {'synced': synced, 'plain': _embedded_lyrics(path)}
+    plain = _embedded_lyrics(path)
+    base: dict[str, Any] = {'synced': synced, 'plain': plain}
+    if not target_lang or (not synced and not plain):
+        return base
+
+    from .lyrics_translation import get_or_translate_lyrics
+    try:
+        return get_or_translate_lyrics(path, synced, plain, target_lang)
+    except Exception:
+        logger.opt(exception=True).warning(
+            'Lyrics translation failed for {}', path
+        )
+        return base
 
 
 def _read_lrc_text(sidecar: Path) -> str:
@@ -644,6 +661,7 @@ def write_to_file(
     lyrics: Lyrics,
     *,
     sidecar: Optional[Path] = None,
+    target_lang: Optional[str] = None,
 ) -> None:
     """Embed plain lyrics and write a ``.lrc`` sidecar when they are synced.
 
@@ -666,6 +684,14 @@ def write_to_file(
             _unlink_other_lrc(path, dest)
 
     text = lyrics.plain or _strip_lrc_timestamps(lyrics.synced or '')
+    if text and (target_lang or os.environ.get('DOWNTIFY_UI_LANGUAGE')):
+        try:
+            from .lyrics_translation import get_or_translate_lyrics
+            lang = target_lang or os.environ.get('DOWNTIFY_UI_LANGUAGE') or 'en'
+            get_or_translate_lyrics(path, lyrics.synced, text, lang)
+        except Exception:
+            logger.opt(exception=True).debug('Pre-translation for download skipped')
+
     if not text:
         return
     if not can_mutate_audio(path):

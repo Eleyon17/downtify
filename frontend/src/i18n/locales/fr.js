@@ -611,6 +611,7 @@ export default {
     queue: 'File',
     upNext: 'À suivre',
     lyrics: 'Paroles',
+    translate: 'Traduire',
     details: 'Détails',
     playing: 'En lecture',
     play: 'Lire',
@@ -817,10 +818,17 @@ export default {
     showLyrics: 'Afficher les paroles dans le lecteur',
     showLyricsHint:
       'Désactivez pour masquer le panneau des paroles, son bouton et son raccourci. Vos fichiers conservent leurs paroles et les téléchargements continuent de les chercher.',
+    translateLyrics: 'Traduire les paroles',
+    translateLyricsHint:
+      'Afficher le texte traduit sous les paroles en langue étrangère selon la langue de l’application.',
     searchGroup: 'Recherche',
     searchAlbums: 'Afficher les albums dans les résultats',
     searchAlbumsHint:
       'Chercher aussi les albums, avec la possibilité de télécharger l’album entier.',
+    playlistsGroup: 'Playlists',
+    hidePublicPlaylists: 'Masquer les playlists publiques par défaut',
+    hidePublicPlaylistsHint:
+      'Déplacer automatiquement les playlists créées par d’autres utilisateurs vers la section masquée.',
     shortcutsGroup: 'Clavier',
     shortcutsHint: 'Contrôlez la lecture et naviguez sans souris.',
     showShortcuts: 'Voir les raccourcis',
@@ -901,6 +909,27 @@ export default {
     playlistCover: 'Enregistrer la pochette de la playlist',
     playlistCoverHint:
       'Écrit la pochette de la playlist à côté de son .m3u, pour que les serveurs multimédias l’affichent au lieu d’une icône générique.',
+    autoUpgradeGroup: 'Mises à niveau automatiques de la bibliothèque',
+    autoUpgradeGroupHint:
+      'Analyser et mettre à niveau régulièrement les pochettes, paroles, métadonnées et formats en arrière-plan.',
+    autoUpgrade: 'Mettre à niveau la bibliothèque automatiquement',
+    autoUpgradeHint:
+      'Exécuter les mises à niveau planifiées sans devoir les lancer manuellement.',
+    autoUpgradeCategories: 'Tâches de mise à niveau',
+    autoUpgradeCategoriesHint:
+      'Sélectionner les actions de mise à niveau à effectuer automatiquement.',
+    autoUpgradeInterval: 'Fréquence de mise à niveau',
+    autoUpgradeIntervalHint:
+      'À quelle fréquence la mise à niveau automatique vérifie votre bibliothèque.',
+    autoUpgradeRecheck: 'Ignorer les morceaux vérifiés récemment',
+    autoUpgradeRecheckHint:
+      'Ignorer les morceaux vérifiés pendant cette période pour économiser les ressources et les requêtes réseau.',
+    recheckNever: 'Toujours réanalyser tous les morceaux',
+    recheck7Days: 'Morceaux non vérifiés depuis 7 jours',
+    recheck14Days: 'Morceaux non vérifiés depuis 14 jours',
+    recheck30Days: 'Morceaux non vérifiés depuis 30 jours',
+    recheck60Days: 'Morceaux non vérifiés depuis 60 jours',
+    recheck90Days: 'Morceaux non vérifiés depuis 90 jours',
     pacingGroup: 'Cadence',
     parallel: 'Téléchargements simultanés',
     parallelHint: 'Nombre de titres téléchargés ou synchronisés en même temps.',
@@ -1516,5 +1545,7 @@ export default {
     playingShared: 'Partagé avec Downtify',
     queue: 'File d’attente',
     removeFromQueue: 'Retirer de la file d’attente',
+    export: 'Exporter en CSV',
+    exported: 'Playlist exportée en CSV',
   },
 }

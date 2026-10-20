@@ -598,6 +598,7 @@ export default {
     queue: 'Kuyruk',
     upNext: 'Sıradaki',
     lyrics: 'Şarkı sözleri',
+    translate: 'Çevir',
     details: 'Ayrıntılar',
     playing: 'Çalıyor',
     play: 'Çal',
@@ -805,10 +806,17 @@ export default {
     showLyrics: 'Oynatıcıda şarkı sözlerini göster',
     showLyricsHint:
       'Şarkı sözü panelini, düğmesini ve kısayolunu gizlemek için kapatın. Dosyalarınız sözlerini korur ve indirmeler onları getirmeye devam eder.',
+    translateLyrics: 'Şarkı sözlerini çevir',
+    translateLyricsHint:
+      'Uygulama dilinize göre yabancı dildeki şarkı sözlerinin altına çevrilmiş metni gösterin.',
     searchGroup: 'Arama',
     searchAlbums: 'Arama sonuçlarında albümleri göster',
     searchAlbumsHint:
       'Aramada albümleri de getir ve albümün tamamını indirme seçeneği sun.',
+    playlistsGroup: 'Çalma listeleri',
+    hidePublicPlaylists: 'Herkese açık çalma listelerini varsayılan olarak gizle',
+    hidePublicPlaylistsHint:
+      'Diğer kullanıcıların oluşturduğu çalma listelerini otomatik olarak gizli bölüme taşıyın.',
     shortcutsGroup: 'Klavye',
     shortcutsHint: 'Fare olmadan çalmayı kontrol et ve gezin.',
     showShortcuts: 'Kısayolları göster',
@@ -886,6 +894,27 @@ export default {
     playlistCover: 'Çalma listesi kapağını kaydet',
     playlistCoverHint:
       'Çalma listesinin kendi kapağını .m3u dosyasının yanına yazar; medya sunucuları genel bir simge yerine onu gösterir.',
+    autoUpgradeGroup: 'Otomatik kitaplık yükseltmeleri',
+    autoUpgradeGroupHint:
+      'Arka planda kapak resimlerini, şarkı sözlerini, meta verileri ve biçimleri düzenli olarak tarayın ve yükseltin.',
+    autoUpgrade: 'Kitaplığı otomatik olarak yükselt',
+    autoUpgradeHint:
+      'Manuel olarak başlatmak zorunda kalmadan zamanlanmış yükseltmeleri çalıştırın.',
+    autoUpgradeCategories: 'Yükseltme görevleri',
+    autoUpgradeCategoriesHint:
+      'Otomatik olarak gerçekleştirilecek yükseltme işlemlerini seçin.',
+    autoUpgradeInterval: 'Yükseltme sıklığı',
+    autoUpgradeIntervalHint:
+      'Otomatik yükseltmenin kitaplığınızı ne sıklıkla denetleyeceği.',
+    autoUpgradeRecheck: 'Son denetlenen parçaları atla',
+    autoUpgradeRecheckHint:
+      'İşlem ve ağ isteklerinden tasarruf etmek için bu süre içinde doğrulanan parçaları yoksayın.',
+    recheckNever: 'Her zaman tüm parçaları yeniden tara',
+    recheck7Days: '7 gün içinde denetlenmeyen parçalar',
+    recheck14Days: '14 gün içinde denetlenmeyen parçalar',
+    recheck30Days: '30 gün içinde denetlenmeyen parçalar',
+    recheck60Days: '60 gün içinde denetlenmeyen parçalar',
+    recheck90Days: '90 gün içinde denetlenmeyen parçalar',
     pacingGroup: 'Hız',
     parallel: 'Eşzamanlı indirmeler',
     parallelHint: 'Aynı anda kaç şarkı indirileceği veya eşitleneceği.',
@@ -1497,5 +1526,7 @@ export default {
     playingShared: 'Downtify ile paylaşıldı',
     queue: 'Kuyruk',
     removeFromQueue: 'Kuyruktan kaldır',
+    export: "CSV'ye aktar",
+    exported: "Çalma listesi CSV'ye aktarıldı",
   },
 }

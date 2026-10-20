@@ -127,11 +127,13 @@ def track(track_id: str) -> dict[str, Any]:
 
 
 @router.get('/tracks/{track_id}/lyrics')
-def track_lyrics(track_id: str) -> dict[str, Any]:
+def track_lyrics(
+    track_id: str, lang: Optional[str] = None
+) -> dict[str, Any]:
     """``{synced, plain}``: the ``.lrc`` sidecar and the embedded lyrics."""
 
     _row, full = _track_path(track_id)
-    return read_track_lyrics(full)
+    return read_track_lyrics(full, target_lang=lang)
 
 
 @router.get('/playlists')

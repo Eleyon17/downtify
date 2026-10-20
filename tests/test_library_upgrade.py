@@ -1281,3 +1281,14 @@ def test_format_upgrade_with_existing_lyrics(
         embedded_lyrics[0].synced
         == '[00:01.00] Existing line\n[00:05.00] Another line'
     )
+
+
+def test_runner_start_auto_upgrade(tmp_path: Path) -> None:
+    ctx = _context(tmp_path)
+    runner = _runner(tmp_path, ctx)
+    opts = UpgradeOptions(categories=('artwork', 'lyrics'), artwork_min_px=600)
+    runner.start_auto_upgrade(['artwork', 'lyrics'], opts)
+    _wait(runner)
+    status = runner.status()
+    assert status['state'] in {STATE_DONE, STATE_READY}
+

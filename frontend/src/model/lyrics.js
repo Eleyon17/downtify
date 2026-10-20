@@ -1,25 +1,35 @@
-// Lyrics for the Now playing view (GET /lyrics), cached per file.
+// Lyrics for the Now playing view (GET /lyrics), cached per file and lang.
 import API from '/src/model/api'
 import { parseLrc } from '/src/lib/lrc'
 
 const cache = new Map()
 
-/** Resolves `{ lines: [{time, text}], plain: string }` for a track. */
-export function loadLyrics(file) {
-  if (!file) return Promise.resolve({ lines: [], plain: '' })
-  if (!cache.has(file)) {
+/** Resolves `{ lines: [{time, text, translation}], plain: string, translatedPlain: string }` for a track. */
+export function loadLyrics(file, lang = '') {
+  if (!file) return Promise.resolve({ lines: [], plain: '', translatedPlain: '' })
+  const cacheKey = `${file}::${lang || ''}`
+  if (!cache.has(cacheKey)) {
     cache.set(
-      file,
-      API.getLyrics(file)
-        .then((res) => ({
-          lines: parseLrc(res.data?.synced),
-          plain: String(res.data?.plain || ''),
-        }))
+      cacheKey,
+      API.getLyrics(file, lang)
+        .then((res) => {
+          const synced = res.data?.synced
+          const translatedSynced = res.data?.translated_synced
+          const plain = String(res.data?.plain || '')
+          const translatedPlain = String(res.data?.translated_plain || '')
+          return {
+            lines: parseLrc(synced, translatedSynced),
+            plain,
+            translatedPlain,
+            sourceLang: res.data?.source_lang,
+            targetLang: res.data?.target_lang,
+          }
+        })
         .catch(() => {
-          cache.delete(file)
-          return { lines: [], plain: '' }
+          cache.delete(cacheKey)
+          return { lines: [], plain: '', translatedPlain: '' }
         })
     )
   }
-  return cache.get(file)
+  return cache.get(cacheKey)
 }

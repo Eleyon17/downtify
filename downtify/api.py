@@ -549,6 +549,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     'external_sync_delay_seconds': 0,
     'cover_resolution': providers.DEFAULT_COVER_RESOLUTION,
     'download_cover_art': True,
+    'auto_upgrade_library': False,
+    'auto_upgrade_categories': ['artwork', 'lyrics', 'metadata', 'format'],
+    'auto_upgrade_interval': 1440,
+    'auto_upgrade_recheck_days': 30,
+    'auto_upgrade_artwork_min_px': 600,
+    'auto_upgrade_artwork_source': 'highest',
     'overwrite_existing_files': True,
     'organize_by_artist': True,
     'organize_by_album': True,
@@ -4533,6 +4539,7 @@ async def _process_batch(
         spotify_playlist_id=spotify_playlist_id,
         spotify_track_count=spotify_track_count,
         generate_m3u=generate_m3u,
+        user_id=user_id,
     )
 
 
@@ -4545,6 +4552,7 @@ async def _finish_playlist_batch(
     spotify_playlist_id: Optional[str],
     spotify_track_count: int,
     generate_m3u: bool,
+    user_id: int = 0,
 ) -> None:
     """Close a playlist batch: record its outcome, relink the playlist's
     on-disk tracks in the catalog and refresh its M3U/Navidrome playlist.
@@ -4647,7 +4655,7 @@ async def _finish_playlist_batch(
         )
 
 
-    if playlist_name:
+    if playlist_name and user_id:
         auto_hide_new_playlist_for_others(playlist_name, user_id)
 
 
@@ -7313,6 +7321,24 @@ async def update_settings_endpoint(
                     if isinstance(raw_value, dict)
                     else copy.deepcopy(DEFAULT_SOURCE_TARGETS)
                 )
+            elif key == 'auto_upgrade_library':
+                state.settings[key] = lyrics.coerce_bool(raw_value, False)
+            elif key == 'auto_upgrade_categories':
+                state.settings[key] = (
+                    [str(c) for c in raw_value]
+                    if isinstance(raw_value, (list, tuple))
+                    else ['artwork', 'lyrics', 'metadata', 'format']
+                )
+            elif key == 'auto_upgrade_interval':
+                state.settings[key] = max(15, int(raw_value or 1440))
+            elif key == 'auto_upgrade_recheck_days':
+                state.settings[key] = max(
+                    0, int(raw_value if raw_value is not None else 30)
+                )
+            elif key == 'auto_upgrade_artwork_min_px':
+                state.settings[key] = max(100, int(raw_value or 600))
+            elif key == 'auto_upgrade_artwork_source':
+                state.settings[key] = str(raw_value or 'highest')
             else:
                 state.settings[key] = raw_value
         if {'audio_providers', 'slskd'} & set(payload):

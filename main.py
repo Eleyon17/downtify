@@ -546,6 +546,15 @@ def build_app() -> FastAPI:
                 api.state.upgrade_runner.resume_after_restart()
             except Exception:
                 logger.exception('Library upgrade: could not resume')
+            from downtify.library_upgrade import auto_upgrade_loop
+            api.spawn_task(
+                auto_upgrade_loop(
+                    get_runner=lambda: api.state.upgrade_runner,
+                    settings=lambda: api.state.settings,
+                    state_file=DATABASE_DIR / 'auto_upgrade_state.txt',
+                ),
+                name='auto-upgrade-loop',
+            )
 
         yield
 
@@ -945,17 +954,37 @@ def build_app() -> FastAPI:
         return await api.after_library_delete(results, result, user_id)
 
     @app.get('/lyrics')
-    def get_lyrics(file: str) -> dict:
+    def get_lyrics(file: str, request: Request, lang: Optional[str] = None) -> dict:
         """Lyrics saved with a library track, for the player.
 
         ``{"synced": "<LRC text>", "plain": "<text>"}`` - the ``.lrc``
         sidecar and the lyrics embedded in the file's tags; either may be
-        empty.
+        empty. When translation is enabled, translated lyrics are included.
         """
         full = resolve_library_file(file, api.library_context())
         if full is None:
             raise HTTPException(status_code=404, detail='File not found')
-        return read_track_lyrics(full)
+
+        target_lang = lang
+        translate = True
+        try:
+            principal = api.principal_of(request)
+            if principal and principal.user_id and api.state.auth is not None:
+                prefs = api.state.auth.users.preferences(principal.user_id)
+                if prefs:
+                    if 'translate_lyrics' in prefs:
+                        translate = bool(prefs['translate_lyrics'])
+                    if not target_lang and prefs.get('locale'):
+                        target_lang = str(prefs['locale'])
+        except Exception:
+            pass
+
+        if not target_lang:
+            target_lang = (api.state.settings or {}).get('ui_language') or 'en'
+
+        if not translate:
+            return read_track_lyrics(full)
+        return read_track_lyrics(full, target_lang=target_lang)
 
     @app.get('/cover')
     def get_cover(file: str):
