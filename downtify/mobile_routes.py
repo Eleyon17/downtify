@@ -128,12 +128,24 @@ def track(track_id: str) -> dict[str, Any]:
 
 @router.get('/tracks/{track_id}/lyrics')
 def track_lyrics(
-    track_id: str, lang: Optional[str] = None
+    track_id: str,
+    request: Request,
+    lang: Optional[str] = None,
 ) -> dict[str, Any]:
     """``{synced, plain}``: the ``.lrc`` sidecar and the embedded lyrics."""
 
     _row, full = _track_path(track_id)
-    return read_track_lyrics(full, target_lang=lang)
+    target_lang = lang
+    if not target_lang:
+        try:
+            accept = request.headers.get('accept-language', '')
+            if accept:
+                target_lang = accept.split(',')[0].split(';')[0].strip()
+        except Exception:
+            pass
+    if not target_lang:
+        target_lang = (api.state.settings or {}).get('ui_language') or 'en'
+    return read_track_lyrics(full, target_lang=target_lang)
 
 
 @router.get('/playlists')

@@ -317,3 +317,4 @@ data/
 design/
 # Personal dev stack (docker-compose.dev.yml)
 /dev/
+*.apk
