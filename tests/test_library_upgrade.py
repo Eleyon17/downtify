@@ -1283,6 +1283,59 @@ def test_format_upgrade_with_existing_lyrics(
     )
 
 
+def test_format_upgrade_flac_to_opus_with_ytm(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    from downtify.library_upgrade import CATEGORY_FORMAT, JOB_DONE
+
+    ctx = _context(tmp_path)
+    ctx.download_dir.mkdir(parents=True, exist_ok=True)
+    # Existing track on disk is FLAC
+    flac_file = ctx.download_dir / 'track.flac'
+    flac_file.write_bytes(b'FLAC_MOCK_EXISTING_CONTENT')
+
+    monkeypatch.setattr(
+        'downtify.library_upgrade.find_match_youtube_music_only',
+        lambda song: ('video_match_ytm', None),
+    )
+    monkeypatch.setattr(
+        'downtify.library_upgrade._audio_length', lambda _p: 200.0
+    )
+    monkeypatch.setattr(
+        'downtify.library_upgrade.embed_metadata', lambda *a, **k: None
+    )
+
+    class FakeDownloader:
+        def fetch_audio(self, video_id, target_dir, basename, **kwargs):
+            fmt = kwargs.get('audio_format') or 'opus'
+            staged = target_dir / f'{basename}.{fmt}'
+            staged.write_bytes(b'OPUS_NEW_AUDIO_CONTENT')
+            return staged
+
+    deps = UpgradeDeps(
+        context=lambda: ctx,
+        settings=lambda: {
+            'redownload_improper_format': True,
+            'audio_providers': ['youtube-music'],
+        },
+        downloader=lambda: FakeDownloader(),
+    )
+    options = UpgradeOptions(
+        categories=(CATEGORY_FORMAT,),
+        check_format=True,
+        source_targets={
+            'youtube-music': [{'format': 'opus', 'bitrate': '256'}],
+        },
+        audio_providers=['youtube-music'],
+    )
+
+    outcome = upgrade_track('track.flac', deps=deps, options=options)
+    assert outcome.status == JOB_DONE
+    assert outcome.new_path == 'track.opus'
+    assert not flac_file.exists()
+    assert (ctx.download_dir / 'track.opus').is_file()
+
+
 def test_runner_start_auto_upgrade(tmp_path: Path) -> None:
     ctx = _context(tmp_path)
     runner = _runner(tmp_path, ctx)

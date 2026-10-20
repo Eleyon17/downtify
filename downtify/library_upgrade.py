@@ -227,6 +227,26 @@ def _summarize(
     }
 
 
+def _target_already_satisfied(
+    curr_fmt: str,
+    curr_bitrate_kbps: int,
+    target_fmt: str,
+    target_bitrate_kbps: int,
+) -> bool:
+    """Return True when a file on disk already matches ``(target_fmt, target_bitrate_kbps)``."""
+    c_fmt = str(curr_fmt or '').lower().lstrip('.')
+    t_fmt = str(target_fmt or 'mp3').lower().lstrip('.')
+    if c_fmt != t_fmt:
+        return False
+    if t_fmt == 'flac':
+        return True
+    if curr_bitrate_kbps > 0 and target_bitrate_kbps > 0:
+        tol = max(15, round(target_bitrate_kbps * 0.12))
+        if abs(curr_bitrate_kbps - target_bitrate_kbps) > tol:
+            return False
+    return True
+
+
 def track_format_improper(
     entry: dict[str, Any],
     full_path: Path,
@@ -276,12 +296,10 @@ def track_format_improper(
         except Exception:
             bitrate_bps = 0
 
-    if bitrate_bps > 0 and target_bitrate_kbps > 0:
-        file_kbps = round(bitrate_bps / 1000)
-        if abs(file_kbps - target_bitrate_kbps) > 15:
-            return True
-
-    return False
+    file_kbps = round(bitrate_bps / 1000) if bitrate_bps > 0 else 0
+    return not _target_already_satisfied(
+        file_fmt, file_kbps, target_fmt, target_bitrate_kbps
+    )
 
 
 def track_findings(
@@ -737,6 +755,8 @@ def upgrade_track(
         staged_path: Optional[Path] = None
         effective_target_fmt = ''
         effective_target_bitrate = 0
+        already_satisfied = False
+        last_download_error: Optional[str] = None
 
         try:
             for provider in audio_providers:
@@ -747,6 +767,7 @@ def upgrade_track(
                     }
                 ]
 
+                # Check if the existing file on disk already satisfies any target for this provider
                 for tgt in p_targets:
                     t_fmt = str(tgt.get('format') or 'mp3').lower().lstrip('.')
                     t_br_str = str(tgt.get('bitrate') or '320')
@@ -759,16 +780,24 @@ def upgrade_track(
                     except (TypeError, ValueError):
                         t_br = 320
 
-                    if curr_fmt == 'flac' and t_fmt != 'flac':
-                        continue
-                    if curr_fmt == t_fmt and t_fmt == 'flac':
-                        continue
-                    if (
-                        curr_fmt == t_fmt
-                        and curr_bitrate_kbps >= (t_br - 15)
-                        and t_br > 0
-                    ):
-                        continue
+                    if _target_already_satisfied(curr_fmt, curr_bitrate_kbps, t_fmt, t_br):
+                        already_satisfied = True
+                        break
+
+                if already_satisfied:
+                    break
+
+                for tgt in p_targets:
+                    t_fmt = str(tgt.get('format') or 'mp3').lower().lstrip('.')
+                    t_br_str = str(tgt.get('bitrate') or '320')
+                    try:
+                        t_br = (
+                            int(t_br_str)
+                            if t_br_str.isdigit()
+                            else (0 if t_fmt == 'flac' else 320)
+                        )
+                    except (TypeError, ValueError):
+                        t_br = 320
 
                     if provider == 'slskd':
                         slskd_settings = (
@@ -834,7 +863,15 @@ def upgrade_track(
                                     effective_target_bitrate = t_br
                                     break
                                 staged_path = None
-                            except Exception:
+                            except Exception as exc:
+                                logger.opt(exception=True).warning(
+                                    'fetch_audio youtube-music failed for {} ({}.{}): {}',
+                                    song.get('name'),
+                                    t_fmt,
+                                    t_br,
+                                    exc,
+                                )
+                                last_download_error = str(exc)
                                 staged_path = None
 
                     elif provider == 'youtube':
@@ -863,7 +900,15 @@ def upgrade_track(
                                     effective_target_bitrate = t_br
                                     break
                                 staged_path = None
-                            except Exception:
+                            except Exception as exc:
+                                logger.opt(exception=True).warning(
+                                    'fetch_audio youtube failed for {} ({}.{}): {}',
+                                    song.get('name'),
+                                    t_fmt,
+                                    t_br,
+                                    exc,
+                                )
+                                last_download_error = str(exc)
                                 staged_path = None
 
                 if staged_path is not None:
@@ -874,70 +919,87 @@ def upgrade_track(
                 or not staged_path.is_file()
                 or staged_path.stat().st_size <= 0
             ):
-                return UpgradeOutcome(
-                    JOB_FAILED,
-                    f'No verified audio match found for {song.get("name")!r}',
-                )
-
-            after_length = _audio_length(staged_path)
-            if after_length <= 0:
-                return UpgradeOutcome(
-                    JOB_FAILED, 'Downloaded audio could not be read'
-                )
-
-            stage_now('writing')
-            keep_cover = cover_sources.current_cover(full)
-            cover_bytes = artwork.data or (
-                keep_cover.data if keep_cover is not None else None
-            )
-            embed_metadata(
-                staged_path,
-                song,
-                download_cover=True,
-                cover_bytes=cover_bytes,
-            )
-            eff_lyrics = new_lyrics
-            if eff_lyrics is None:
-                from .lyrics import Lyrics, read_track_lyrics
-
-                ex = read_track_lyrics(full)
-                if ex.get('synced') or ex.get('plain'):
-                    eff_lyrics = Lyrics(
-                        synced=ex.get('synced') or None,
-                        plain=ex.get('plain') or None,
-                        provider=ex.get('provider') or None,
+                if already_satisfied:
+                    # Current file already matches one of the acceptable targets (e.g. fallback source).
+                    # Do not fail or replace audio, but proceed to let artwork/lyrics/metadata be upgraded if needed.
+                    pass
+                else:
+                    err_msg = (
+                        f'Audio download failed for {song.get("name")!r}: {last_download_error[:120]}'
+                        if last_download_error
+                        else f'No verified audio match found for {song.get("name")!r}'
                     )
-            if eff_lyrics is not None:
-                embed_lyrics(
+                    return UpgradeOutcome(JOB_FAILED, err_msg)
+
+            if staged_path is not None and staged_path.is_file():
+                after_length = _audio_length(staged_path)
+                if after_length <= 0:
+                    return UpgradeOutcome(
+                        JOB_FAILED, 'Downloaded audio could not be read'
+                    )
+
+                stage_now('writing')
+                keep_cover = cover_sources.current_cover(full)
+                cover_bytes = artwork.data or (
+                    keep_cover.data if keep_cover is not None else None
+                )
+                embed_metadata(
                     staged_path,
-                    eff_lyrics,
-                    sidecar=staged_path.with_suffix('.lrc'),
+                    song,
+                    download_cover=True,
+                    cover_bytes=cover_bytes,
                 )
+                eff_lyrics = new_lyrics
+                if eff_lyrics is None:
+                    from .lyrics import Lyrics, read_track_lyrics
 
-            final_path = full.with_name(f'{full.stem}.{effective_target_fmt}')
-            os.replace(str(staged_path), str(final_path))
-            staged_path = None
+                    ex = read_track_lyrics(full)
+                    if ex.get('synced') or ex.get('plain'):
+                        eff_lyrics = Lyrics(
+                            synced=ex.get('synced') or None,
+                            plain=ex.get('plain') or None,
+                            provider=ex.get('provider') or None,
+                        )
+                staged_lrc = staged_path.with_suffix('.lrc')
+                if eff_lyrics is not None:
+                    embed_lyrics(
+                        staged_path,
+                        eff_lyrics,
+                        sidecar=staged_lrc,
+                    )
 
-            if final_path != full:
-                full.unlink(missing_ok=True)
-                old_lrc = full.with_suffix('.lrc')
-                new_lrc = final_path.with_suffix('.lrc')
-                if old_lrc.is_file() and not new_lrc.exists():
-                    try:
-                        os.replace(str(old_lrc), str(new_lrc))
-                    except Exception:
-                        pass
+                final_path = full.with_name(f'{full.stem}.{effective_target_fmt}')
+                os.replace(str(staged_path), str(final_path))
+                staged_path = None
 
-            try:
-                os.utime(
-                    str(final_path), ns=(stat.st_atime_ns, stat.st_mtime_ns)
-                )
-            except OSError:
-                pass
+                if staged_lrc.is_file():
+                    dest_lrc = lyrics_mod.lrc_path_for(final_path)
+                    dest_lrc.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(str(staged_lrc), str(dest_lrc))
+                    beside = final_path.with_suffix('.lrc')
+                    if dest_lrc != beside:
+                        beside.unlink(missing_ok=True)
 
-            changed.append(CATEGORY_FORMAT)
-            if new_lyrics is not None:
-                changed.append(CATEGORY_LYRICS)
+                if final_path != full:
+                    full.unlink(missing_ok=True)
+                    old_lrc = full.with_suffix('.lrc')
+                    new_lrc = final_path.with_suffix('.lrc')
+                    if old_lrc.is_file() and not new_lrc.exists():
+                        try:
+                            os.replace(str(old_lrc), str(new_lrc))
+                        except Exception:
+                            pass
+
+                try:
+                    os.utime(
+                        str(final_path), ns=(stat.st_atime_ns, stat.st_mtime_ns)
+                    )
+                except OSError:
+                    pass
+
+                changed.append(CATEGORY_FORMAT)
+                if new_lyrics is not None:
+                    changed.append(CATEGORY_LYRICS)
 
             old_stored = stored_path
             new_stored = str(
@@ -1016,19 +1078,19 @@ def upgrade_track(
                             'on_track_path_changed hook failed'
                         )
 
-            return UpgradeOutcome(
-                JOB_DONE,
-                _outcome_detail(
-                    changed,
-                    artwork,
-                    target_format=effective_target_fmt,
-                    target_bitrate=effective_target_bitrate,
-                ),
-                changed=changed,
-                artwork_px=artwork.px,
-                artwork_source=artwork.source,
-                new_path=new_stored if new_stored != old_stored else None,
-            )
+                return UpgradeOutcome(
+                    JOB_DONE,
+                    _outcome_detail(
+                        changed,
+                        artwork,
+                        target_format=effective_target_fmt,
+                        target_bitrate=effective_target_bitrate,
+                    ),
+                    changed=changed,
+                    artwork_px=artwork.px,
+                    artwork_source=artwork.source,
+                    new_path=new_stored if new_stored != old_stored else None,
+                )
         except Exception as exc:
             logger.opt(exception=True).warning(
                 'Format upgrade failed for {}: {}', full.name, exc
@@ -1380,6 +1442,8 @@ class LibraryUpgradeRunner:
                 check_format=bool(opts.get('check_format', False)),
                 target_format=str(opts.get('target_format') or 'mp3'),
                 target_bitrate=int(opts.get('target_bitrate') or 320),
+                source_targets=opts.get('source_targets'),
+                audio_providers=opts.get('audio_providers'),
             )
             self._begin(run_id, options)
         return self.status()
@@ -1447,6 +1511,8 @@ class LibraryUpgradeRunner:
                     check_format=options.check_format,
                     target_format=options.target_format,
                     target_bitrate=options.target_bitrate,
+                    source_targets=options.source_targets,
+                    audio_providers=options.audio_providers,
                 ),
                 on_stage=on_stage,
             )
@@ -1529,6 +1595,8 @@ class LibraryUpgradeRunner:
             check_format=bool(opts.get('check_format', False)),
             target_format=str(opts.get('target_format') or 'mp3'),
             target_bitrate=int(opts.get('target_bitrate') or 320),
+            source_targets=opts.get('source_targets'),
+            audio_providers=opts.get('audio_providers'),
         )
         logger.info(
             'Library upgrade: resuming run {} ({} track(s) re-queued)',
@@ -1597,6 +1665,11 @@ async def auto_upgrade_loop(
             )
             check_format = 'format' in categories
 
+            provs = [
+                p
+                for p in (cfg.get('audio_providers') or ['youtube-music'])
+                if p != 'slskd' or (cfg.get('slskd') or {}).get('enabled')
+            ]
             options = UpgradeOptions(
                 categories=tuple(categories),
                 artwork_min_px=artwork_min,
@@ -1605,6 +1678,8 @@ async def auto_upgrade_loop(
                 check_format=check_format,
                 target_format=str(cfg.get('format') or 'mp3'),
                 target_bitrate=int(cfg.get('bitrate') or 320),
+                source_targets=cfg.get('source_targets'),
+                audio_providers=provs,
             )
 
             try:
