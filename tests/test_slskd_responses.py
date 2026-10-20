@@ -842,3 +842,40 @@ def test_download_from_slskd_falls_back_to_queued_peers(monkeypatch, tmp_path):
     )
     assert result == target
 
+
+def test_search_responses_falls_back_to_include_responses_param():
+    client = SlskdClient({'base_url': 'https://slskd.example', 'api_key': 'key'})
+
+    def fake_request(method, path, **kwargs):
+        if path.endswith('/responses'):
+            # /responses returns empty list
+            return []
+        if 'includeResponses=true' in path:
+            return {
+                'id': 'search-1',
+                'responses': [
+                    {'username': 'peerA', 'files': [{'filename': 'A.mp3', 'size': 100}]}
+                ]
+            }
+        return {}
+
+    client._request = fake_request  # type: ignore[method-assign]
+    responses = client.search_responses('search-1')
+    assert len(responses) == 1
+    assert responses[0]['username'] == 'peerA'
+
+
+def test_search_responses_from_responses_endpoint():
+    client = SlskdClient({'base_url': 'https://slskd.example', 'api_key': 'key'})
+
+    def fake_request(method, path, **kwargs):
+        if path.endswith('/responses'):
+            return [
+                {'username': 'peerB', 'files': [{'filename': 'B.mp3', 'size': 200}]}
+            ]
+        return {}
+
+    client._request = fake_request  # type: ignore[method-assign]
+    responses = client.search_responses('search-1')
+    assert len(responses) == 1
+    assert responses[0]['username'] == 'peerB'

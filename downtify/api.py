@@ -2547,16 +2547,24 @@ def check_update() -> Optional[dict[str, Any]]:
 
 @router.get('/api/songs/search')
 def search_endpoint(query: str = Query('')) -> list[dict[str, Any]]:
+    providers_list = _effective_audio_providers(state.settings)
+    q = query.strip()
+    stub = (
+        providers.song_stub_from_text_query(q)
+        if (q and 'slskd' in providers_list)
+        else None
+    )
+
     results = providers.search_songs(query, limit=20)
+
+    # When slskd is configured as the #1 priority audio provider, include the
+    # direct Soulseek search candidate at the top of results.
+    if providers_list and providers_list[0] == 'slskd' and stub is not None:
+        return [stub] + results
+
     if results:
         return results
-    q = query.strip()
-    if not q or 'slskd' not in _effective_audio_providers(state.settings):
-        return []
-    # With slskd enabled, a search YouTube Music has nothing for can still
-    # be downloaded from Soulseek: offer the query itself as a track
-    # ("Artist - Title" is split into artist and title).
-    stub = providers.song_stub_from_text_query(q)
+
     if stub is None:
         return []
     logger.info(

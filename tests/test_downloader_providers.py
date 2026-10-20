@@ -235,7 +235,6 @@ def test_source_targets_slskd_passes_targets_and_falls_back_to_ytm(
 
     def fake_slskd(song, settings, progress_cb=None, targets=None, **kwargs):
         captured_targets.append(targets)
-        return None
 
     monkeypatch.setattr(downloader_mod, 'download_from_slskd', fake_slskd)
     monkeypatch.setattr(
@@ -307,3 +306,86 @@ def test_downloader_normalizes_source_targets():
     assert norm['youtube-music'] == [{'format': 'ogg', 'bitrate': '192'}]
     assert norm['youtube'] == [{'format': 'mp3', 'bitrate': '320'}]
 
+
+def test_slskd_prioritized_over_youtube_when_song_has_youtube_source(
+    tmp_path, monkeypatch, no_youtube
+):
+    slskd_dir, source = _slskd_file(tmp_path)
+    monkeypatch.setattr(
+        downloader_mod, 'download_from_slskd', lambda *a, **k: source
+    )
+    d = Downloader(
+        tmp_path / 'downloads',
+        audio_providers=['slskd', 'youtube-music'],
+        slskd_settings={
+            'enabled': True,
+            'leave_in_place': True,
+            'source_dir': str(slskd_dir),
+        },
+    )
+    # A song found from YouTube search (which carries source='youtube' and song_id)
+    yt_search_song = {
+        **_SONG,
+        'source': 'youtube',
+        'song_id': 'yt_vid_from_search',
+        'url': 'https://music.youtube.com/watch?v=yt_vid_from_search',
+    }
+    stored = d.download(yt_search_song)
+    # Should resolve to slskd because slskd is prioritized #1
+    assert stored == 'slskd/Artist - Album/01 - Track.mp3'
+    assert no_youtube == []
+
+
+def test_slskd_falls_back_to_youtube_id_when_no_slskd_match(
+    tmp_path, monkeypatch, no_youtube
+):
+    monkeypatch.setattr(
+        downloader_mod, 'download_from_slskd', lambda *a, **k: None
+    )
+    d = Downloader(
+        tmp_path / 'downloads',
+        audio_providers=['slskd', 'youtube-music'],
+        slskd_settings={
+            'enabled': True,
+            'leave_in_place': True,
+        },
+    )
+    yt_search_song = {
+        **_SONG,
+        'source': 'youtube',
+        'song_id': 'yt_vid_from_search',
+        'url': 'https://music.youtube.com/watch?v=yt_vid_from_search',
+    }
+    stored = d.download(yt_search_song)
+    assert stored == 'Artist - Track.mp3'
+    assert no_youtube == ['https://www.youtube.com/watch?v=yt_vid_from_search']
+
+
+def test_explicit_youtube_id_override_bypasses_slskd(
+    tmp_path, monkeypatch, no_youtube
+):
+    slskd_called = []
+    monkeypatch.setattr(
+        downloader_mod,
+        'download_from_slskd',
+        lambda *a, **k: slskd_called.append(True),
+    )
+    d = Downloader(
+        tmp_path / 'downloads',
+        audio_providers=['slskd', 'youtube-music'],
+        slskd_settings={
+            'enabled': True,
+            'leave_in_place': True,
+        },
+    )
+    # User selected a specific YouTube video override
+    explicit_song = {
+        **_SONG,
+        'source': 'youtube',
+        'song_id': 'yt_vid_from_search',
+        'youtube_id': 'forced_video_123',
+    }
+    stored = d.download(explicit_song)
+    assert stored == 'Artist - Track.mp3'
+    assert slskd_called == []
+    assert no_youtube == ['https://music.youtube.com/watch?v=forced_video_123']

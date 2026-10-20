@@ -549,6 +549,7 @@ class Downloader:
         self,
         song: dict[str, Any],
         progress_cb: Optional[ProgressCallback],
+        fallback_video_id: Optional[str] = None,
     ) -> tuple[
         Optional[str],
         Optional[dict[str, Any]],
@@ -597,7 +598,13 @@ class Downloader:
                 )
                 _report(progress_cb, 0.0, 'Trying next source', 'slskd')
             elif provider == 'youtube-music':
-                if self._explicit_source_targets:
+                if fallback_video_id:
+                    video_id = fallback_video_id
+                    try:
+                        match = find_match_for_video(song, video_id)
+                    except Exception:
+                        match = None
+                elif self._explicit_source_targets:
                     video_id, match = find_match_youtube_music_only(song)
                 else:
                     video_id, match = find_match(song)
@@ -633,7 +640,7 @@ class Downloader:
                 )
                 _report(progress_cb, 0.0, 'Trying next source', 'youtube-music')
             elif provider == 'youtube' and not youtube_searched:
-                video_id = find_match_youtube_only(song)
+                video_id = fallback_video_id or find_match_youtube_only(song)
                 youtube_searched = True
                 if video_id:
                     first_target = targets[0] if targets else {
@@ -956,19 +963,47 @@ class Downloader:
         reject_overlong_song(song, self.max_track_duration_seconds)
 
         video_id = song.get('youtube_id')
+        yt_fallback_id = None
         if not video_id and (song.get('source') == 'youtube'):
-            video_id = song.get('song_id')
+            yt_fallback_id = song.get('song_id')
+
+        # When slskd is prioritized ahead of YouTube in audio_providers and enabled,
+        # try resolving via audio_providers first (unless user explicitly forced a YouTube ID).
+        slskd_prioritized = (
+            bool(self.slskd_settings.get('enabled'))
+            and 'slskd' in self.audio_providers
+            and (
+                'youtube-music' not in self.audio_providers
+                or self.audio_providers.index('slskd')
+                < self.audio_providers.index('youtube-music')
+            )
+            and (
+                'youtube' not in self.audio_providers
+                or self.audio_providers.index('slskd')
+                < self.audio_providers.index('youtube')
+            )
+        )
 
         match: Optional[dict[str, Any]] = None
-        provider: Optional[str] = 'youtube-music' if video_id else None
+        provider: Optional[str] = (
+            'youtube-music'
+            if (video_id or (yt_fallback_id and not slskd_prioritized))
+            else None
+        )
         local_source: Optional[Path] = None
         selected_fmt = self.audio_format
         selected_bitrate = self.audio_bitrate
-        if not video_id:
+        if not video_id and (not yt_fallback_id or slskd_prioritized):
             # Playlist rows lack year/track number; the per-track embed has
             # them, and they can feed the output path and the slskd match.
             song = spotify_mod.enrich_track_from_spotify_if_sparse(song)
-            resolved = self._resolve_source(song, progress_cb)
+            resolved = (
+                self._resolve_source(
+                    song, progress_cb, fallback_video_id=yt_fallback_id
+                )
+                if yt_fallback_id
+                else self._resolve_source(song, progress_cb)
+            )
             if len(resolved) == 4:
                 video_id, match, provider, local_source = resolved
             else:
@@ -980,6 +1015,8 @@ class Downloader:
                     selected_fmt,
                     selected_bitrate,
                 ) = resolved
+        elif not video_id and yt_fallback_id:
+            video_id = yt_fallback_id
         elif not song.get('album_name') or not song.get('cover_url'):
             # We already have a target video, but the metadata is incomplete.
             # Look up the YT Music entry for THIS specific videoId so we

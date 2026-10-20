@@ -229,12 +229,15 @@ class SlskdClient:
                 )
                 return False
             if attempt >= 1 and free_files >= 5:
-                logger.info(
-                    'slskd: search acquired {} free files early label={!r}',
-                    free_files,
-                    label[:120],
-                )
-                return True
+                # In slskd, peer responses are often only available once search completes.
+                # Only exit early if responses are actually populated and available.
+                if self.search_responses(search_id):
+                    logger.info(
+                        'slskd: search acquired {} free files early label={!r}',
+                        free_files,
+                        label[:120],
+                    )
+                    return True
             if attempt + 1 < self.search_retries:
                 time.sleep(max(1, self.search_poll_seconds))
         if last_file_count > 0 and last_file_count > last_locked:
@@ -252,14 +255,24 @@ class SlskdClient:
         return False
 
     def search_responses(self, search_id: str) -> list[dict[str, Any]]:
-        try:
-            data = self._request(
-                'GET', f'/api/v0/searches/{search_id}/responses'
-            )
-        except Exception:
-            return []
-        if isinstance(data, list):
-            return [r for r in data if isinstance(r, dict)]
+        for ep in (
+            f'/api/v0/searches/{search_id}/responses',
+            f'/api/v0/searches/{search_id}?includeResponses=true',
+        ):
+            try:
+                data = self._request('GET', ep)
+            except Exception:
+                continue
+            if isinstance(data, list):
+                res = [r for r in data if isinstance(r, dict)]
+                if res:
+                    return res
+            elif isinstance(data, dict):
+                resps = data.get('responses')
+                if isinstance(resps, list):
+                    res = [r for r in resps if isinstance(r, dict)]
+                    if res:
+                        return res
         return []
 
     def delete_search(self, search_id: str) -> None:
