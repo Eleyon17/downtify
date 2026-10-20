@@ -278,6 +278,7 @@ def looks_like_lrc(text: str) -> bool:
 class Lyrics:
     plain: Optional[str] = None
     synced: Optional[str] = None
+    provider: Optional[str] = None
 
     def has_any(self) -> bool:
         return bool(self.plain) or bool(self.synced)

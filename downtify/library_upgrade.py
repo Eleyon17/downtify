@@ -739,10 +739,12 @@ def upgrade_track(
 
         try:
             for provider in audio_providers:
-                p_targets = source_targets.get(provider) or [{
-                    'format': options.target_format or 'mp3',
-                    'bitrate': str(options.target_bitrate or 320),
-                }]
+                p_targets = source_targets.get(provider) or [
+                    {
+                        'format': options.target_format or 'mp3',
+                        'bitrate': str(options.target_bitrate or 320),
+                    }
+                ]
 
                 for tgt in p_targets:
                     t_fmt = str(tgt.get('format') or 'mp3').lower().lstrip('.')
@@ -796,12 +798,21 @@ def upgrade_track(
                     elif provider == 'youtube-music':
                         if providers.find_match != _ORIG_PROVIDERS_FIND_MATCH:
                             video_id, ytm_match = providers.find_match(song)
-                        elif find_match_youtube_music_only != _ORIG_FIND_MATCH_YTM_ONLY:
-                            video_id, ytm_match = find_match_youtube_music_only(song)
+                        elif (
+                            find_match_youtube_music_only
+                            != _ORIG_FIND_MATCH_YTM_ONLY
+                        ):
+                            video_id, ytm_match = (
+                                find_match_youtube_music_only(song)
+                            )
                         else:
-                            video_id, ytm_match = find_match_youtube_music_only(song)
+                            video_id, ytm_match = (
+                                find_match_youtube_music_only(song)
+                            )
                             if not video_id:
-                                video_id, ytm_match = providers.find_match(song)
+                                video_id, ytm_match = providers.find_match(
+                                    song
+                                )
                         if video_id:
                             try:
                                 staged_path = downloader.fetch_audio(
@@ -864,7 +875,7 @@ def upgrade_track(
             ):
                 return UpgradeOutcome(
                     JOB_FAILED,
-                    f"No verified audio match found for {song.get('name')!r}",
+                    f'No verified audio match found for {song.get("name")!r}',
                 )
 
             after_length = _audio_length(staged_path)
@@ -891,9 +902,9 @@ def upgrade_track(
                 ex = read_track_lyrics(full)
                 if ex.get('synced') or ex.get('plain'):
                     eff_lyrics = Lyrics(
-                        synced=ex.get('synced') or '',
-                        plain=ex.get('plain') or '',
-                        provider=ex.get('provider') or '',
+                        synced=ex.get('synced') or None,
+                        plain=ex.get('plain') or None,
+                        provider=ex.get('provider') or None,
                     )
             if eff_lyrics is not None:
                 embed_lyrics(
@@ -917,7 +928,9 @@ def upgrade_track(
                         pass
 
             try:
-                os.utime(str(final_path), ns=(stat.st_atime_ns, stat.st_mtime_ns))
+                os.utime(
+                    str(final_path), ns=(stat.st_atime_ns, stat.st_mtime_ns)
+                )
             except OSError:
                 pass
 
@@ -941,6 +954,7 @@ def upgrade_track(
                 if ctx.download_dir:
                     try:
                         from .m3u import iter_m3u_files
+
                         for m3u_path in iter_m3u_files(ctx.download_dir):
                             try:
                                 text = m3u_path.read_text(encoding='utf-8')
@@ -1022,7 +1036,7 @@ def upgrade_track(
         finally:
             if staged_path is not None and staged_path.is_file():
                 staged_path.unlink(missing_ok=True)
-            for leftover in full.parent.glob(f"{basename}.*"):
+            for leftover in full.parent.glob(f'{basename}.*'):
                 if leftover.is_file():
                     leftover.unlink(missing_ok=True)
 
@@ -1148,7 +1162,8 @@ class LibraryUpgradeRunner:
             if self.busy():
                 raise RuntimeError('A library upgrade is already running')
             active_cats = [
-                c for c in CATEGORIES
+                c
+                for c in CATEGORIES
                 if c != CATEGORY_FORMAT or options.check_format
             ]
             run_id = self.db.create_run(active_cats, options.as_dict())
@@ -1176,7 +1191,8 @@ class LibraryUpgradeRunner:
             total_bytes = 0
             skipped = 0
             active_cats = [
-                c for c in CATEGORIES
+                c
+                for c in CATEGORIES
                 if c != CATEGORY_FORMAT or options.check_format
             ]
             for index, entry in enumerate(entries, start=1):
@@ -1302,8 +1318,7 @@ class LibraryUpgradeRunner:
             options = UpgradeOptions(
                 categories=categories,
                 artwork_min_px=int(
-                    opts.get('artwork_min_px')
-                    or DEFAULT_ARTWORK_MIN_PX
+                    opts.get('artwork_min_px') or DEFAULT_ARTWORK_MIN_PX
                 ),
                 artwork_source=str(
                     opts.get('artwork_source')
@@ -1354,6 +1369,7 @@ class LibraryUpgradeRunner:
             self.db.set_state(run_id, state)
         try:
             from .library_paths_cache import invalidate_library_paths_cache
+
             invalidate_library_paths_cache(drop_entries=True, notify=True)
         except Exception:
             pass
@@ -1457,12 +1473,9 @@ class LibraryUpgradeRunner:
                 opts.get('artwork_min_px') or DEFAULT_ARTWORK_MIN_PX
             ),
             artwork_source=str(
-                opts.get('artwork_source')
-                or cover_sources.PREFERENCE_HIGHEST
+                opts.get('artwork_source') or cover_sources.PREFERENCE_HIGHEST
             ),
-            recheck_days=int(
-                opts.get('recheck_days') or DEFAULT_RECHECK_DAYS
-            ),
+            recheck_days=int(opts.get('recheck_days') or DEFAULT_RECHECK_DAYS),
             check_format=bool(opts.get('check_format', False)),
             target_format=str(opts.get('target_format') or 'mp3'),
             target_bitrate=int(opts.get('target_bitrate') or 320),

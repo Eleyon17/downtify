@@ -57,3 +57,13 @@ def test_embedded_lyrics_in_vorbis_comments(tmp_path, monkeypatch):
     assert read_track_lyrics(tmp_path / 'Song.flac')['plain'] == (
         'Words in a FLAC'
     )
+
+
+def test_lyrics_dataclass_supports_provider():
+    lyr = lyrics_mod.Lyrics(
+        plain='words', synced='[00:01.00] words', provider='lrclib'
+    )
+    assert lyr.plain == 'words'
+    assert lyr.synced == '[00:01.00] words'
+    assert lyr.provider == 'lrclib'
+    assert lyr.has_any() is True

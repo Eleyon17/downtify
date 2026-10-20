@@ -1204,6 +1204,7 @@ def _wait_for_slskd_file(
     last_bytes = -1
     last_progress = wait_started
     last_reported_pct = -1.0
+    transfer_succeeded_at: Optional[float] = None
 
     for attempt in range(max(1, attempts)):
         if deadline is not None and _past_deadline(deadline):
@@ -1243,6 +1244,17 @@ def _wait_for_slskd_file(
                 pass
             if _transfer_failed(transfer):
                 return None
+            if _transfer_succeeded(transfer):
+                if transfer_succeeded_at is None:
+                    transfer_succeeded_at = time.monotonic()
+                elif time.monotonic() - transfer_succeeded_at > 5.0:
+                    logger.warning(
+                        'slskd: transfer completed on slskd for {!r} ({}) but file was not found on local disk. '
+                        'Check that slskd completed downloads directory is mounted into Downtify.',
+                        song.get('name'),
+                        filename,
+                    )
+                    return None
             transferred = int(transfer.get('bytesTransferred') or 0)
             if transferred > last_bytes:
                 last_bytes = transferred
@@ -1446,10 +1458,12 @@ def download_from_slskd(  # noqa: PLR0914  # search, rank, enqueue, poll, finali
 
             eff_targets = targets
             if not eff_targets and target_format:
-                eff_targets = [{
-                    'format': target_format,
-                    'bitrate': min_bitrate or 0,
-                }]
+                eff_targets = [
+                    {
+                        'format': target_format,
+                        'bitrate': min_bitrate or 0,
+                    }
+                ]
 
             if eff_targets:
                 selected = []

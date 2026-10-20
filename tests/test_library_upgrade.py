@@ -923,7 +923,9 @@ def test_track_format_improper(tmp_path: Path) -> None:
     )
 
 
-def test_track_findings_checks_format_only_when_requested(tmp_path: Path) -> None:
+def test_track_findings_checks_format_only_when_requested(
+    tmp_path: Path,
+) -> None:
     from downtify.library_upgrade import CATEGORY_FORMAT
 
     mp3_file = _write_track(tmp_path / 'song.mp3', cover_px=800)
@@ -1217,3 +1219,65 @@ def test_format_upgrade_slskd_fails_falls_back_to_ytm(
     assert (ctx.download_dir / 'track.mp3').is_file()
 
 
+def test_format_upgrade_with_existing_lyrics(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    from downtify.library_upgrade import CATEGORY_FORMAT, JOB_DONE
+
+    ctx = _context(tmp_path)
+    old_track = _write_track(ctx.download_dir / 'track.mp3')
+    # Existing LRC sidecar
+    lrc_file = old_track.with_suffix('.lrc')
+    lrc_file.write_text('[00:01.00] Existing line\n[00:05.00] Another line')
+
+    monkeypatch.setattr(
+        'downtify.library_upgrade.download_from_slskd',
+        lambda song, settings, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        'downtify.library_upgrade.find_match_youtube_music_only',
+        lambda song: ('video_match_lyrics', None),
+    )
+    monkeypatch.setattr(
+        'downtify.library_upgrade._audio_length', lambda _p: 180.0
+    )
+    monkeypatch.setattr(
+        'downtify.library_upgrade.embed_metadata', lambda *a, **k: None
+    )
+
+    embedded_lyrics: list[Any] = []
+    monkeypatch.setattr(
+        'downtify.library_upgrade.embed_lyrics',
+        lambda path, lyrics, **kwargs: embedded_lyrics.append(lyrics),
+    )
+
+    class FakeDownloader:
+        def fetch_audio(self, video_id, target_dir, basename, **kwargs):
+            staged = target_dir / f'{basename}.mp3'
+            staged.write_bytes(b'MP3_YTM_DATA')
+            return staged
+
+    deps = UpgradeDeps(
+        context=lambda: ctx,
+        settings=lambda: {
+            'redownload_improper_format': True,
+            'audio_providers': ['youtube-music'],
+        },
+        downloader=lambda: FakeDownloader(),
+    )
+    options = UpgradeOptions(
+        categories=(CATEGORY_FORMAT,),
+        check_format=True,
+        source_targets={
+            'youtube-music': [{'format': 'mp3', 'bitrate': '320'}],
+        },
+        audio_providers=['youtube-music'],
+    )
+
+    outcome = upgrade_track('track.mp3', deps=deps, options=options)
+    assert outcome.status == JOB_DONE
+    assert len(embedded_lyrics) == 1
+    assert (
+        embedded_lyrics[0].synced
+        == '[00:01.00] Existing line\n[00:05.00] Another line'
+    )
