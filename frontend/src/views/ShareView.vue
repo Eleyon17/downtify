@@ -254,8 +254,14 @@
           />
         </div>
 
-        <!-- Right side: Cast & Volume -->
-        <div class="flex items-center gap-2 md:w-48 justify-end">
+        <!-- Right side: Lyrics, Cast & Volume -->
+        <div class="flex items-center gap-2 md:w-56 justify-end">
+          <UiIconButton
+            icon="mic"
+            :label="t('player.lyrics') || 'Lyrics'"
+            :active="showLyrics"
+            @click="showLyrics = !showLyrics"
+          />
           <UiIconButton
             :icon="cast.isConnected.value ? 'cast-connected' : 'cast'"
             :label="cast.isConnected.value ? t('player.castingTo', { device: cast.deviceName.value }) : t('player.cast')"
@@ -284,6 +290,17 @@
         </div>
       </div>
     </footer>
+
+    <!-- Lyrics Modal for Shared Songs -->
+    <UiModal
+      :open="showLyrics"
+      :title="currentPlayingTrack ? `${currentPlayingTrack.title} — Lyrics` : 'Lyrics'"
+      @close="showLyrics = false"
+    >
+      <div class="h-[60vh] max-h-[500px] w-full min-h-0 bg-surface-2/60 rounded-[12px] p-2 overflow-hidden">
+        <LyricsPanel />
+      </div>
+    </UiModal>
   </div>
 </template>
 
@@ -296,6 +313,8 @@ import AppLogo from '/src/components/ui/AppLogo.vue'
 import CoverArt from '/src/components/ui/CoverArt.vue'
 import UiButton from '/src/components/ui/UiButton.vue'
 import UiIconButton from '/src/components/ui/UiIconButton.vue'
+import UiModal from '/src/components/ui/UiModal.vue'
+import LyricsPanel from '/src/components/player/LyricsPanel.vue'
 import SliderBar from '/src/components/player/SliderBar.vue'
 import EqBars from '/src/components/ui/EqBars.vue'
 import { usePlayer } from '/src/model/player'
@@ -312,6 +331,7 @@ const loading = ref(true)
 const error = ref('')
 const share = ref(null)
 const scrub = ref(null)
+const showLyrics = ref(false)
 
 const shareTracks = computed(() => {
   return player.playlist.value

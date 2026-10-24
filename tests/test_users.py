@@ -159,6 +159,95 @@ def test_renaming_and_passwords(tmp_path):
     assert not users.check_password(admin['id'], DEFAULT_PASSWORD)
 
 
+def test_user_sign_up(tmp_path):
+    users = _users(tmp_path)
+    user = users.sign_up(
+        username='johndoe',
+        password=PASSWORD,
+        email='john@example.com',
+        display_name='John Doe',
+    )
+    assert user['username'] == 'johndoe'
+    assert user['email'] == 'john@example.com'
+    assert user['display_name'] == 'John Doe'
+    assert user['role'] == 'user'
+
+    # Duplicate email with password should fail
+    with pytest.raises(UserError, match='email already exists'):
+        users.sign_up(
+            username='anotherjohn',
+            password=PASSWORD,
+            email='john@example.com',
+        )
+
+    # Derive username when missing
+    jane = users.sign_up(
+        password=PASSWORD,
+        email='jane.doe@example.com',
+        display_name='Jane Doe',
+    )
+    assert jane['email'] == 'jane.doe@example.com'
+    assert jane['username'].startswith('jane')
+
+
+def test_google_oauth_and_merging(tmp_path):
+    users = _users(tmp_path)
+    # 1. Sign up via Google OAuth
+    g_user = users.authenticate_google(
+        google_id='gid_123',
+        email='sam@example.com',
+        display_name='Sam Smith',
+    )
+    assert g_user['google_id'] == 'gid_123'
+    assert g_user['email'] == 'sam@example.com'
+    assert g_user['display_name'] == 'Sam Smith'
+
+    # Same Google ID signs in again
+    re_login = users.authenticate_google(
+        google_id='gid_123',
+        email='sam@example.com',
+    )
+    assert re_login['id'] == g_user['id']
+
+    # 2. Existing standard user signs in with Google having the same email -> merges!
+    std = users.create('alice', PASSWORD)
+    users.update(std['id'], email='alice@example.com')
+    merged = users.authenticate_google(
+        google_id='gid_456',
+        email='alice@example.com',
+        display_name='Alice Wonderland',
+    )
+    assert merged['id'] == std['id']
+    assert merged['google_id'] == 'gid_456'
+    assert merged['display_name'] == 'Alice Wonderland'
+
+    # 3. User with email created via Google can set password via sign_up to activate password auth
+    bob_g = users.authenticate_google(
+        google_id='gid_789',
+        email='bob@example.com',
+        display_name='Bob Ross',
+    )
+    bob_pw = users.sign_up(
+        username='bob_ross',
+        password=PASSWORD,
+        email='bob@example.com',
+    )
+    assert bob_pw['id'] == bob_g['id']
+    assert users.authenticate(bob_pw['username'], PASSWORD) is not None
+
+
+def test_user_update_email_and_merge(tmp_path):
+    users = _users(tmp_path)
+    u1 = users.create('userone', PASSWORD)
+    u2 = users.create('usertwo', PASSWORD)
+    users.update(u2['id'], email='shared@example.com')
+
+    # u1 adds the same email -> u2 gets merged into u1!
+    users.update(u1['id'], email='shared@example.com')
+    assert users.get(u2['id']) is None
+    assert users.get(u1['id'])['email'] == 'shared@example.com'
+
+
 def test_reset_brings_the_admin_back(tmp_path):
     users = _users(tmp_path)
     admin = users.by_username('admin')
@@ -385,6 +474,38 @@ def test_a_user_changes_only_their_own_things(client):
     assert refused.status_code == 403
 
 
+def test_signup_and_google_endpoints(client):
+    # Public sign up
+    res = client.post(
+        '/api/auth/signup',
+        json={
+            'username': 'newuser',
+            'password': PASSWORD,
+            'email': 'newuser@example.com',
+            'display_name': 'New User',
+        },
+    )
+    assert res.status_code == 200
+    assert res.json()['signed_in'] is True
+    assert res.json()['user']['email'] == 'newuser@example.com'
+    assert client.get('/api/me').status_code == 200
+
+    # Public Google OAuth endpoint
+    client.cookies.clear()
+    gres = client.post(
+        '/api/auth/google',
+        json={
+            'google_id': 'g_sub_999',
+            'email': 'googleuser@example.com',
+            'name': 'Google User',
+        },
+    )
+    assert gres.status_code == 200
+    assert gres.json()['signed_in'] is True
+    assert gres.json()['user']['email'] == 'googleuser@example.com'
+    assert client.get('/api/me').status_code == 200
+
+
 def test_a_users_own_search_albums_choice_wins(client, monkeypatch):
     calls = []
     monkeypatch.setattr(
@@ -419,6 +540,58 @@ def test_hide_public_playlists_preference(client):
     # Stored and returned as False
     prefs2 = client.get('/api/me/preferences').json()
     assert prefs2.get('hide_public_playlists_by_default') is False
+
+    # Sidebar preferences can be set
+    side_prefs = client.put(
+        '/api/me/preferences',
+        json={
+            'sidebar_discovery': False,
+            'sidebar_monitor': False,
+            'sidebar_podcasts': True,
+        },
+    ).json()
+    assert side_prefs.get('sidebar_discovery') is False
+    assert side_prefs.get('sidebar_monitor') is False
+    assert side_prefs.get('sidebar_podcasts') is True
+
+
+def test_my_listening_stats_and_suggested_mix(client):
+    api.state.auth.users.create('statsuser', PASSWORD)
+    _sign_in(client, 'statsuser', PASSWORD)
+
+    # Report a playback
+    rep = client.post(
+        '/api/activity/playback',
+        json={
+            'state': 'playing',
+            'track': {
+                'title': 'Stargazer',
+                'artist': 'Rainbow',
+                'album': 'Rising',
+                'file': 'rising/stargazer.mp3',
+                'duration': 506.0,
+                'genre': 'Rock',
+            },
+        },
+    )
+    assert rep.status_code == 200
+
+    # Get stats
+    stats_res = client.get('/api/me/stats')
+    assert stats_res.status_code == 200
+    stats = stats_res.json()
+    assert stats['total_plays'] >= 1
+    assert any(a['artist'] == 'Rainbow' for a in stats['top_artists'])
+    assert any(g['genre'] == 'Rock' for g in stats['top_genres'])
+    assert len(stats['by_day']) >= 1
+
+    # Suggested mix
+    mix_res = client.get('/api/me/suggested-mix')
+    assert mix_res.status_code == 200
+    mix = mix_res.json()
+    assert mix['title'] == 'Daily Suggested Mix'
+    assert 'tracks' in mix
+    assert 'date' in mix
 
 
 def test_sign_out_everywhere(client):

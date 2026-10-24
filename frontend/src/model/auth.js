@@ -46,6 +46,28 @@ async function signIn(username, password) {
   return true
 }
 
+async function signUp(data) {
+  try {
+    await API.signup(data)
+  } catch (err) {
+    if (err?.response?.status === 429) return 'tooMany'
+    return err?.response?.data?.detail || err?.message || 'failed'
+  }
+  window.location.reload()
+  return true
+}
+
+async function signInWithGoogle(data) {
+  try {
+    await API.googleAuth(data)
+  } catch (err) {
+    if (err?.response?.status === 429) return 'tooMany'
+    return err?.response?.data?.detail || err?.message || 'failed'
+  }
+  window.location.reload()
+  return true
+}
+
 async function signOut() {
   try {
     await API.logout()
@@ -69,6 +91,8 @@ export function useAuth() {
     authDisabled,
     load,
     signIn,
+    signUp,
+    signInWithGoogle,
     signOut,
     setUser,
   }

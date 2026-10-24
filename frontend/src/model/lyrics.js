@@ -9,9 +9,21 @@ export function loadLyrics(file, lang = '') {
   if (!file) return Promise.resolve({ lines: [], plain: '', translatedPlain: '' })
   const cacheKey = `${file}::${lang || ''}`
   if (!cache.has(cacheKey)) {
+    const fetcher = file.startsWith('share:')
+      ? (() => {
+          const parts = file.split(':')
+          const shareId = parts[1]
+          const trackIdx = parts[2] || 0
+          return API.get(
+            `/api/share/${encodeURIComponent(shareId)}/lyrics/${encodeURIComponent(trackIdx)}`,
+            { params: lang ? { lang } : {} }
+          )
+        })()
+      : API.getLyrics(file, lang)
+
     cache.set(
       cacheKey,
-      API.getLyrics(file, lang)
+      fetcher
         .then((res) => {
           const synced = res.data?.synced
           const translatedSynced = res.data?.translated_synced

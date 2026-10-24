@@ -165,6 +165,7 @@ import CoverArt from '../ui/CoverArt.vue'
 import { useI18n } from '/src/i18n'
 import { itemTrackCount } from '/src/lib/library'
 import { useAuth } from '/src/model/auth'
+import { useAccount } from '/src/model/account'
 import { useLibrary } from '/src/model/library'
 import { useUpdateCheck } from '/src/model/updateCheck'
 import { usePendingCount } from './navState'
@@ -173,6 +174,7 @@ const { t } = useI18n()
 const route = useRoute()
 const library = useLibrary()
 const auth = useAuth()
+const account = useAccount()
 const pending = usePendingCount()
 const update = useUpdateCheck().status
 const collapsed = useLocalStorage('downtify-sidebar-collapsed', false)
@@ -181,7 +183,7 @@ const version = computed(() => {
   return v && v !== '0.0.0' ? v : ''
 })
 
-const items = [
+const allItems = [
   { name: 'Home', icon: 'home', label: 'nav.home' },
   {
     name: 'Search',
@@ -201,17 +203,41 @@ const items = [
     icon: 'sparkle',
     label: 'nav.discover',
     match: ['FinderBrowse'],
+    pref: 'sidebarDiscovery',
   },
-  { name: 'Monitor', icon: 'radar', label: 'nav.monitor' },
+  {
+    name: 'Monitor',
+    icon: 'radar',
+    label: 'nav.monitor',
+    pref: 'sidebarMonitor',
+  },
   {
     name: 'Podcasts',
     icon: 'mic',
     label: 'nav.podcasts',
     match: ['PodcastShow'],
+    pref: 'sidebarPodcasts',
   },
-  { name: 'Charts', icon: 'trending', label: 'nav.charts' },
-  { name: 'Similar', icon: 'wand', label: 'nav.similar' },
+  {
+    name: 'Charts',
+    icon: 'trending',
+    label: 'nav.charts',
+    pref: 'sidebarCharts',
+  },
+  {
+    name: 'Similar',
+    icon: 'wand',
+    label: 'nav.similar',
+    pref: 'sidebarSimilar',
+  },
 ]
+
+const items = computed(() => {
+  return allItems.filter((item) => {
+    if (!item.pref) return true
+    return account[item.pref]?.value ?? true
+  })
+})
 
 function isActive(item) {
   return route.name === item.name || (item.match || []).includes(route.name)

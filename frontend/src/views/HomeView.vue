@@ -165,6 +165,56 @@
       </section>
     </div>
 
+    <!-- Daily Suggested Mix -->
+    <section
+      v-if="suggestedMix && suggestedMix.tracks?.length"
+      class="relative overflow-hidden rounded-panel border border-line-2 bg-gradient-to-r from-surface via-surface to-surface-2 p-6 animate-rise"
+    >
+      <div
+        class="pointer-events-none absolute -bottom-16 -right-16 size-64 rounded-full bg-accent/15 blur-3xl"
+        aria-hidden="true"
+      />
+      <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-center gap-5 min-w-0">
+          <div class="relative size-24 shrink-0 overflow-hidden rounded-[14px] shadow-lg border border-line-3">
+            <CoverArt
+              :covers="suggestedMix.covers?.length ? suggestedMix.covers : undefined"
+              :src="suggestedMix.covers?.[0]"
+              name="Suggested Mix"
+              rounded="rounded-none"
+              class="size-24"
+            />
+          </div>
+          <div class="flex min-w-0 flex-col gap-1">
+            <div class="flex items-center gap-2">
+              <span class="rounded-full bg-accent/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-accent">
+                Daily Mix
+              </span>
+              <span class="text-xs text-muted">{{ suggestedMix.date }}</span>
+            </div>
+            <h2 class="text-display text-2xl font-bold tracking-tight text-fg truncate">
+              {{ suggestedMix.title }}
+            </h2>
+            <p class="text-sm text-muted line-clamp-1">
+              {{ suggestedMix.subtitle || `${suggestedMix.count} songs recommended for today` }}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 shrink-0">
+          <UiButton
+            variant="primary"
+            size="lg"
+            icon="play"
+            class="min-w-[130px] shadow-md"
+            @click="playSuggestedMix"
+          >
+            Play Mix
+          </UiButton>
+        </div>
+      </div>
+    </section>
+
     <!-- Jump back in -->
     <section
       v-if="jumpBackIn.length"
@@ -301,8 +351,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import API from '/src/model/api'
 import AppIcon from '/src/components/ui/AppIcon.vue'
 import CoverArt from '/src/components/ui/CoverArt.vue'
 import EqBars from '/src/components/ui/EqBars.vue'
@@ -462,4 +513,27 @@ const onboarding = computed(() => [
   { title: t('home.step2Title'), body: t('home.step2Body') },
   { title: t('home.step3Title'), body: t('home.step3Body') },
 ])
+
+const suggestedMix = ref(null)
+
+async function loadSuggestedMix() {
+  try {
+    const res = await API.getSuggestedMix()
+    suggestedMix.value = res.data
+  } catch {
+    suggestedMix.value = null
+  }
+}
+
+function playSuggestedMix() {
+  if (!suggestedMix.value?.tracks?.length) return
+  actions.play(suggestedMix.value.tracks, 0, {
+    type: 'playlist',
+    title: suggestedMix.value.title || 'Daily Suggested Mix',
+    subtitle: suggestedMix.value.date,
+    cover: suggestedMix.value.covers?.[0],
+  })
+}
+
+onMounted(loadSuggestedMix)
 </script>

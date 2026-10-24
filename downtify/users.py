@@ -58,6 +58,7 @@ DEFAULT_PASSWORD = 'downtify'
 
 #: Usernames: 3-32 letters, digits, dots, dashes or underscores.
 _USERNAME_RE = re.compile(r'^[A-Za-z0-9._-]{3,32}$')
+_EMAIL_RE = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
 
 #: The preferences a user keeps for themselves (Settings > General), with
 #: their type. Anything else sent is ignored.
@@ -68,7 +69,26 @@ PREFERENCES: dict[str, type] = {
     'translate_lyrics': bool,
     'search_albums': bool,
     'hide_public_playlists_by_default': bool,
+    'sidebar_discovery': bool,
+    'sidebar_monitor': bool,
+    'sidebar_podcasts': bool,
+    'sidebar_charts': bool,
+    'sidebar_similar': bool,
 }
+
+
+def clean_email(value: Any) -> Optional[str]:
+    text = str(value or '').strip()
+    if not text:
+        return None
+    if not _EMAIL_RE.fullmatch(text):
+        raise UserError('Please enter a valid email address')
+    return text.lower()
+
+
+def clean_display_name(value: Any) -> str:
+    text = str(value or '').strip()
+    return text[:100]
 
 
 class UserError(ValueError):
@@ -168,6 +188,7 @@ def clean_preferences(values: Any) -> dict[str, Any]:
 def public_user(row: Any) -> dict[str, Any]:
     """A user as the API shows it - never the password hash."""
 
+    cols = row.keys() if hasattr(row, 'keys') else []
     return {
         'id': int(row['id']),
         'username': row['username'],
@@ -176,15 +197,18 @@ def public_user(row: Any) -> dict[str, Any]:
         'created_at': row['created_at'],
         'last_login_at': row['last_login_at'],
         'last_login_ip': row['last_login_ip'] or '',
+        'email': (row['email'] or '') if 'email' in cols else '',
+        'display_name': (row['display_name'] or '') if 'display_name' in cols else '',
+        'google_id': (row['google_id'] or '') if 'google_id' in cols else '',
     }
 
 
-class UserStore:
+class UserStore:  # noqa: PLR0904
     """The users table (and the one-time accounts notice)."""
 
     def __init__(self, db_path: Path) -> None:
         self._path = str(db_path)
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._init_db()
         self._dummy: Optional[str] = None
 
@@ -212,9 +236,28 @@ class UserStore:
                     prefs_json TEXT NOT NULL DEFAULT '{}',
                     created_at TEXT NOT NULL,
                     last_login_at TEXT,
-                    last_login_ip TEXT NOT NULL DEFAULT ''
+                    last_login_ip TEXT NOT NULL DEFAULT '',
+                    email TEXT UNIQUE COLLATE NOCASE,
+                    display_name TEXT NOT NULL DEFAULT '',
+                    google_id TEXT UNIQUE
                 )
             """)
+            cols = {
+                r['name']
+                for r in conn.execute('PRAGMA table_info(users)').fetchall()
+            }
+            if 'email' not in cols:
+                conn.execute(
+                    'ALTER TABLE users ADD COLUMN email TEXT UNIQUE COLLATE NOCASE'
+                )
+            if 'display_name' not in cols:
+                conn.execute(
+                    "ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''"
+                )
+            if 'google_id' not in cols:
+                conn.execute(
+                    'ALTER TABLE users ADD COLUMN google_id TEXT UNIQUE'
+                )
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS auth_config (
                     key TEXT PRIMARY KEY,
@@ -378,7 +421,29 @@ class UserStore:
     def by_username(self, username: str) -> Optional[dict[str, Any]]:
         with self._connect() as conn:
             row = conn.execute(
-                'SELECT * FROM users WHERE username = ?', (username,)
+                'SELECT * FROM users WHERE username = ? COLLATE NOCASE', (username,)
+            ).fetchone()
+        return public_user(row) if row else None
+
+    def by_email(self, email: str) -> Optional[dict[str, Any]]:
+        clean = clean_email(email)
+        if not clean:
+            return None
+        with self._connect() as conn:
+            row = conn.execute(
+                'SELECT * FROM users WHERE email = ? COLLATE NOCASE',
+                (clean,),
+            ).fetchone()
+        return public_user(row) if row else None
+
+    def by_google_id(self, google_id: str) -> Optional[dict[str, Any]]:
+        gid = str(google_id or '').strip()
+        if not gid:
+            return None
+        with self._connect() as conn:
+            row = conn.execute(
+                'SELECT * FROM users WHERE google_id = ?',
+                (gid,),
             ).fetchone()
         return public_user(row) if row else None
 
@@ -409,6 +474,220 @@ class UserStore:
 
     # Changing
 
+    @staticmethod
+    def _unique_username(
+        conn: sqlite3.Connection,
+        preferred: str,
+        exclude_id: Optional[int] = None,
+    ) -> str:
+        base = re.sub(
+            r'[^A-Za-z0-9._-]', '', str(preferred or '').strip().lower()
+        )
+        if len(base) < 3:
+            base = 'user'
+        base = base[:26]
+        candidate = base
+        count = 1
+        while True:
+            row = conn.execute(
+                'SELECT id FROM users WHERE username = ? COLLATE NOCASE',
+                (candidate,),
+            ).fetchone()
+            if not row or (exclude_id is not None and row['id'] == exclude_id):
+                return candidate
+            count += 1
+            candidate = f'{base}_{count}'[:32]
+
+    def sign_up(
+        self,
+        username: Optional[str] = None,
+        password: Any = None,
+        *,
+        email: Optional[str] = None,
+        display_name: str = '',
+        role: str = ROLE_USER,
+    ) -> dict[str, Any]:
+        """Sign up a new user account (defaults to standard ROLE_USER).
+        If an account with this email already exists:
+        - If it had no custom password (e.g. created via Google), merges
+          password and display name into that existing account.
+        - If it already has a password, raises UserError.
+        """
+        secret = check_password_rules(password)
+        clean_em = clean_email(email) if email else None
+        disp_name = clean_display_name(display_name)
+        if role not in ROLES:
+            raise UserError('Unknown role')
+
+        with self._lock:
+            with self._connect() as conn:
+                existing_merged = False
+                if clean_em:
+                    existing = conn.execute(
+                        'SELECT * FROM users WHERE email = ? COLLATE NOCASE',
+                        (clean_em,),
+                    ).fetchone()
+                    if existing:
+                        if (
+                            not existing['password_hash']
+                            or existing['default_password']
+                            or (existing['google_id'] and not existing['password_hash'])
+                            or existing['default_password'] == 1
+                        ):
+                            conn.execute(
+                                'UPDATE users SET password_hash = ?, default_password = 0, '
+                                'display_name = CASE WHEN display_name = "" THEN ? ELSE display_name END '
+                                'WHERE id = ?',
+                                (hash_password(secret), disp_name, existing['id']),
+                            )
+                            user_id = existing['id']
+                            existing_merged = True
+                        else:
+                            raise UserError('An account with this email already exists')
+
+                if not existing_merged:
+                    uname = str(username or '').strip()
+                    if not uname:
+                        base = clean_em.split('@')[0] if clean_em else (disp_name or 'user')
+                        uname = self._unique_username(conn, base)
+                    else:
+                        uname = clean_username(uname)
+                        row = conn.execute(
+                            'SELECT id FROM users WHERE username = ? COLLATE NOCASE',
+                            (uname,),
+                        ).fetchone()
+                        if row:
+                            raise UserError('That username is taken')
+
+                    try:
+                        conn.execute(
+                            'INSERT INTO users (username, password_hash, role, created_at, '
+                            'email, display_name) VALUES (?, ?, ?, ?, ?, ?)',
+                            (
+                                uname,
+                                hash_password(secret),
+                                role,
+                                _now(),
+                                clean_em,
+                                disp_name,
+                            ),
+                        )
+                    except sqlite3.IntegrityError as exc:
+                        if 'email' in str(exc).lower():
+                            raise UserError('An account with this email already exists') from exc
+                        raise UserError('That username is taken') from exc
+                    user_id = conn.execute(
+                        'SELECT id FROM users WHERE username = ?', (uname,)
+                    ).fetchone()['id']
+            return self.get(user_id) or {}
+
+    def authenticate_google(
+        self, google_id: str, email: str, display_name: str = ''
+    ) -> dict[str, Any]:
+        """Authenticate or register a user via Google OAuth.
+        Automatically merges accounts sharing the same email address.
+        """
+        gid = str(google_id or '').strip()
+        if not gid:
+            raise UserError('Invalid Google account ID')
+        clean_em = clean_email(email)
+        if not clean_em:
+            raise UserError('Google account missing valid email address')
+        disp_name = clean_display_name(display_name)
+
+        with self._lock:
+            with self._connect() as conn:
+                # 1. Existing by google_id
+                row = conn.execute(
+                    'SELECT * FROM users WHERE google_id = ?', (gid,)
+                ).fetchone()
+                if row:
+                    updates = {}
+                    if not row['email']:
+                        updates['email'] = clean_em
+                    if not row['display_name'] and disp_name:
+                        updates['display_name'] = disp_name
+                    if updates:
+                        assignments = ', '.join(f'{k} = ?' for k in updates)
+                        conn.execute(
+                            f'UPDATE users SET {assignments} WHERE id = ?',
+                            (*updates.values(), row['id']),
+                        )
+                    user_id = row['id']
+                else:
+                    # 2. Existing by email -> MERGE Google account into existing user!
+                    row = conn.execute(
+                        'SELECT * FROM users WHERE email = ? COLLATE NOCASE',
+                        (clean_em,),
+                    ).fetchone()
+                    if row:
+                        conn.execute(
+                            'UPDATE users SET google_id = ?, '
+                            'display_name = CASE WHEN display_name = "" THEN ? ELSE display_name END '
+                            'WHERE id = ?',
+                            (gid, disp_name, row['id']),
+                        )
+                        user_id = row['id']
+                    else:
+                        # 3. Create new user
+                        base = clean_em.split('@')[0] if clean_em else (disp_name or 'user')
+                        uname = self._unique_username(conn, base)
+                        conn.execute(
+                            'INSERT INTO users (username, password_hash, role, created_at, '
+                            'email, display_name, google_id, default_password) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
+                            (
+                                uname,
+                                '',
+                                ROLE_USER,
+                                _now(),
+                                clean_em,
+                                disp_name,
+                                gid,
+                            ),
+                        )
+                        new_row = conn.execute(
+                            'SELECT id FROM users WHERE username = ?', (uname,)
+                        ).fetchone()
+                        user_id = new_row['id']
+            return self.get(user_id) or {}
+
+    def merge_users(self, target_id: int, source_id: int) -> dict[str, Any]:
+        """Merge source_id into target_id: reassign devices and sessions,
+        keep non-empty profile fields, and delete source_id."""
+        if target_id == source_id:
+            return self.get(target_id) or {}
+        with self._lock:
+            with self._connect() as conn:
+                target = conn.execute(
+                    'SELECT * FROM users WHERE id = ?', (target_id,)
+                ).fetchone()
+                source = conn.execute(
+                    'SELECT * FROM users WHERE id = ?', (source_id,)
+                ).fetchone()
+                if not target or not source:
+                    raise UserError('User not found')
+
+                email = target['email'] or source['email']
+                disp = target['display_name'] or source['display_name']
+                gid = target['google_id'] or source['google_id']
+
+                for table in ('auth_devices', 'auth_sessions'):
+                    cols = {
+                        r[1] for r in conn.execute(f'PRAGMA table_info({table})')
+                    }
+                    if 'user_id' in cols:
+                        conn.execute(
+                            f'UPDATE {table} SET user_id = ? WHERE user_id = ?',
+                            (target_id, source_id),
+                        )
+
+                conn.execute('DELETE FROM users WHERE id = ?', (source_id,))
+                conn.execute(
+                    'UPDATE users SET email = ?, display_name = ?, google_id = ? WHERE id = ?',
+                    (email, disp, gid, target_id),
+                )
+            return self.get(target_id) or {}
+
     def create(
         self, username: Any, password: Any, role: str = ROLE_USER
     ) -> dict[str, Any]:
@@ -432,11 +711,11 @@ class UserStore:
         user_id: int,
         *,
         username: Any = None,
+        email: Any = None,
+        display_name: Any = None,
         role: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Rename a user and/or change their role. Refuses to leave the
-        server without an admin."""
-
+        """Rename a user, change email/display_name and/or change their role."""
         with self._lock:
             current = self.get(user_id)
             if current is None:
@@ -444,6 +723,21 @@ class UserStore:
             updates: dict[str, Any] = {}
             if username is not None:
                 updates['username'] = clean_username(username)
+            if display_name is not None:
+                updates['display_name'] = clean_display_name(display_name)
+            if email is not None:
+                clean_em = clean_email(email)
+                if clean_em:
+                    with self._connect() as conn:
+                        other = conn.execute(
+                            'SELECT id FROM users WHERE email = ? COLLATE NOCASE AND id != ?',
+                            (clean_em, user_id),
+                        ).fetchone()
+                    if other:
+                        self.merge_users(
+                            target_id=user_id, source_id=other['id']
+                        )
+                updates['email'] = clean_em
             if role is not None:
                 if role not in ROLES:
                     raise UserError('Unknown role')
@@ -463,6 +757,10 @@ class UserStore:
                             (*updates.values(), user_id),
                         )
                 except sqlite3.IntegrityError as exc:
+                    if 'email' in str(exc).lower():
+                        raise UserError(
+                            'An account with this email already exists'
+                        ) from exc
                     raise UserError('That username is taken') from exc
         return self.get(user_id) or {}
 

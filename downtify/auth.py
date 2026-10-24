@@ -863,6 +863,8 @@ RULES: list[tuple[frozenset[str], re.Pattern[str], str]] = [
         (_READ, r'^/api/auth/status$', PUBLIC),
         (_m('POST'), r'^/api/auth/login$', PUBLIC),
         (_m('POST'), r'^/api/auth/logout$', PUBLIC),
+        (_m('POST'), r'^/api/auth/signup$', PUBLIC),
+        (_m('POST'), r'^/api/auth/google$', PUBLIC),
         (_m('POST'), r'^/api/auth/pair$', PUBLIC),
         # Public: shared tracks and playlists (zero login, sandbox-confined).
         (_READ, r'^/api/share/[a-zA-Z0-9_-]+(/.*)?$', PUBLIC),

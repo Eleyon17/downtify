@@ -116,6 +116,11 @@ def test_public_share_endpoints(app, tmp_path, monkeypatch):
     assert track['title'] == 'Great Track'
     assert track['stream_url'] == f'/api/share/{share["id"]}/stream/0'
     assert track['cover_url'] == f'/api/share/{share["id"]}/cover/0'
+    assert track['lyrics_url'] == f'/api/share/{share["id"]}/lyrics/0'
+
+    # Lyrics endpoint without login
+    lyrics_res = client.get(f'/api/share/{share["id"]}/lyrics/0')
+    assert lyrics_res.status_code == 200
 
     # 2. Stream audio without login
     stream_res = client.get(f'/api/share/{share["id"]}/stream/0')

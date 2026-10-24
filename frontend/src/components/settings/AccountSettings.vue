@@ -59,6 +59,41 @@
     </SettingRow>
 
     <SettingRow
+      label="Profile Information"
+      description="Update your display name and email address. If you add an existing email, accounts will be merged."
+      stacked
+    >
+      <form
+        class="grid w-full gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+        @submit.prevent="saveProfile"
+      >
+        <UiInput
+          v-model="displayName"
+          label="Display Name"
+          icon="user"
+          autocomplete="name"
+          placeholder="e.g. Alex"
+        />
+        <UiInput
+          v-model="email"
+          type="email"
+          label="Email Address"
+          icon="mail"
+          autocomplete="email"
+          placeholder="alex@example.com"
+          :error="profileError"
+        />
+        <UiButton
+          type="submit"
+          :loading="savingProfile"
+          :disabled="displayName === (user?.display_name || '') && email === (user?.email || '')"
+        >
+          {{ t('apps.save') }}
+        </UiButton>
+      </form>
+    </SettingRow>
+
+    <SettingRow
       :label="t('account.password')"
       :description="t('account.passwordHint', { count: minLength })"
       stacked
@@ -132,9 +167,36 @@ function errorOf(err) {
 const username = ref(user.value?.username || '')
 const usernameError = ref('')
 const savingUsername = ref(false)
+
+const displayName = ref(user.value?.display_name || '')
+const email = ref(user.value?.email || '')
+const profileError = ref('')
+const savingProfile = ref(false)
+
 watch(user, (value) => {
-  if (value) username.value = value.username
+  if (value) {
+    username.value = value.username
+    displayName.value = value.display_name || ''
+    email.value = value.email || ''
+  }
 })
+
+async function saveProfile() {
+  savingProfile.value = true
+  profileError.value = ''
+  try {
+    const res = await API.renameMe({
+      display_name: displayName.value.trim(),
+      email: email.value.trim() || null,
+    })
+    auth.setUser(res.data.user)
+    ui.toast(t('account.saved'), { kind: 'success' })
+  } catch (err) {
+    profileError.value = errorOf(err)
+  } finally {
+    savingProfile.value = false
+  }
+}
 
 async function saveUsername() {
   savingUsername.value = true

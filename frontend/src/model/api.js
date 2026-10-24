@@ -533,8 +533,37 @@ function getMe() {
   return API.get('/api/me')
 }
 
-function renameMe(username) {
-  return API.patch('/api/me', { username })
+function renameMe(data) {
+  if (typeof data === 'string') {
+    return API.patch('/api/me', { username: data })
+  }
+  return API.patch('/api/me', data)
+}
+
+function updateMe(data) {
+  return API.patch('/api/me', data)
+}
+
+function signup(data) {
+  return API.post('/api/auth/signup', data)
+}
+
+function googleAuth(data) {
+  return API.post('/api/auth/google', data)
+}
+
+function getMyStats(days = 90) {
+  return API.get('/api/me/stats', { params: { days } })
+}
+
+function getActivityStats(days = 90, userId = null) {
+  return API.get('/api/activity/stats', {
+    params: { days, ...(userId ? { user_id: userId } : {}) },
+  })
+}
+
+function getSuggestedMix() {
+  return API.get('/api/me/suggested-mix')
 }
 
 function changeMyPassword(currentPassword, newPassword) {
@@ -911,9 +940,15 @@ export default {
   getAuthStatus,
   login,
   logout,
+  signup,
+  googleAuth,
   getMe,
   renameMe,
+  updateMe,
   changeMyPassword,
+  getMyStats,
+  getActivityStats,
+  getSuggestedMix,
   setPreferences,
   signOutEverywhere,
   signUrls,

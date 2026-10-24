@@ -18,6 +18,11 @@ import { useTheme } from '/src/model/theme'
 
 const searchAlbums = ref(true)
 const hidePublicPlaylists = ref(true)
+const sidebarDiscovery = ref(true)
+const sidebarMonitor = ref(true)
+const sidebarPodcasts = ref(true)
+const sidebarCharts = ref(true)
+const sidebarSimilar = ref(true)
 const ready = ref(false)
 let started = false
 
@@ -31,6 +36,11 @@ function current() {
     translate_lyrics: translateLyrics.value,
     search_albums: searchAlbums.value,
     hide_public_playlists_by_default: hidePublicPlaylists.value,
+    sidebar_discovery: sidebarDiscovery.value,
+    sidebar_monitor: sidebarMonitor.value,
+    sidebar_podcasts: sidebarPodcasts.value,
+    sidebar_charts: sidebarCharts.value,
+    sidebar_similar: sidebarSimilar.value,
   }
 }
 
@@ -48,6 +58,16 @@ function apply(prefs) {
     searchAlbums.value = prefs.search_albums
   if (typeof prefs.hide_public_playlists_by_default === 'boolean')
     hidePublicPlaylists.value = prefs.hide_public_playlists_by_default
+  if (typeof prefs.sidebar_discovery === 'boolean')
+    sidebarDiscovery.value = prefs.sidebar_discovery
+  if (typeof prefs.sidebar_monitor === 'boolean')
+    sidebarMonitor.value = prefs.sidebar_monitor
+  if (typeof prefs.sidebar_podcasts === 'boolean')
+    sidebarPodcasts.value = prefs.sidebar_podcasts
+  if (typeof prefs.sidebar_charts === 'boolean')
+    sidebarCharts.value = prefs.sidebar_charts
+  if (typeof prefs.sidebar_similar === 'boolean')
+    sidebarSimilar.value = prefs.sidebar_similar
 }
 
 async function save() {
@@ -83,6 +103,11 @@ async function start() {
       translateLyrics,
       searchAlbums,
       hidePublicPlaylists,
+      sidebarDiscovery,
+      sidebarMonitor,
+      sidebarPodcasts,
+      sidebarCharts,
+      sidebarSimilar,
     ],
     () => save(),
     {
@@ -145,6 +170,11 @@ export function useAccount() {
   return {
     searchAlbums,
     hidePublicPlaylists,
+    sidebarDiscovery,
+    sidebarMonitor,
+    sidebarPodcasts,
+    sidebarCharts,
+    sidebarSimilar,
     ready,
     start,
     startPlaybackReports,

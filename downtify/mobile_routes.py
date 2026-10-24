@@ -713,3 +713,17 @@ def mobile_delete_share(share_id: str, request: Request) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail='Share not found')
     return {'deleted': True, 'id': share_id}
 
+
+@router.get('/suggested-mix')
+def mobile_suggested_mix(request: Request) -> dict[str, Any]:
+    """A personalized daily mix of songs recommended per user for mobile apps."""
+    entries = api.entries_for_request(request)
+    user_id = api.request_user_id(request)
+    return api.build_daily_suggested_mix(
+        entries=entries,
+        user_id=user_id,
+        likes_store=api.state.likes,
+        activity_log=api.state.activity,
+        target_count=25,
+    )
+

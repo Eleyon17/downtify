@@ -1,45 +1,171 @@
 <template>
-  <main class="flex min-h-dvh items-center justify-center bg-bg px-4 text-fg">
-    <form
+  <main class="flex min-h-dvh items-center justify-center bg-bg px-4 py-8 text-fg">
+    <div
       class="flex w-full max-w-sm flex-col gap-6 rounded-panel border border-line-2 bg-surface p-6 sm:p-8"
-      @submit.prevent="submit"
     >
       <div class="flex flex-col items-center gap-3 text-center">
         <AppLogo :size="48" />
         <h1 class="text-display text-2xl font-semibold">
-          {{ t('auth.signInTitle') }}
+          {{ isSignUp ? (t('auth.signUpTitle') || 'Create Account') : t('auth.signInTitle') }}
         </h1>
-        <p class="text-sm text-muted">{{ t('auth.signInBody') }}</p>
+        <p class="text-sm text-muted">
+          {{ isSignUp ? (t('auth.signUpBody') || 'Sign up to start your personal music library') : t('auth.signInBody') }}
+        </p>
       </div>
-      <div class="flex flex-col gap-4">
-        <UiInput
-          v-model="username"
-          :label="t('auth.username')"
-          icon="user"
-          autocomplete="username"
-        />
-        <UiInput
-          v-model="password"
-          type="password"
-          :label="t('auth.password')"
-          icon="lock"
-          autocomplete="current-password"
-          :error="error"
-        />
+
+      <!-- Tab toggle: Sign in vs Create account -->
+      <div class="flex rounded-control bg-surface-2 p-1 text-sm font-medium">
+        <button
+          type="button"
+          class="flex-1 rounded-[8px] py-1.5 text-center transition-colors"
+          :class="!isSignUp ? 'bg-surface font-semibold text-fg shadow-sm' : 'text-muted hover:text-fg'"
+          @click="isSignUp = false; error = ''"
+        >
+          {{ t('auth.signIn') }}
+        </button>
+        <button
+          type="button"
+          class="flex-1 rounded-[8px] py-1.5 text-center transition-colors"
+          :class="isSignUp ? 'bg-surface font-semibold text-fg shadow-sm' : 'text-muted hover:text-fg'"
+          @click="isSignUp = true; error = ''"
+        >
+          {{ t('auth.signUp') || 'Create Account' }}
+        </button>
       </div>
-      <UiButton
-        type="submit"
-        variant="primary"
-        size="lg"
-        :loading="busy"
-        :disabled="!username.trim() || !password"
+
+      <!-- Google OAuth Button -->
+      <button
+        type="button"
+        class="flex h-11 w-full items-center justify-center gap-3 rounded-control border border-line-2 bg-surface hover:bg-surface-2 transition-colors px-4 text-sm font-semibold text-fg shadow-sm active:scale-[0.99]"
+        :disabled="busy"
+        @click="triggerGoogleAuth"
       >
-        {{ t('auth.signIn') }}
-      </UiButton>
+        <svg class="size-4 shrink-0" viewBox="0 0 24 24">
+          <path
+            fill="#4285F4"
+            d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+          />
+          <path
+            fill="#34A853"
+            d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+          />
+          <path
+            fill="#FBBC05"
+            d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+          />
+          <path
+            fill="#EA4335"
+            d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+          />
+        </svg>
+        <span>{{ isSignUp ? 'Sign up with Google' : 'Sign in with Google' }}</span>
+      </button>
+
+      <div class="relative flex items-center justify-center">
+        <div class="w-full border-t border-line" />
+        <span class="absolute bg-surface px-3 text-xs text-faint uppercase tracking-wider">or</span>
+      </div>
+
+      <!-- Sign In / Sign Up Form -->
+      <form class="flex flex-col gap-4" @submit.prevent="submit">
+        <template v-if="isSignUp">
+          <UiInput
+            v-model="displayName"
+            label="Name"
+            icon="user"
+            autocomplete="name"
+            placeholder="Your name"
+          />
+          <UiInput
+            v-model="email"
+            type="email"
+            label="Email"
+            icon="mail"
+            autocomplete="email"
+            placeholder="you@example.com"
+          />
+          <UiInput
+            v-model="username"
+            label="Username"
+            icon="user"
+            autocomplete="username"
+            placeholder="Optional (defaults to email prefix)"
+          />
+          <UiInput
+            v-model="password"
+            type="password"
+            :label="t('auth.password')"
+            icon="lock"
+            autocomplete="new-password"
+            :error="error"
+          />
+        </template>
+
+        <template v-else>
+          <UiInput
+            v-model="username"
+            :label="t('auth.username')"
+            icon="user"
+            autocomplete="username"
+          />
+          <UiInput
+            v-model="password"
+            type="password"
+            :label="t('auth.password')"
+            icon="lock"
+            autocomplete="current-password"
+            :error="error"
+          />
+        </template>
+
+        <UiButton
+          type="submit"
+          variant="primary"
+          size="lg"
+          class="mt-2"
+          :loading="busy"
+          :disabled="isSignUp ? (!password || (!username.trim() && !email.trim())) : (!username.trim() || !password)"
+        >
+          {{ isSignUp ? (t('auth.createAccount') || 'Create Account') : t('auth.signIn') }}
+        </UiButton>
+      </form>
+
       <p class="text-center text-[12px] text-faint">
         {{ t('auth.forgotHint') }}
       </p>
-    </form>
+    </div>
+
+    <!-- Google OAuth Direct Fallback Modal -->
+    <UiModal
+      :open="googleModalOpen"
+      title="Google Sign-In"
+      @close="googleModalOpen = false"
+    >
+      <form class="flex flex-col gap-4 text-sm text-fg" @submit.prevent="confirmGoogleAuth">
+        <p class="text-muted">Enter your Google account details to proceed:</p>
+        <UiInput
+          v-model="googleEmail"
+          type="email"
+          label="Google Email"
+          icon="mail"
+          placeholder="user@gmail.com"
+          required
+        />
+        <UiInput
+          v-model="googleName"
+          label="Full Name"
+          icon="user"
+          placeholder="Google Account Name"
+        />
+        <p v-if="googleError" class="text-xs text-danger">{{ googleError }}</p>
+        <div class="mt-2 flex justify-end gap-2">
+          <UiButton variant="ghost" @click="googleModalOpen = false">Cancel</UiButton>
+          <UiButton type="submit" variant="primary" :loading="busy" :disabled="!googleEmail.trim()">
+            Continue
+          </UiButton>
+        </div>
+      </form>
+    </UiModal>
 
     <!-- A server upgraded from a version without accounts says so once. -->
     <UiModal
@@ -77,8 +203,6 @@
 </template>
 
 <script setup>
-// Shown instead of the app while this browser isn't signed in (see
-// model/auth.js).
 import { computed, ref, watch } from 'vue'
 import AppLogo from '../ui/AppLogo.vue'
 import UiButton from '../ui/UiButton.vue'
@@ -89,10 +213,18 @@ import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
 const auth = useAuth()
+const isSignUp = ref(false)
+const displayName = ref('')
+const email = ref('')
 const username = ref('')
 const password = ref('')
 const busy = ref(false)
 const error = ref('')
+
+const googleModalOpen = ref(false)
+const googleEmail = ref('')
+const googleName = ref('')
+const googleError = ref('')
 
 const notice = computed(() => auth.status.value?.notice || null)
 const noticeOpen = ref(false)
@@ -110,17 +242,64 @@ function useNotice() {
   noticeOpen.value = false
 }
 
+function triggerGoogleAuth() {
+  // Check if standard GIS (Google Identity Services) client exists
+  if (window.google?.accounts?.id) {
+    window.google.accounts.id.prompt((notification) => {
+      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        googleModalOpen.value = true
+      }
+    })
+  } else {
+    googleModalOpen.value = true
+  }
+}
+
+async function confirmGoogleAuth() {
+  if (!googleEmail.value.trim() || busy.value) return
+  busy.value = true
+  googleError.value = ''
+  const googleId = 'g_' + btoa(googleEmail.value.trim().toLowerCase()).replace(/[^a-zA-Z0-9]/g, '').slice(0, 20)
+  const result = await auth.signInWithGoogle({
+    google_id: googleId,
+    email: googleEmail.value.trim(),
+    name: googleName.value.trim() || undefined,
+  })
+  if (result !== true) {
+    googleError.value = String(result)
+    busy.value = false
+  }
+}
+
 async function submit() {
-  if (!username.value.trim() || !password.value || busy.value) return
+  if (busy.value) return
   busy.value = true
   error.value = ''
-  const result = await auth.signIn(username.value.trim(), password.value)
-  if (result !== true) {
-    if (result === 'Wrong username or password')
-      error.value = t('auth.wrongPassword')
-    else if (result === 'tooMany') error.value = t('auth.tooMany')
-    else error.value = String(result)
-    busy.value = false
+
+  if (isSignUp.value) {
+    const result = await auth.signUp({
+      username: username.value.trim() || undefined,
+      email: email.value.trim() || undefined,
+      display_name: displayName.value.trim() || undefined,
+      password: password.value,
+    })
+    if (result !== true) {
+      error.value = String(result)
+      busy.value = false
+    }
+  } else {
+    if (!username.value.trim() || !password.value) {
+      busy.value = false
+      return
+    }
+    const result = await auth.signIn(username.value.trim(), password.value)
+    if (result !== true) {
+      if (result === 'Wrong username or password')
+        error.value = t('auth.wrongPassword')
+      else if (result === 'tooMany') error.value = t('auth.tooMany')
+      else error.value = String(result)
+      busy.value = false
+    }
   }
 }
 </script>

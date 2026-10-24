@@ -103,14 +103,18 @@ def get_me(request: Request) -> dict[str, Any]:
 
 @router.patch('/api/me')
 async def update_me(request: Request) -> dict[str, Any]:
-    """Change your own username: ``{username}``."""
+    """Change your own username, email, or display name: ``{username, email, display_name}``."""
 
     _accounts_on()
     me = _me(request)
     payload = await _json(request)
     try:
         user = await asyncio.to_thread(
-            _users().update, me.user_id, username=payload.get('username')
+            _users().update,
+            me.user_id,
+            username=payload.get('username'),
+            email=payload.get('email'),
+            display_name=payload.get('display_name'),
         )
     except UserError as exc:
         raise _bad(exc) from exc
@@ -262,6 +266,8 @@ async def update_user(user_id: int, request: Request) -> dict[str, Any]:
             _users().update,
             user_id,
             username=payload.get('username'),
+            email=payload.get('email'),
+            display_name=payload.get('display_name'),
             role=payload.get('role'),
         )
         if payload.get('password'):
@@ -498,3 +504,52 @@ async def report_playback(request: Request) -> dict[str, Any]:
             request, 'playback', track_label(track), {'track': track}
         )
     return {'ok': True}
+
+
+@router.get('/api/me/stats')
+async def my_listening_stats(
+    request: Request, days: int = Query(90, ge=1, le=365)
+) -> dict[str, Any]:
+    """Listening statistics for the signed-in user by genre, artist, day, etc."""
+    me = _me(request)
+    log = api.state.activity
+    if log is None:
+        return {'total_plays': 0, 'days': days}
+    try:
+        entries = listing_for_request(api.library_context())
+        genre_map = {
+            e['file']: str(e.get('genre') or '')
+            for e in entries
+            if e.get('file') and e.get('genre')
+        }
+    except Exception:
+        genre_map = {}
+    return await asyncio.to_thread(
+        log.stats, user_id=me.user_id, days=days, genre_map=genre_map
+    )
+
+
+@router.get('/api/activity/stats')
+async def activity_listening_stats(
+    request: Request,
+    user_id: Optional[int] = Query(None),
+    days: int = Query(90, ge=1, le=365),
+) -> dict[str, Any]:
+    """Listening statistics for admins (across everyone or filtered by user_id)."""
+    _me(request)
+    log = api.state.activity
+    if log is None:
+        return {'total_plays': 0, 'days': days}
+    try:
+        entries = listing_for_request(api.library_context())
+        genre_map = {
+            e['file']: str(e.get('genre') or '')
+            for e in entries
+            if e.get('file') and e.get('genre')
+        }
+    except Exception:
+        genre_map = {}
+    uid = user_id or 0
+    return await asyncio.to_thread(
+        log.stats, user_id=uid, days=days, genre_map=genre_map
+    )

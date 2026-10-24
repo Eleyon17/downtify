@@ -16,6 +16,7 @@ Admins see both in Settings > Activity (``GET /api/activity``,
 
 from __future__ import annotations
 
+import collections
 import json
 import re
 import sqlite3
@@ -235,6 +236,148 @@ class ActivityLog:
                 'DELETE FROM activity WHERE at < ?', (cutoff,)
             ).rowcount
 
+    def stats(
+        self,
+        *,
+        user_id: int = 0,
+        days: int = 90,
+        genre_map: Optional[dict[str, str]] = None,
+    ) -> dict[str, Any]:
+        """Aggregate listening statistics from playback activity:
+        by genre, artist, day, weekday, hour, and top tracks."""
+        where = ["kind = 'playback'"]
+        args: list[Any] = []
+        if user_id:
+            where.append('user_id = ?')
+            args.append(int(user_id))
+        if days > 0:
+            cutoff = (_now() - timedelta(days=days)).isoformat()
+            where.append('at >= ?')
+            args.append(cutoff)
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                f'SELECT at, summary, detail_json FROM activity WHERE {" AND ".join(where)} '
+                'ORDER BY at ASC',
+                args,
+            ).fetchall()
+
+        genre_map = genre_map or {}
+        artist_counts: dict[str, int] = collections.defaultdict(int)
+        artist_durations: dict[str, float] = collections.defaultdict(float)
+        genre_counts: dict[str, int] = collections.defaultdict(int)
+        track_counts: dict[str, int] = collections.defaultdict(int)
+        day_counts: dict[str, int] = collections.defaultdict(int)
+        weekday_counts: dict[int, int] = collections.defaultdict(int)
+        hour_counts: dict[int, int] = collections.defaultdict(int)
+
+        total_plays = 0
+        total_duration = 0.0
+
+        for row in rows:
+            total_plays += 1
+            dt_str = str(row['at'])
+            day_str = dt_str[:10]
+            day_counts[day_str] += 1
+            try:
+                dt = datetime.fromisoformat(dt_str)
+                weekday_counts[dt.weekday()] += 1
+                hour_counts[dt.hour] += 1
+            except Exception:
+                pass
+
+            try:
+                detail = json.loads(row['detail_json'])
+            except Exception:
+                detail = {}
+            track = detail.get('track') or {}
+            artist = str(track.get('artist') or '').strip()
+            title = str(track.get('title') or '').strip()
+            summary = str(row['summary'] or '').strip()
+            if not artist and ' - ' in summary:
+                artist = summary.split(' - ')[0].strip()
+            if not title and ' - ' in summary:
+                title = summary.split(' - ', 1)[1].strip()
+            elif not title:
+                title = summary
+
+            if artist:
+                artist_counts[artist] += 1
+            if title:
+                t_lbl = f'{artist} - {title}' if artist else title
+                track_counts[t_lbl] += 1
+
+            dur = float(track.get('duration') or 0.0)
+            if dur > 0:
+                total_duration += dur
+                if artist:
+                    artist_durations[artist] += dur
+
+            file_path = str(track.get('file') or '').strip()
+            genre = (
+                str(track.get('genre') or '').strip()
+                or genre_map.get(file_path, '')
+            )
+            if genre:
+                for g in [
+                    p.strip() for p in re.split(r'[/,;&]', genre) if p.strip()
+                ]:
+                    genre_counts[g.capitalize()] += 1
+            else:
+                genre_counts['Unknown'] += 1
+
+        top_artists = [
+            {
+                'artist': a,
+                'plays': c,
+                'duration': round(artist_durations.get(a, 0.0), 1),
+            }
+            for a, c in sorted(
+                artist_counts.items(), key=lambda x: x[1], reverse=True
+            )[:20]
+        ]
+        top_genres = [
+            {
+                'genre': g,
+                'plays': c,
+                'percentage': round((c / total_plays) * 100, 1)
+                if total_plays
+                else 0,
+            }
+            for g, c in sorted(
+                genre_counts.items(), key=lambda x: x[1], reverse=True
+            )[:15]
+        ]
+        top_tracks_list = [
+            {'track': t, 'plays': c}
+            for t, c in sorted(
+                track_counts.items(), key=lambda x: x[1], reverse=True
+            )[:20]
+        ]
+        by_day_list = [
+            {'day': d, 'plays': c} for d, c in sorted(day_counts.items())
+        ]
+        weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        by_weekday_list = [
+            {'weekday': weekdays[i], 'index': i, 'plays': weekday_counts[i]}
+            for i in range(7)
+        ]
+        by_hour_list = [
+            {'hour': h, 'plays': hour_counts[h]} for h in range(24)
+        ]
+
+        return {
+            'total_plays': total_plays,
+            'total_duration': round(total_duration, 1),
+            'top_artists': top_artists,
+            'top_genres': top_genres,
+            'top_tracks': top_tracks_list,
+            'by_day': by_day_list,
+            'by_weekday': by_weekday_list,
+            'by_hour': by_hour_list,
+            'days': days,
+        }
+
 
 class NowPlaying:
     """What each player is playing, from its reports. In memory only."""
@@ -328,7 +471,15 @@ def clean_track(value: Any) -> dict[str, Any]:
         return {}
     track: dict[str, Any] = {
         key: _clip(value.get(key), 300)
-        for key in ('title', 'artist', 'album', 'file', 'track_id', 'cover')
+        for key in (
+            'title',
+            'artist',
+            'album',
+            'file',
+            'track_id',
+            'cover',
+            'genre',
+        )
         if value.get(key)
     }
     try:

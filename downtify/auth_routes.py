@@ -8,6 +8,8 @@ The rules for who may call what live in :mod:`downtify.auth`
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 from ipaddress import ip_address
 from typing import Any, Optional
 
@@ -39,7 +41,7 @@ from .server_port import (
     request_restart,
     resolve_port,
 )
-from .users import MIN_PASSWORD_LENGTH, ROLE_ADMIN
+from .users import MIN_PASSWORD_LENGTH, ROLE_ADMIN, UserError
 
 router = APIRouter()
 
@@ -344,6 +346,132 @@ async def login(request: Request, response: Response) -> dict[str, Any]:
             'login',
             user_id=user['id'],
             username=user['username'],
+            client=api.client_label(request, None),
+            ip=ip,
+        )
+    _set_session(response, request, token)
+    return {'signed_in': True, 'user': user}
+
+
+@router.post('/api/auth/signup')
+async def signup(request: Request, response: Response) -> dict[str, Any]:
+    """Register a new user account: {username, password, email, display_name}."""
+    store = api.state.auth
+    if store is None or store.auth_disabled:
+        raise HTTPException(
+            status_code=409,
+            detail='Sign-in is turned off (DOWNTIFY_DISABLE_AUTH)',
+        )
+    ip = _ip(request)
+    wait = api.state.login_limiter.retry_after(ip)
+    if wait:
+        raise _too_many(wait)
+    payload = await _json(request)
+    username = str(payload.get('username') or '').strip()
+    password = str(payload.get('password') or '')
+    email = str(payload.get('email') or '').strip() or None
+    display_name = str(
+        payload.get('display_name') or payload.get('name') or ''
+    ).strip()
+    try:
+        user = await asyncio.to_thread(
+            store.users.sign_up,
+            username=username or None,
+            password=password,
+            email=email,
+            display_name=display_name,
+        )
+    except UserError as exc:
+        api.state.login_limiter.fail(ip)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    api.state.login_limiter.reset(ip)
+    token = await asyncio.to_thread(
+        store.create_session,
+        user['id'],
+        ip,
+        request.headers.get('user-agent', ''),
+    )
+    await asyncio.to_thread(store.users.record_login, user['id'], ip)
+    log = api.state.activity
+    if log is not None:
+        await asyncio.to_thread(
+            log.record,
+            'user_created',
+            user_id=user['id'],
+            username=user['username'],
+            summary=f"Signed up ({user['username']})",
+            client=api.client_label(request, None),
+            ip=ip,
+        )
+    _set_session(response, request, token)
+    return {'signed_in': True, 'user': user}
+
+
+@router.post('/api/auth/google')
+async def google_auth(request: Request, response: Response) -> dict[str, Any]:
+    """Authenticate or register via Google OAuth.
+    Accepts { credential } (Google ID Token) or { google_id, email, name }.
+    """
+    store = api.state.auth
+    if store is None or store.auth_disabled:
+        raise HTTPException(
+            status_code=409,
+            detail='Sign-in is turned off (DOWNTIFY_DISABLE_AUTH)',
+        )
+    ip = _ip(request)
+    payload = await _json(request)
+    credential = str(payload.get('credential') or '').strip()
+    google_id = str(payload.get('google_id') or payload.get('sub') or '').strip()
+    email = str(payload.get('email') or '').strip()
+    name = str(payload.get('name') or payload.get('display_name') or '').strip()
+
+    if credential:
+        try:
+            parts = credential.split('.')
+            if len(parts) >= 2:
+                padded = parts[1] + '=' * (-len(parts[1]) % 4)
+                claims = json.loads(base64.urlsafe_b64decode(padded))
+                google_id = str(claims.get('sub') or google_id)
+                email = str(claims.get('email') or email)
+                name = str(claims.get('name') or name)
+        except Exception as exc:
+            logger.warning('Failed to decode Google credential: {}', exc)
+            raise HTTPException(
+                status_code=400, detail='Invalid Google token'
+            ) from exc
+
+    if not google_id or not email:
+        raise HTTPException(
+            status_code=400,
+            detail='Google authentication requires valid account ID and email',
+        )
+
+    try:
+        user = await asyncio.to_thread(
+            store.users.authenticate_google,
+            google_id=google_id,
+            email=email,
+            display_name=name,
+        )
+    except UserError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    token = await asyncio.to_thread(
+        store.create_session,
+        user['id'],
+        ip,
+        request.headers.get('user-agent', ''),
+    )
+    await asyncio.to_thread(store.users.record_login, user['id'], ip)
+    log = api.state.activity
+    if log is not None:
+        await asyncio.to_thread(
+            log.record,
+            'login',
+            user_id=user['id'],
+            username=user['username'],
+            summary=f"Google sign-in ({user['username']})",
             client=api.client_label(request, None),
             ip=ip,
         )

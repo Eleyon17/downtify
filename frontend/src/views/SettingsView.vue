@@ -134,6 +134,38 @@
                 />
               </SettingRow>
             </SettingGroup>
+            <SettingGroup title="Sidebar Navigation" description="Choose which items appear in your navigation sidebar">
+              <SettingRow label="Discover" description="Browse recommendations, releases, and finder">
+                <UiSwitch
+                  v-model="account.sidebarDiscovery.value"
+                  aria-label="Discover"
+                />
+              </SettingRow>
+              <SettingRow label="Monitor" description="Spotify playlist monitoring and auto-downloads">
+                <UiSwitch
+                  v-model="account.sidebarMonitor.value"
+                  aria-label="Monitor"
+                />
+              </SettingRow>
+              <SettingRow label="Podcasts" description="Podcast show subscriptions and episodes">
+                <UiSwitch
+                  v-model="account.sidebarPodcasts.value"
+                  aria-label="Podcasts"
+                />
+              </SettingRow>
+              <SettingRow label="Charts" description="Trending top charts from Spotify, Deezer, etc.">
+                <UiSwitch
+                  v-model="account.sidebarCharts.value"
+                  aria-label="Charts"
+                />
+              </SettingRow>
+              <SettingRow label="Similar" description="Explore tracks similar to songs you love">
+                <UiSwitch
+                  v-model="account.sidebarSimilar.value"
+                  aria-label="Similar"
+                />
+              </SettingRow>
+            </SettingGroup>
             <SettingGroup :title="t('settings.shortcutsGroup')">
               <SettingRow
                 :label="t('shortcuts.title')"
@@ -796,6 +828,10 @@
             <AppsSettings />
           </template>
 
+          <template v-else-if="section === 'stats'">
+            <StatsSettings />
+          </template>
+
           <!-- About -->
           <template v-else-if="section === 'about'">
             <div
@@ -920,6 +956,7 @@ import ActivitySettings from '/src/components/settings/ActivitySettings.vue'
 import AppsSettings from '/src/components/settings/AppsSettings.vue'
 import ServerPortSetting from '/src/components/settings/ServerPortSetting.vue'
 import UsersSettings from '/src/components/settings/UsersSettings.vue'
+import StatsSettings from '/src/components/settings/StatsSettings.vue'
 import SettingGroup from '/src/components/settings/SettingGroup.vue'
 import SettingRow from '/src/components/settings/SettingRow.vue'
 import SourceOrder from '/src/components/settings/SourceOrder.vue'
@@ -999,6 +1036,11 @@ const sections = computed(() =>
     auth.user.value?.role,
     [
       { id: 'general', icon: 'sliders', label: t('settings.general') },
+      {
+        id: 'stats',
+        icon: 'trending',
+        label: t('nav.stats') || 'Listening Stats',
+      },
       {
         id: 'sources',
         icon: 'download',

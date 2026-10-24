@@ -303,6 +303,7 @@ import hashlib
 import io
 import json
 import mimetypes
+import random
 import re
 import shutil
 import threading
@@ -9076,6 +9077,7 @@ def get_share_endpoint(share_id: str) -> dict[str, Any]:
             'has_cover': entry.get('has_cover') is not False,
             'stream_url': f'/api/share/{share["id"]}/stream/{idx}',
             'cover_url': f'/api/share/{share["id"]}/cover/{idx}',
+            'lyrics_url': f'/api/share/{share["id"]}/lyrics/{idx}',
         })
 
     has_cover = playlist_cover is not None or any(t['has_cover'] for t in tracks)
@@ -9212,6 +9214,33 @@ def share_export_csv_endpoint(share_id: str) -> Response:
     )
 
 
+@router.get('/api/share/{share_id}/lyrics')
+@router.get('/api/share/{share_id}/lyrics/{track_idx}')
+def share_lyrics_endpoint(
+    share_id: str,
+    track_idx: int = 0,
+    lang: Optional[str] = None,
+    translate: bool = True,
+) -> dict[str, Any]:
+    """Lyrics and translation for a shared song or playlist track."""
+    share = _require_shares().get_share(share_id)
+    if not share:
+        raise HTTPException(status_code=404, detail='Share not found')
+    files, _, _ = _resolve_share_files(share)
+    if not (0 <= track_idx < len(files)):
+        raise HTTPException(status_code=404, detail='Track not found in share')
+    file = files[track_idx]
+    full = resolve_library_file(file, library_context())
+    if full is None or not full.is_file():
+        raise HTTPException(status_code=404, detail='File not found')
+    from .lyrics import read_track_lyrics
+
+    target_lang = lang or (state.settings or {}).get('ui_language') or 'en'
+    if not translate:
+        return read_track_lyrics(full)
+    return read_track_lyrics(full, target_lang=target_lang)
+
+
 @router.post('/api/shares')
 async def create_share_endpoint(request: Request) -> dict[str, Any]:
     """Create a persistent public share link for a track or playlist."""
@@ -9268,3 +9297,108 @@ def delete_share_endpoint(share_id: str, request: Request) -> dict[str, Any]:
     if not deleted:
         raise HTTPException(status_code=404, detail='Share not found')
     return {'deleted': True, 'id': share_id}
+
+
+def build_daily_suggested_mix(
+    entries: list[dict[str, Any]],
+    user_id: int,
+    likes_store: Optional[Any] = None,
+    activity_log: Optional[Any] = None,
+    target_count: int = 25,
+) -> dict[str, Any]:
+    today = datetime.now(timezone.utc).date().isoformat()
+    if not entries:
+        return {
+            'date': today,
+            'title': 'Daily Suggested Mix',
+            'subtitle': 'Add songs to your library to get daily recommendations',
+            'count': 0,
+            'tracks': [],
+            'covers': [],
+        }
+
+    seed_str = f'{user_id}:{today}'
+    seed = int(hashlib.sha256(seed_str.encode()).hexdigest()[:8], 16)
+    rng = random.Random(seed)
+
+    liked_paths: set[str] = set()
+    fav_artists: set[str] = set()
+    if likes_store is not None and user_id:
+        try:
+            liked_paths = set(likes_store.paths(user_id))
+        except Exception:
+            liked_paths = set()
+
+    if activity_log is not None and user_id:
+        try:
+            recent_acts = activity_log.entries(
+                user_id=user_id, kinds=['playback'], limit=100
+            )
+            for act in recent_acts.get('entries', []):
+                tr = (act.get('detail') or {}).get('track') or {}
+                art = str(tr.get('artist') or '').strip().lower()
+                if art:
+                    fav_artists.add(art)
+        except Exception:
+            pass
+
+    favored: list[dict[str, Any]] = []
+    others: list[dict[str, Any]] = []
+    for e in entries:
+        art = str(e.get('artist') or '').strip().lower()
+        path = str(e.get('file') or '')
+        if (art and art in fav_artists) or (path and path in liked_paths):
+            favored.append(e)
+        else:
+            others.append(e)
+
+    rng.shuffle(favored)
+    rng.shuffle(others)
+
+    needed = min(target_count, len(entries))
+    fav_take = min(len(favored), needed // 2) if favored else 0
+    selected = favored[:fav_take]
+    remaining = needed - len(selected)
+    selected.extend(others[:remaining])
+
+    if len(selected) < needed:
+        more = favored[fav_take:] + others[remaining:]
+        rng.shuffle(more)
+        selected.extend(more[: (needed - len(selected))])
+
+    rng.shuffle(selected)
+
+    covers: list[str] = []
+    seen_covers: set[str] = set()
+    for tr in selected:
+        c = str(tr.get('cover') or tr.get('cover_url') or '')
+        if not c and tr.get('has_cover') and tr.get('file'):
+            c = f"/cover?file={quote(tr['file'])}"
+        if c and c not in seen_covers:
+            seen_covers.add(c)
+            covers.append(c)
+        if len(covers) >= 4:
+            break
+
+    return {
+        'date': today,
+        'title': 'Daily Suggested Mix',
+        'subtitle': f'A fresh mix of {len(selected)} songs from your library',
+        'count': len(selected),
+        'tracks': selected,
+        'covers': covers,
+    }
+
+
+@router.get('/api/me/suggested-mix')
+def get_daily_suggested_mix(request: Request) -> dict[str, Any]:
+    """A personalized daily mix of songs recommended per user from tracks in library."""
+    entries = entries_for_request(request)
+    user_id = request_user_id(request)
+    return build_daily_suggested_mix(
+        entries=entries,
+        user_id=user_id,
+        likes_store=state.likes,
+        activity_log=state.activity,
+        target_count=25,
+    )
