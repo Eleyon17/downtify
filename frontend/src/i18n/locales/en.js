@@ -1101,9 +1101,20 @@ export default {
   auth: {
     signInTitle: 'Sign in to Downtify',
     signInBody: 'Sign in with your username and password.',
+    signUpTitle: 'Create an account',
+    signUpBody: 'Sign up to start your personal music library.',
     username: 'Username',
     password: 'Password',
+    name: 'Name',
+    email: 'Email',
     signIn: 'Sign in',
+    signUp: 'Sign up',
+    createAccount: 'Create account',
+    signInWithGoogle: 'Sign in with Google',
+    signUpWithGoogle: 'Sign up with Google',
+    googleNotConfiguredTitle: 'Google Sign-In Not Configured',
+    googleNotConfiguredBody:
+      'Google OAuth requires a Google Client ID. Set GOOGLE_CLIENT_ID in your environment or configure it in Settings.',
     wrongPassword: 'Wrong username or password',
     tooMany: 'Too many attempts. Wait a few minutes and try again.',
     forgotHint:
@@ -1272,6 +1283,11 @@ export default {
     deleteBody:
       'Their apps are unpaired and their browsers signed out. Their files stay in the library; their likes, playlists and watches go with them.',
     deleteConfirm: 'Delete',
+    googleGroup: 'Google OAuth',
+    googleHint: 'Allow users to sign in or register with their Google account.',
+    googleClientId: 'Google Client ID',
+    googleClientSecret: 'Google Client Secret',
+    googleRedirectUri: 'Authorized Redirect URI',
   },
   activity: {
     nowTitle: 'Playing now',

@@ -1143,9 +1143,20 @@ export default {
     signInTitle: 'Se connecter à Downtify',
     signInBody:
       'Connectez-vous avec votre nom d’utilisateur et votre mot de passe.',
+    signUpTitle: 'Créer un compte',
+    signUpBody: 'Inscrivez-vous pour démarrer votre bibliothèque musicale personnelle.',
     username: 'Nom d’utilisateur',
     password: 'Mot de passe',
+    name: 'Nom',
+    email: 'E-mail',
     signIn: 'Se connecter',
+    signUp: "S'inscrire",
+    createAccount: 'Créer un compte',
+    signInWithGoogle: 'Se connecter avec Google',
+    signUpWithGoogle: "S'inscrire avec Google",
+    googleNotConfiguredTitle: 'Connexion Google non configurée',
+    googleNotConfiguredBody:
+      'Google OAuth nécessite un identifiant client Google. Définissez GOOGLE_CLIENT_ID dans votre environnement ou dans Paramètres.',
     wrongPassword: 'Nom d’utilisateur ou mot de passe incorrect',
     tooMany: 'Trop de tentatives. Patientez quelques minutes et réessayez.',
     forgotHint:
@@ -1320,6 +1331,11 @@ export default {
     deleteBody:
       'Ses applis sont dissociées et ses navigateurs déconnectés. Ses téléchargements restent dans la bibliothèque.',
     deleteConfirm: 'Supprimer',
+    googleGroup: 'Google OAuth',
+    googleHint: 'Permettre aux utilisateurs de se connecter ou de créer un compte avec Google.',
+    googleClientId: 'Identifiant client Google',
+    googleClientSecret: 'Secret client Google',
+    googleRedirectUri: 'URI de redirection autorisée',
   },
   activity: {
     nowTitle: 'En cours de lecture',

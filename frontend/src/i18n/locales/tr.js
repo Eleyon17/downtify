@@ -1122,9 +1122,20 @@ export default {
   auth: {
     signInTitle: 'Downtify’a giriş yap',
     signInBody: 'Kullanıcı adınız ve parolanızla giriş yapın.',
+    signUpTitle: 'Hesap oluştur',
+    signUpBody: 'Kişisel müzik kitaplığınızı başlatmak için kaydolun.',
     username: 'Kullanıcı adı',
     password: 'Parola',
+    name: 'İsim',
+    email: 'E-posta',
     signIn: 'Giriş yap',
+    signUp: 'Kaydol',
+    createAccount: 'Hesap oluştur',
+    signInWithGoogle: 'Google ile giriş yap',
+    signUpWithGoogle: 'Google ile kaydol',
+    googleNotConfiguredTitle: 'Google ile Giriş Yapılandırılmadı',
+    googleNotConfiguredBody:
+      'Google OAuth için bir Google İstemci Kimliği gerekir. Ortamınızda GOOGLE_CLIENT_ID ayarlayın veya Ayarlar’dan yapılandırın.',
     wrongPassword: 'Kullanıcı adı veya parola yanlış',
     tooMany: 'Çok fazla deneme. Birkaç dakika bekleyip tekrar deneyin.',
     forgotHint:
@@ -1299,6 +1310,11 @@ export default {
     deleteBody:
       'Uygulamalarının eşleşmesi kaldırılır ve tarayıcılarındaki oturumlar kapatılır. İndirdikleri kitaplıkta kalır.',
     deleteConfirm: 'Sil',
+    googleGroup: 'Google OAuth',
+    googleHint: 'Kullanıcıların Google hesaplarıyla giriş yapmasına veya kaydolmasına izin verin.',
+    googleClientId: 'Google İstemci Kimliği',
+    googleClientSecret: 'Google İstemci Gizli Anahtarı',
+    googleRedirectUri: 'Yetkili Yönlendirme URI’si',
   },
   activity: {
     nowTitle: 'Şimdi çalıyor',

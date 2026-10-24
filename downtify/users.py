@@ -30,6 +30,7 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import re
 import secrets
 import sqlite3
@@ -294,6 +295,28 @@ class UserStore:  # noqa: PLR0904
                    ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
                 (key, value),
             )
+
+    def get_config(self, key: str) -> Optional[str]:
+        with self._connect() as conn:
+            return self._config(conn, key)
+
+    def set_config(self, key: str, value: Optional[str]) -> None:
+        with self._lock, self._connect() as conn:
+            self._set_config(conn, key, value)
+
+    def get_google_client_id(self) -> str:
+        env_val = os.environ.get('DOWNTIFY_GOOGLE_CLIENT_ID') or os.environ.get('GOOGLE_CLIENT_ID')
+        if env_val and env_val.strip():
+            return env_val.strip()
+        val = self.get_config('google_client_id')
+        return val.strip() if val else ''
+
+    def get_google_client_secret(self) -> str:
+        env_val = os.environ.get('DOWNTIFY_GOOGLE_CLIENT_SECRET') or os.environ.get('GOOGLE_CLIENT_SECRET')
+        if env_val and env_val.strip():
+            return env_val.strip()
+        val = self.get_config('google_client_secret')
+        return val.strip() if val else ''
 
     # First run and upgrades
 

@@ -1134,9 +1134,20 @@ export default {
   auth: {
     signInTitle: 'Σύνδεση στο Downtify',
     signInBody: 'Συνδεθείτε με το όνομα χρήστη και τον κωδικό σας.',
+    signUpTitle: 'Δημιουργία λογαριασμού',
+    signUpBody: 'Εγγραφείτε για να ξεκινήσετε την προσωπική σας μουσική βιβλιοθήκη.',
     username: 'Όνομα χρήστη',
     password: 'Κωδικός',
+    name: 'Όνομα',
+    email: 'Email',
     signIn: 'Σύνδεση',
+    signUp: 'Εγγραφή',
+    createAccount: 'Δημιουργία λογαριασμού',
+    signInWithGoogle: 'Σύνδεση με το Google',
+    signUpWithGoogle: 'Εγγραφή με το Google',
+    googleNotConfiguredTitle: 'Η σύνδεση Google δεν έχει ρυθμιστεί',
+    googleNotConfiguredBody:
+      'Το Google OAuth απαιτεί Google Client ID. Ορίστε το GOOGLE_CLIENT_ID στο περιβάλλον σας ή στις Ρυθμίσεις.',
     wrongPassword: 'Λάθος όνομα χρήστη ή κωδικός',
     tooMany:
       'Πάρα πολλές προσπάθειες. Περιμένετε λίγα λεπτά και δοκιμάστε ξανά.',
@@ -1312,6 +1323,11 @@ export default {
     deleteBody:
       'Οι εφαρμογές του αποσυνδέονται και τα προγράμματα περιήγησής του αποσυνδέονται. Οι λήψεις του μένουν στη βιβλιοθήκη.',
     deleteConfirm: 'Διαγραφή',
+    googleGroup: 'Google OAuth',
+    googleHint: 'Επιτρέψτε στους χρήστες να συνδέονται ή να εγγράφονται με τον λογαριασμό τους Google.',
+    googleClientId: 'Google Client ID',
+    googleClientSecret: 'Google Client Secret',
+    googleRedirectUri: 'Εξουσιοδοτημένο URI ανακατεύθυνσης',
   },
   activity: {
     nowTitle: 'Παίζει τώρα',

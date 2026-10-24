@@ -6,14 +6,14 @@
       <div class="flex flex-col items-center gap-3 text-center">
         <AppLogo :size="48" />
         <h1 class="text-display text-2xl font-semibold">
-          {{ isSignUp ? (t('auth.signUpTitle') || 'Create Account') : t('auth.signInTitle') }}
+          {{ isSignUp ? t('auth.signUpTitle') : t('auth.signInTitle') }}
         </h1>
         <p class="text-sm text-muted">
-          {{ isSignUp ? (t('auth.signUpBody') || 'Sign up to start your personal music library') : t('auth.signInBody') }}
+          {{ isSignUp ? t('auth.signUpBody') : t('auth.signInBody') }}
         </p>
       </div>
 
-      <!-- Tab toggle: Sign in vs Create account -->
+      <!-- Tab toggle: Sign in vs Sign up -->
       <div class="flex rounded-control bg-surface-2 p-1 text-sm font-medium">
         <button
           type="button"
@@ -29,7 +29,7 @@
           :class="isSignUp ? 'bg-surface font-semibold text-fg shadow-sm' : 'text-muted hover:text-fg'"
           @click="isSignUp = true; error = ''"
         >
-          {{ t('auth.signUp') || 'Create Account' }}
+          {{ t('auth.signUp') }}
         </button>
       </div>
 
@@ -58,7 +58,7 @@
             d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
           />
         </svg>
-        <span>{{ isSignUp ? 'Sign up with Google' : 'Sign in with Google' }}</span>
+        <span>{{ isSignUp ? t('auth.signUpWithGoogle') : t('auth.signInWithGoogle') }}</span>
       </button>
 
       <div class="relative flex items-center justify-center">
@@ -71,7 +71,7 @@
         <template v-if="isSignUp">
           <UiInput
             v-model="displayName"
-            label="Name"
+            :label="t('auth.name')"
             icon="user"
             autocomplete="name"
             placeholder="Your name"
@@ -79,14 +79,14 @@
           <UiInput
             v-model="email"
             type="email"
-            label="Email"
+            :label="t('auth.email')"
             icon="mail"
             autocomplete="email"
             placeholder="you@example.com"
           />
           <UiInput
             v-model="username"
-            label="Username"
+            :label="t('auth.username')"
             icon="user"
             autocomplete="username"
             placeholder="Optional (defaults to email prefix)"
@@ -126,7 +126,7 @@
           :loading="busy"
           :disabled="isSignUp ? (!password || (!username.trim() && !email.trim())) : (!username.trim() || !password)"
         >
-          {{ isSignUp ? (t('auth.createAccount') || 'Create Account') : t('auth.signIn') }}
+          {{ isSignUp ? t('auth.createAccount') : t('auth.signIn') }}
         </UiButton>
       </form>
 
@@ -135,36 +135,27 @@
       </p>
     </div>
 
-    <!-- Google OAuth Direct Fallback Modal -->
+    <!-- Google OAuth Setup Modal (shown when Google Client ID has not been set up) -->
     <UiModal
       :open="googleModalOpen"
-      title="Google Sign-In"
+      :title="t('auth.googleNotConfiguredTitle')"
       @close="googleModalOpen = false"
     >
-      <form class="flex flex-col gap-4 text-sm text-fg" @submit.prevent="confirmGoogleAuth">
-        <p class="text-muted">Enter your Google account details to proceed:</p>
-        <UiInput
-          v-model="googleEmail"
-          type="email"
-          label="Google Email"
-          icon="mail"
-          placeholder="user@gmail.com"
-          required
-        />
-        <UiInput
-          v-model="googleName"
-          label="Full Name"
-          icon="user"
-          placeholder="Google Account Name"
-        />
-        <p v-if="googleError" class="text-xs text-danger">{{ googleError }}</p>
-        <div class="mt-2 flex justify-end gap-2">
-          <UiButton variant="ghost" @click="googleModalOpen = false">Cancel</UiButton>
-          <UiButton type="submit" variant="primary" :loading="busy" :disabled="!googleEmail.trim()">
-            Continue
-          </UiButton>
+      <div class="flex flex-col gap-4 text-sm text-pretty text-fg-2">
+        <p>{{ t('auth.googleNotConfiguredBody') }}</p>
+        <div class="flex flex-col gap-1 rounded-control border border-line-2 bg-surface-2 p-3 text-xs">
+          <span class="text-muted font-medium">Authorized Redirect URI:</span>
+          <span class="font-mono select-all text-fg break-all">{{ redirectUri }}</span>
         </div>
-      </form>
+        <p class="text-xs text-muted">
+          To connect Google sign-in, add <code class="font-mono text-fg">DOWNTIFY_GOOGLE_CLIENT_ID</code> to your docker-compose.yml, or sign in as an admin and configure it in Settings &rarr; Users.
+        </p>
+      </div>
+      <template #footer>
+        <UiButton variant="primary" @click="googleModalOpen = false">
+          {{ t('auth.noticeOk') }}
+        </UiButton>
+      </template>
     </UiModal>
 
     <!-- A server upgraded from a version without accounts says so once. -->
@@ -203,7 +194,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import AppLogo from '../ui/AppLogo.vue'
 import UiButton from '../ui/UiButton.vue'
 import UiInput from '../ui/UiInput.vue'
@@ -222,9 +213,12 @@ const busy = ref(false)
 const error = ref('')
 
 const googleModalOpen = ref(false)
-const googleEmail = ref('')
-const googleName = ref('')
-const googleError = ref('')
+const redirectUri = computed(() => {
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/api/auth/google/callback`
+  }
+  return '/api/auth/google/callback'
+})
 
 const notice = computed(() => auth.status.value?.notice || null)
 const noticeOpen = ref(false)
@@ -236,6 +230,38 @@ watch(
   { immediate: true }
 )
 
+onMounted(() => {
+  // Check for error parameters returned from OAuth callback
+  const params = new URLSearchParams(window.location.search)
+  const err = params.get('error')
+  if (err) {
+    if (err === 'missing_code') error.value = 'Google sign-in was cancelled.'
+    else error.value = `Google sign-in failed (${err})`
+  }
+
+  // If GIS is available and Google client ID is configured, initialize GIS
+  const clientId = auth.status.value?.google_client_id
+  if (clientId && window.google?.accounts?.id) {
+    try {
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: async (resp) => {
+          if (resp?.credential) {
+            busy.value = true
+            const res = await auth.signInWithGoogle({ credential: resp.credential })
+            if (res !== true) {
+              error.value = String(res)
+              busy.value = false
+            }
+          }
+        },
+      })
+    } catch {
+      // Ignore GIS init errors
+    }
+  }
+})
+
 function useNotice() {
   username.value = notice.value?.username || username.value
   if (notice.value?.password) password.value = notice.value.password
@@ -243,32 +269,13 @@ function useNotice() {
 }
 
 function triggerGoogleAuth() {
-  // Check if standard GIS (Google Identity Services) client exists
-  if (window.google?.accounts?.id) {
-    window.google.accounts.id.prompt((notification) => {
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        googleModalOpen.value = true
-      }
-    })
-  } else {
-    googleModalOpen.value = true
+  if (auth.status.value?.google_auth_enabled) {
+    // Initiate real Google OAuth flow
+    window.location.href = '/api/auth/google/login'
+    return
   }
-}
-
-async function confirmGoogleAuth() {
-  if (!googleEmail.value.trim() || busy.value) return
-  busy.value = true
-  googleError.value = ''
-  const googleId = 'g_' + btoa(googleEmail.value.trim().toLowerCase()).replace(/[^a-zA-Z0-9]/g, '').slice(0, 20)
-  const result = await auth.signInWithGoogle({
-    google_id: googleId,
-    email: googleEmail.value.trim(),
-    name: googleName.value.trim() || undefined,
-  })
-  if (result !== true) {
-    googleError.value = String(result)
-    busy.value = false
-  }
+  // Not configured yet on server -> show setup guidance modal
+  googleModalOpen.value = true
 }
 
 async function submit() {

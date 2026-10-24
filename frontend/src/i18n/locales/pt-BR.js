@@ -1123,9 +1123,20 @@ export default {
   auth: {
     signInTitle: 'Entrar no Downtify',
     signInBody: 'Entre com seu usuário e senha.',
+    signUpTitle: 'Criar uma conta',
+    signUpBody: 'Cadastre-se para começar sua biblioteca de música pessoal.',
     username: 'Usuário',
     password: 'Senha',
+    name: 'Nome',
+    email: 'E-mail',
     signIn: 'Entrar',
+    signUp: 'Cadastrar',
+    createAccount: 'Criar conta',
+    signInWithGoogle: 'Entrar com o Google',
+    signUpWithGoogle: 'Cadastrar com o Google',
+    googleNotConfiguredTitle: 'Login com Google não configurado',
+    googleNotConfiguredBody:
+      'O Google OAuth requer um ID do cliente Google. Defina GOOGLE_CLIENT_ID no seu ambiente ou nas Configurações.',
     wrongPassword: 'Usuário ou senha incorretos',
     tooMany: 'Tentativas demais. Espere alguns minutos e tente de novo.',
     forgotHint:
@@ -1296,6 +1307,11 @@ export default {
     deleteBody:
       'Os apps dele são despareados e os navegadores desconectados. Os downloads continuam na biblioteca.',
     deleteConfirm: 'Excluir',
+    googleGroup: 'Google OAuth',
+    googleHint: 'Permitir que usuários façam login ou cadastro com sua conta Google.',
+    googleClientId: 'ID do cliente Google',
+    googleClientSecret: 'Segredo do cliente Google',
+    googleRedirectUri: 'URI de redirecionamento autorizada',
   },
   activity: {
     nowTitle: 'Tocando agora',

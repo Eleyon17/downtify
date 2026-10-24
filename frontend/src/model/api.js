@@ -552,6 +552,14 @@ function googleAuth(data) {
   return API.post('/api/auth/google', data)
 }
 
+function getGoogleOAuthConfig() {
+  return API.get('/api/auth/google/config')
+}
+
+function setGoogleOAuthConfig(data) {
+  return API.put('/api/auth/google/config', data)
+}
+
 function getMyStats(days = 90) {
   return API.get('/api/me/stats', { params: { days } })
 }
@@ -942,6 +950,8 @@ export default {
   logout,
   signup,
   googleAuth,
+  getGoogleOAuthConfig,
+  setGoogleOAuthConfig,
   getMe,
   renameMe,
   updateMe,

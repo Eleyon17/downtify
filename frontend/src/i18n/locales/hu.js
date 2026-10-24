@@ -1125,9 +1125,20 @@ export default {
   auth: {
     signInTitle: 'Bejelentkezés a Downtify-ba',
     signInBody: 'Jelentkezz be a felhasználóneveddel és a jelszavaddal.',
+    signUpTitle: 'Fiók létrehozása',
+    signUpBody: 'Regisztráljon személyes zenei könyvtára indításához.',
     username: 'Felhasználónév',
     password: 'Jelszó',
+    name: 'Név',
+    email: 'E-mail',
     signIn: 'Bejelentkezés',
+    signUp: 'Regisztráció',
+    createAccount: 'Fiók létrehozása',
+    signInWithGoogle: 'Bejelentkezés Google-fiókkal',
+    signUpWithGoogle: 'Regisztráció Google-fiókkal',
+    googleNotConfiguredTitle: 'A Google bejelentkezés nincs konfigurálva',
+    googleNotConfiguredBody:
+      'A Google OAuth szolgáltatáshoz Google Ügyfél-azonosító szükséges. Állítsa be a GOOGLE_CLIENT_ID változót vagy adja meg a Beállításokban.',
     wrongPassword: 'Hibás felhasználónév vagy jelszó',
     tooMany: 'Túl sok próbálkozás. Várj néhány percet, és próbáld újra.',
     forgotHint:
@@ -1305,6 +1316,11 @@ export default {
     deleteBody:
       'Az alkalmazásai párosítása megszűnik, a böngészőiből kijelentkezik. A letöltései a könyvtárban maradnak.',
     deleteConfirm: 'Törlés',
+    googleGroup: 'Google OAuth',
+    googleHint: 'Engedélyezi a felhasználóknak a Google-fiókkal történő bejelentkezést vagy regisztrációt.',
+    googleClientId: 'Google Ügyfél-azonosító',
+    googleClientSecret: 'Google Ügyféltitok',
+    googleRedirectUri: 'Engedélyezett átirányítási URI',
   },
   activity: {
     nowTitle: 'Most szól',

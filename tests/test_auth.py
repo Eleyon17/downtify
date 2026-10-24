@@ -781,3 +781,45 @@ def test_auth_routes_are_served(client):
 )
 def test_client_exceptions_win_over_admin_blocks(method, path, scope):
     assert classify(method, path) == scope
+
+
+def test_google_oauth_endpoints(client):
+    # 1. Status indicates not configured initially
+    status = client.get('/api/auth/status').json()
+    assert status['google_auth_enabled'] is False
+    assert status['google_client_id'] == ''
+
+    # 2. Login fails with 400 when not configured
+    login_attempt = client.get('/api/auth/google/login', follow_redirects=False)
+    assert login_attempt.status_code == 400
+
+    # 3. Setting config requires admin
+    unauth_cfg = client.put('/api/auth/google/config', json={'client_id': 'test-client-id'})
+    assert unauth_cfg.status_code == 401
+
+    # Sign in as admin
+    _sign_in(client)
+
+    # 4. Save google config as admin
+    save_cfg = client.put(
+        '/api/auth/google/config',
+        json={'client_id': 'test.apps.googleusercontent.com', 'client_secret': 'sec123'}
+    )
+    assert save_cfg.status_code == 200
+    cfg_data = save_cfg.json()
+    assert cfg_data['client_id'] == 'test.apps.googleusercontent.com'
+    assert cfg_data['has_secret'] is True
+    assert '/api/auth/google/callback' in cfg_data['redirect_uri']
+
+    # 5. Check status again
+    status = client.get('/api/auth/status').json()
+    assert status['google_auth_enabled'] is True
+    assert status['google_client_id'] == 'test.apps.googleusercontent.com'
+
+    # 6. GET /api/auth/google/login redirects to Google OAuth
+    redirect_res = client.get('/api/auth/google/login', follow_redirects=False)
+    assert redirect_res.status_code == 303
+    loc = redirect_res.headers['location']
+    assert 'accounts.google.com/o/oauth2/v2/auth' in loc
+    assert 'client_id=test.apps.googleusercontent.com' in loc
+    assert 'openid' in loc

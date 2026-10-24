@@ -67,6 +67,37 @@
       </SettingRow>
     </SettingGroup>
 
+    <SettingGroup :title="t('users.googleGroup')" :description="t('users.googleHint')">
+      <div class="flex flex-col gap-4 px-5 py-4">
+        <UiInput
+          v-model="googleClientId"
+          :label="t('users.googleClientId')"
+          placeholder="your-app-id.apps.googleusercontent.com"
+        />
+        <UiInput
+          v-model="googleClientSecret"
+          type="password"
+          :label="t('users.googleClientSecret')"
+          :placeholder="hasGoogleSecret ? '••••••••••••••••' : 'Optional client secret'"
+        />
+        <SettingRow
+          :label="t('users.googleRedirectUri')"
+          description="Add this to Authorized redirect URIs in Google Cloud Console."
+        >
+          <span class="font-mono text-xs select-all text-muted break-all">{{ googleRedirectUri }}</span>
+        </SettingRow>
+        <div class="flex justify-end">
+          <UiButton
+            variant="primary"
+            :loading="savingGoogle"
+            @click="saveGoogleConfig"
+          >
+            {{ t('apps.save') }}
+          </UiButton>
+        </div>
+      </div>
+    </SettingGroup>
+
     <!-- Add or edit a user -->
     <UiModal
       :open="editing !== null"
@@ -309,5 +340,43 @@ async function signOutAll() {
   }
 }
 
-onMounted(load)
+const googleClientId = ref('')
+const googleClientSecret = ref('')
+const hasGoogleSecret = ref(false)
+const googleRedirectUri = ref('')
+const savingGoogle = ref(false)
+
+async function loadGoogleConfig() {
+  try {
+    const res = await API.getGoogleOAuthConfig()
+    googleClientId.value = res.data.client_id || ''
+    hasGoogleSecret.value = Boolean(res.data.has_secret)
+    googleRedirectUri.value = res.data.redirect_uri || ''
+  } catch {
+    // ignore
+  }
+}
+
+async function saveGoogleConfig() {
+  savingGoogle.value = true
+  try {
+    const payload = { client_id: googleClientId.value.trim() }
+    if (googleClientSecret.value) {
+      payload.client_secret = googleClientSecret.value.trim()
+    }
+    await API.setGoogleOAuthConfig(payload)
+    googleClientSecret.value = ''
+    await loadGoogleConfig()
+    ui.toast(t('account.saved'), { kind: 'success' })
+  } catch (err) {
+    ui.toast(errorOf(err), { kind: 'error' })
+  } finally {
+    savingGoogle.value = false
+  }
+}
+
+onMounted(() => {
+  load()
+  loadGoogleConfig()
+})
 </script>

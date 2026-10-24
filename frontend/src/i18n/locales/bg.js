@@ -1117,9 +1117,20 @@ export default {
   auth: {
     signInTitle: 'Вход в Downtify',
     signInBody: 'Влезте с потребителското си име и парола.',
+    signUpTitle: 'Създаване на акаунт',
+    signUpBody: 'Регистрирайте се, за да стартирате личната си музикална библиотека.',
     username: 'Потребителско име',
     password: 'Парола',
+    name: 'Име',
+    email: 'Имейл',
     signIn: 'Вход',
+    signUp: 'Регистрация',
+    createAccount: 'Създаване на акаунт',
+    signInWithGoogle: 'Вход с Google',
+    signUpWithGoogle: 'Регистрация с Google',
+    googleNotConfiguredTitle: 'Входът с Google не е конфигуриран',
+    googleNotConfiguredBody:
+      'Google OAuth изисква Google клиентски идентификатор. Задайте GOOGLE_CLIENT_ID във вашата среда или в Настройки.',
     wrongPassword: 'Грешно потребителско име или парола',
     tooMany: 'Твърде много опити. Изчакайте няколко минути и опитайте отново.',
     forgotHint:
@@ -1294,6 +1305,11 @@ export default {
     deleteBody:
       'Сдвояването на приложенията му се прекратява, а браузърите му се отписват. Изтеглянията му остават в библиотеката.',
     deleteConfirm: 'Изтриване',
+    googleGroup: 'Google OAuth',
+    googleHint: 'Позволете на потребителите да влизат или да се регистрират с техния Google акаунт.',
+    googleClientId: 'Google клиентски идентификатор',
+    googleClientSecret: 'Google клиентски секрет',
+    googleRedirectUri: 'Оторизиран URI за пренасочване',
   },
   activity: {
     nowTitle: 'Звучи сега',

@@ -10,10 +10,14 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import secrets
+import urllib.parse
 from ipaddress import ip_address
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Request, Response
+import httpx
+from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi.responses import RedirectResponse
 from loguru import logger
 
 from . import api
@@ -69,6 +73,15 @@ def _me(request: Request) -> Principal:
     principal = _principal(request)
     if principal is None or not principal.user_id:
         raise HTTPException(status_code=401, detail='Sign in required')
+    return principal
+
+
+def _me_admin(request: Request) -> Principal:
+    principal = _me(request)
+    store = _store()
+    user = store.users.get(principal.user_id)
+    if not user or user.get('role') != ROLE_ADMIN:
+        raise HTTPException(status_code=403, detail='This needs an admin')
     return principal
 
 
@@ -278,6 +291,7 @@ def auth_status(request: Request) -> dict[str, Any]:
                 'id': principal.device_id,
                 'name': (found or {}).get('name'),
             }
+    google_client_id = store.users.get_google_client_id()
     return {
         'require_sign_in': not store.auth_disabled,
         'auth_disabled': store.auth_disabled,
@@ -289,6 +303,8 @@ def auth_status(request: Request) -> dict[str, Any]:
         'notice': None
         if principal or store.auth_disabled
         else store.users.notice(),
+        'google_auth_enabled': bool(google_client_id),
+        'google_client_id': google_client_id or '',
     }
 
 
@@ -428,15 +444,29 @@ async def google_auth(request: Request, response: Response) -> dict[str, Any]:
 
     if credential:
         try:
-            parts = credential.split('.')
-            if len(parts) >= 2:
-                padded = parts[1] + '=' * (-len(parts[1]) % 4)
-                claims = json.loads(base64.urlsafe_b64decode(padded))
+            claims = None
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    token_info_resp = await client.get(
+                        f'https://oauth2.googleapis.com/tokeninfo?id_token={credential}'
+                    )
+                    if token_info_resp.status_code == 200:
+                        claims = token_info_resp.json()
+            except Exception:
+                pass
+
+            if not claims:
+                parts = credential.split('.')
+                if len(parts) >= 2:
+                    padded = parts[1] + '=' * (-len(parts[1]) % 4)
+                    claims = json.loads(base64.urlsafe_b64decode(padded))
+
+            if claims:
                 google_id = str(claims.get('sub') or google_id)
                 email = str(claims.get('email') or email)
-                name = str(claims.get('name') or name)
+                name = str(claims.get('name') or claims.get('given_name') or name)
         except Exception as exc:
-            logger.warning('Failed to decode Google credential: {}', exc)
+            logger.warning('Failed to decode or verify Google credential: {}', exc)
             raise HTTPException(
                 status_code=400, detail='Invalid Google token'
             ) from exc
@@ -477,6 +507,194 @@ async def google_auth(request: Request, response: Response) -> dict[str, Any]:
         )
     _set_session(response, request, token)
     return {'signed_in': True, 'user': user}
+
+
+@router.get('/api/auth/google/login')
+def google_login(request: Request) -> Response:
+    """Redirect to Google's OAuth 2.0 authorization page."""
+    store = _store()
+    if store.auth_disabled:
+        raise HTTPException(
+            status_code=409,
+            detail='Sign-in is turned off (DOWNTIFY_DISABLE_AUTH)',
+        )
+    client_id = store.users.get_google_client_id()
+    if not client_id:
+        raise HTTPException(
+            status_code=400,
+            detail='Google Sign-In is not configured on this server.',
+        )
+
+    base_url = str(request.base_url).rstrip('/')
+    if _is_https(request) and base_url.startswith('http://'):
+        base_url = 'https://' + base_url[7:]
+    redirect_uri = f'{base_url}/api/auth/google/callback'
+
+    state = secrets.token_urlsafe(24)
+    params = {
+        'client_id': client_id,
+        'redirect_uri': redirect_uri,
+        'response_type': 'code',
+        'scope': 'openid email profile',
+        'state': state,
+        'prompt': 'select_account',
+    }
+    url = 'https://accounts.google.com/o/oauth2/v2/auth?' + urllib.parse.urlencode(params)
+    resp = RedirectResponse(url, status_code=303)
+    resp.set_cookie(
+        'downtify_oauth_state',
+        state,
+        max_age=600,
+        httponly=True,
+        samesite='lax',
+        secure=_is_https(request),
+        path='/',
+    )
+    return resp
+
+
+@router.get('/api/auth/google/callback')
+async def google_callback(
+    request: Request,
+    response: Response,
+    code: Optional[str] = Query(None),
+    error: Optional[str] = Query(None),
+    state: Optional[str] = Query(None),
+) -> Response:
+    """OAuth 2.0 callback handling after user signs in with Google."""
+    store = _store()
+    if error:
+        logger.warning('Google OAuth returned error: {}', error)
+        return RedirectResponse(f'/?error={urllib.parse.quote(error)}', status_code=303)
+    if not code:
+        return RedirectResponse('/?error=missing_code', status_code=303)
+
+    client_id = store.users.get_google_client_id()
+    client_secret = store.users.get_google_client_secret()
+
+    base_url = str(request.base_url).rstrip('/')
+    if _is_https(request) and base_url.startswith('http://'):
+        base_url = 'https://' + base_url[7:]
+    redirect_uri = f'{base_url}/api/auth/google/callback'
+
+    token_url = 'https://oauth2.googleapis.com/token'
+    data = {
+        'code': code,
+        'client_id': client_id,
+        'redirect_uri': redirect_uri,
+        'grant_type': 'authorization_code',
+    }
+    if client_secret:
+        data['client_secret'] = client_secret
+
+    userinfo: dict[str, Any] = {}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            token_resp = await client.post(token_url, data=data)
+            if token_resp.status_code != 200:
+                logger.error('Google token exchange error: {}', token_resp.text)
+                return RedirectResponse('/?error=token_exchange_failed', status_code=303)
+            token_json = token_resp.json()
+            access_token = token_json.get('access_token')
+            id_token = token_json.get('id_token')
+
+            if access_token:
+                userinfo_resp = await client.get(
+                    'https://www.googleapis.com/oauth2/v3/userinfo',
+                    headers={'Authorization': f'Bearer {access_token}'},
+                )
+                if userinfo_resp.status_code == 200:
+                    userinfo = userinfo_resp.json()
+
+            if not userinfo and id_token:
+                parts = id_token.split('.')
+                if len(parts) >= 2:
+                    padded = parts[1] + '=' * (-len(parts[1]) % 4)
+                    userinfo = json.loads(base64.urlsafe_b64decode(padded))
+    except Exception as exc:
+        logger.error('Failed to communicate with Google during OAuth callback: {}', exc)
+        return RedirectResponse('/?error=google_auth_failed', status_code=303)
+
+    google_id = str(userinfo.get('sub') or '').strip()
+    email = str(userinfo.get('email') or '').strip()
+    name = str(userinfo.get('name') or userinfo.get('given_name') or '').strip()
+
+    if not google_id or not email:
+        logger.error('Google userinfo missing sub or email: {}', userinfo)
+        return RedirectResponse('/?error=google_missing_profile', status_code=303)
+
+    try:
+        user = await asyncio.to_thread(
+            store.users.authenticate_google,
+            google_id=google_id,
+            email=email,
+            display_name=name,
+        )
+    except UserError as exc:
+        logger.warning('Failed to authenticate Google user: {}', exc)
+        return RedirectResponse(f'/?error={urllib.parse.quote(str(exc))}', status_code=303)
+
+    ip = _ip(request)
+    session_token = await asyncio.to_thread(
+        store.create_session,
+        user['id'],
+        ip,
+        request.headers.get('user-agent', ''),
+    )
+    await asyncio.to_thread(store.users.record_login, user['id'], ip)
+
+    log = api.state.activity
+    if log is not None:
+        await asyncio.to_thread(
+            log.record,
+            'login',
+            user_id=user['id'],
+            username=user['username'],
+            summary=f"Google sign-in ({user['username']})",
+            client=api.client_label(request, None),
+            ip=ip,
+        )
+
+    redirect = RedirectResponse('/', status_code=303)
+    _set_session(redirect, request, session_token)
+    return redirect
+
+
+@router.get('/api/auth/google/config')
+def get_google_config(request: Request) -> dict[str, Any]:
+    """Retrieve Google OAuth configuration (admins only)."""
+    _me_admin(request)
+    store = _store()
+    base_url = str(request.base_url).rstrip('/')
+    if _is_https(request) and base_url.startswith('http://'):
+        base_url = 'https://' + base_url[7:]
+    client_id = store.users.get_google_client_id()
+    secret = store.users.get_google_client_secret()
+    return {
+        'client_id': client_id,
+        'has_secret': bool(secret),
+        'redirect_uri': f'{base_url}/api/auth/google/callback',
+        'javascript_origin': base_url,
+    }
+
+
+@router.put('/api/auth/google/config')
+async def set_google_config(request: Request) -> dict[str, Any]:
+    """Update Google OAuth configuration (admins only)."""
+    _me_admin(request)
+    store = _store()
+    payload = await _json(request)
+    client_id = str(payload.get('client_id') or '').strip()
+    client_secret = str(payload.get('client_secret') or '').strip()
+
+    await asyncio.to_thread(store.users.set_config, 'google_client_id', client_id or None)
+    if 'client_secret' in payload:
+        await asyncio.to_thread(
+            store.users.set_config,
+            'google_client_secret',
+            client_secret or None,
+        )
+    return get_google_config(request)
 
 
 @router.post('/api/auth/logout')
