@@ -237,9 +237,9 @@ class UserStore:  # noqa: PLR0904
                     created_at TEXT NOT NULL,
                     last_login_at TEXT,
                     last_login_ip TEXT NOT NULL DEFAULT '',
-                    email TEXT UNIQUE COLLATE NOCASE,
+                    email TEXT COLLATE NOCASE,
                     display_name TEXT NOT NULL DEFAULT '',
-                    google_id TEXT UNIQUE
+                    google_id TEXT
                 )
             """)
             cols = {
@@ -248,7 +248,7 @@ class UserStore:  # noqa: PLR0904
             }
             if 'email' not in cols:
                 conn.execute(
-                    'ALTER TABLE users ADD COLUMN email TEXT UNIQUE COLLATE NOCASE'
+                    'ALTER TABLE users ADD COLUMN email TEXT COLLATE NOCASE'
                 )
             if 'display_name' not in cols:
                 conn.execute(
@@ -256,8 +256,18 @@ class UserStore:  # noqa: PLR0904
                 )
             if 'google_id' not in cols:
                 conn.execute(
-                    'ALTER TABLE users ADD COLUMN google_id TEXT UNIQUE'
+                    'ALTER TABLE users ADD COLUMN google_id TEXT'
                 )
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email
+                ON users(email)
+                WHERE email IS NOT NULL AND email != ''
+            """)
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id
+                ON users(google_id)
+                WHERE google_id IS NOT NULL AND google_id != ''
+            """)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS auth_config (
                     key TEXT PRIMARY KEY,

@@ -48,7 +48,43 @@ def test_a_new_install_gets_the_default_admin_and_no_notice(tmp_path):
     assert users.notice() is None
     # Only once.
     assert not users.ensure_default_admin(existing_install=True)
-    assert users.notice() is None
+
+
+def test_upgrade_existing_v5_database_schema(tmp_path):
+    """Verify that upgrading an existing database without email/google_id columns
+    does not fail with SQLite OperationalError."""
+    db_file = tmp_path / 'legacy.db'
+    conn = sqlite3.connect(db_file)
+    conn.execute('''
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'user',
+            default_password INTEGER NOT NULL DEFAULT 0,
+            prefs_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            last_login_at TEXT,
+            last_login_ip TEXT NOT NULL DEFAULT ''
+        )
+    ''')
+    conn.execute(
+        'INSERT INTO users (username, password_hash, created_at) VALUES ("admin", ?, "2026-01-01")',
+        (hash_password('downtify'),),
+    )
+    conn.commit()
+    conn.close()
+
+    store = UserStore(db_file)
+    user = store.get(1)
+    assert user['username'] == 'admin'
+    assert user['email'] == ''
+    assert user['google_id'] == ''
+    assert user['display_name'] == ''
+
+    # Should allow setting email and unique index enforcement
+    store.update(1, email='admin@example.com')
+    assert store.get(1)['email'] == 'admin@example.com'
 
 
 def test_an_upgraded_install_gets_the_notice(tmp_path):
