@@ -96,7 +96,7 @@ Spotify's official API gates downloads behind a Premium subscription. Downtify t
 docker run -d -p 8000:8000 --name downtify \
   -v /path/to/music:/downloads \
   -v downtify_data:/data \
-  ghcr.io/henriquesebastiao/downtify
+  ghcr.io/eleyon17/downtify
 ```
 
 Open [`localhost:8000`](http://localhost:8000), paste a link, hit download. Files land in `/path/to/music` with the tags already in place.

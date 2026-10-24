@@ -76,7 +76,7 @@ You can upload a `cookies.txt` straight from **Settings → YouTube cookies** in
 ```yaml
 services:
   downtify:
-    image: ghcr.io/henriquesebastiao/downtify:latest
+    image: ghcr.io/eleyon17/downtify:latest
     ports:
       - '8000:8000'
     volumes:
