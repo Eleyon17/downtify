@@ -118,14 +118,20 @@ def _is_https(request: Request) -> bool:
 
 
 def _get_request_host(request: Request) -> str:
-    host = request.headers.get('x-forwarded-host') or request.headers.get('host') or ''
+    host = (
+        request.headers.get('x-forwarded-host')
+        or request.headers.get('host')
+        or ''
+    )
     if host:
         return host.split(',')[0].strip()
     return request.url.netloc
 
 
 def _get_base_url(request: Request) -> str:
-    env_base = os.environ.get('DOWNTIFY_BASE_URL') or os.environ.get('BASE_URL')
+    env_base = os.environ.get('DOWNTIFY_BASE_URL') or os.environ.get(
+        'BASE_URL'
+    )
     if env_base and env_base.strip():
         return env_base.strip().rstrip('/')
     store = _store()
@@ -137,7 +143,9 @@ def _get_base_url(request: Request) -> str:
     return f'{scheme}://{host}'
 
 
-def _get_google_redirect_uri(request: Request, client_redirect_uri: Optional[str] = None) -> str:
+def _get_google_redirect_uri(
+    request: Request, client_redirect_uri: Optional[str] = None
+) -> str:
     store = _store()
     env_redirect = os.environ.get('DOWNTIFY_GOOGLE_REDIRECT_URI')
     if env_redirect and env_redirect.strip():
@@ -148,7 +156,9 @@ def _get_google_redirect_uri(request: Request, client_redirect_uri: Optional[str
     if client_redirect_uri:
         uri = client_redirect_uri.strip()
         parsed = urllib.parse.urlparse(uri)
-        if parsed.scheme in ('http', 'https') and parsed.path.rstrip('/').endswith('/api/auth/google/callback'):
+        if parsed.scheme in ('http', 'https') and parsed.path.rstrip(
+            '/'
+        ).endswith('/api/auth/google/callback'):
             return uri.rstrip('/')
     base_url = _get_base_url(request)
     return f'{base_url}/api/auth/google/callback'
@@ -444,6 +454,7 @@ async def signup(request: Request, response: Response) -> dict[str, Any]:
         api.state.login_limiter.fail(ip)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    await asyncio.to_thread(api.apply_hide_public_playlists, user['id'])
     api.state.login_limiter.reset(ip)
     token = await asyncio.to_thread(
         store.create_session,
@@ -459,7 +470,7 @@ async def signup(request: Request, response: Response) -> dict[str, Any]:
             'user_created',
             user_id=user['id'],
             username=user['username'],
-            summary=f"Signed up ({user['username']})",
+            summary=f'Signed up ({user["username"]})',
             client=api.client_label(request, None),
             ip=ip,
         )
@@ -481,9 +492,13 @@ async def google_auth(request: Request, response: Response) -> dict[str, Any]:
     ip = _ip(request)
     payload = await _json(request)
     credential = str(payload.get('credential') or '').strip()
-    google_id = str(payload.get('google_id') or payload.get('sub') or '').strip()
+    google_id = str(
+        payload.get('google_id') or payload.get('sub') or ''
+    ).strip()
     email = str(payload.get('email') or '').strip()
-    name = str(payload.get('name') or payload.get('display_name') or '').strip()
+    name = str(
+        payload.get('name') or payload.get('display_name') or ''
+    ).strip()
 
     if credential:
         try:
@@ -507,9 +522,13 @@ async def google_auth(request: Request, response: Response) -> dict[str, Any]:
             if claims:
                 google_id = str(claims.get('sub') or google_id)
                 email = str(claims.get('email') or email)
-                name = str(claims.get('name') or claims.get('given_name') or name)
+                name = str(
+                    claims.get('name') or claims.get('given_name') or name
+                )
         except Exception as exc:
-            logger.warning('Failed to decode or verify Google credential: {}', exc)
+            logger.warning(
+                'Failed to decode or verify Google credential: {}', exc
+            )
             raise HTTPException(
                 status_code=400, detail='Invalid Google token'
             ) from exc
@@ -530,6 +549,9 @@ async def google_auth(request: Request, response: Response) -> dict[str, Any]:
     except UserError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    if user.get('is_new'):
+        await asyncio.to_thread(api.apply_hide_public_playlists, user['id'])
+
     token = await asyncio.to_thread(
         store.create_session,
         user['id'],
@@ -544,7 +566,7 @@ async def google_auth(request: Request, response: Response) -> dict[str, Any]:
             'login',
             user_id=user['id'],
             username=user['username'],
-            summary=f"Google sign-in ({user['username']})",
+            summary=f'Google sign-in ({user["username"]})',
             client=api.client_label(request, None),
             ip=ip,
         )
@@ -582,7 +604,10 @@ def google_login(
         'state': state,
         'prompt': 'select_account',
     }
-    url = 'https://accounts.google.com/o/oauth2/v2/auth?' + urllib.parse.urlencode(params)
+    url = (
+        'https://accounts.google.com/o/oauth2/v2/auth?'
+        + urllib.parse.urlencode(params)
+    )
     resp = RedirectResponse(url, status_code=303)
     resp.set_cookie(
         'downtify_oauth_state',
@@ -617,7 +642,9 @@ async def google_callback(
     store = _store()
     if error:
         logger.warning('Google OAuth returned error: {}', error)
-        return RedirectResponse(f'/?error={urllib.parse.quote(error)}', status_code=303)
+        return RedirectResponse(
+            f'/?error={urllib.parse.quote(error)}', status_code=303
+        )
     if not code:
         return RedirectResponse('/?error=missing_code', status_code=303)
 
@@ -642,8 +669,12 @@ async def google_callback(
         async with httpx.AsyncClient(timeout=15.0) as client:
             token_resp = await client.post(token_url, data=data)
             if token_resp.status_code != 200:
-                logger.error('Google token exchange error: {}', token_resp.text)
-                return RedirectResponse('/?error=token_exchange_failed', status_code=303)
+                logger.error(
+                    'Google token exchange error: {}', token_resp.text
+                )
+                return RedirectResponse(
+                    '/?error=token_exchange_failed', status_code=303
+                )
             token_json = token_resp.json()
             access_token = token_json.get('access_token')
             id_token = token_json.get('id_token')
@@ -662,16 +693,22 @@ async def google_callback(
                     padded = parts[1] + '=' * (-len(parts[1]) % 4)
                     userinfo = json.loads(base64.urlsafe_b64decode(padded))
     except Exception as exc:
-        logger.error('Failed to communicate with Google during OAuth callback: {}', exc)
+        logger.error(
+            'Failed to communicate with Google during OAuth callback: {}', exc
+        )
         return RedirectResponse('/?error=google_auth_failed', status_code=303)
 
     google_id = str(userinfo.get('sub') or '').strip()
     email = str(userinfo.get('email') or '').strip()
-    name = str(userinfo.get('name') or userinfo.get('given_name') or '').strip()
+    name = str(
+        userinfo.get('name') or userinfo.get('given_name') or ''
+    ).strip()
 
     if not google_id or not email:
         logger.error('Google userinfo missing sub or email: {}', userinfo)
-        return RedirectResponse('/?error=google_missing_profile', status_code=303)
+        return RedirectResponse(
+            '/?error=google_missing_profile', status_code=303
+        )
 
     try:
         user = await asyncio.to_thread(
@@ -682,7 +719,12 @@ async def google_callback(
         )
     except UserError as exc:
         logger.warning('Failed to authenticate Google user: {}', exc)
-        return RedirectResponse(f'/?error={urllib.parse.quote(str(exc))}', status_code=303)
+        return RedirectResponse(
+            f'/?error={urllib.parse.quote(str(exc))}', status_code=303
+        )
+
+    if user.get('is_new'):
+        await asyncio.to_thread(api.apply_hide_public_playlists, user['id'])
 
     ip = _ip(request)
     session_token = await asyncio.to_thread(
@@ -700,7 +742,7 @@ async def google_callback(
             'login',
             user_id=user['id'],
             username=user['username'],
-            summary=f"Google sign-in ({user['username']})",
+            summary=f'Google sign-in ({user["username"]})',
             client=api.client_label(request, None),
             ip=ip,
         )
@@ -739,7 +781,9 @@ async def set_google_config(request: Request) -> dict[str, Any]:
     client_secret = str(payload.get('client_secret') or '').strip()
     custom_redirect = str(payload.get('redirect_uri') or '').strip()
 
-    await asyncio.to_thread(store.users.set_config, 'google_client_id', client_id or None)
+    await asyncio.to_thread(
+        store.users.set_config, 'google_client_id', client_id or None
+    )
     if 'client_secret' in payload:
         await asyncio.to_thread(
             store.users.set_config,

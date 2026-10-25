@@ -116,6 +116,7 @@ PREFERENCES: dict[str, type] = {
     'translate_lyrics': bool,
     'search_albums': bool,
     'hide_public_playlists_by_default': bool,
+    'public_playlists_initialized': bool,
     'sidebar_discovery': bool,
     'sidebar_monitor': bool,
     'sidebar_podcasts': bool,
@@ -711,6 +712,7 @@ class UserStore:  # noqa: PLR0904
 
         with self._lock:
             with self._connect() as conn:
+                is_new = False
                 # 1. Existing by google_id
                 row = conn.execute(
                     'SELECT * FROM users WHERE google_id = ?', (gid,)
@@ -762,12 +764,16 @@ class UserStore:  # noqa: PLR0904
                             'SELECT id FROM users WHERE username = ?', (uname,)
                         ).fetchone()
                         user_id = new_row['id']
+                        is_new = True
                 if user_id:
                     conn.execute(
                         'UPDATE users SET default_password = 0 WHERE id = ? AND default_password = 1 AND google_id != ""',
                         (user_id,),
                     )
-            return self.get(user_id) or {}
+            result = self.get(user_id) or {}
+            if is_new:
+                result['is_new'] = True
+            return result
 
     def merge_users(self, target_id: int, source_id: int) -> dict[str, Any]:
         """Merge source_id into target_id: reassign devices and sessions,

@@ -303,6 +303,7 @@ import hashlib
 import io
 import json
 import mimetypes
+import os
 import random
 import re
 import shutil
@@ -1339,6 +1340,17 @@ def _filter_playlists_for(
     hidden_keys: set[str] = set()
     if user_id and state.manual_playlist_owners is not None:
         try:
+            if state.auth is not None:
+                prefs = state.auth.users.preferences(user_id)
+                if prefs.get(
+                    'hide_public_playlists_by_default', True
+                ) and not prefs.get('public_playlists_initialized'):
+                    if state.manual_playlist_owners.hidden_set(user_id):
+                        state.auth.users.set_preferences(
+                            user_id, {'public_playlists_initialized': True}
+                        )
+                    else:
+                        apply_hide_public_playlists(user_id)
             hidden_keys = state.manual_playlist_owners.hidden_set(user_id)
         except Exception:
             logger.opt(exception=True).debug('Could not read hidden playlists')
@@ -1427,11 +1439,7 @@ def _filter_entries_for(
         {name for name, uid in catalog_names.items() if uid == user_id}
         | {key for key, uid in manual_owners.items() if uid == user_id}
         | {key for key, pub in visibility.items() if pub}
-        | {
-            key
-            for key in monitored_owners
-            if visibility.get(key, True)
-        }
+        | {key for key in monitored_owners if visibility.get(key, True)}
     )
 
     def _scrubbed(row: dict[str, Any], names: Any) -> dict[str, Any]:
@@ -1510,6 +1518,17 @@ def playlist_entry_for_request(
     hidden_keys: set[str] = set()
     if user_id and state.manual_playlist_owners is not None:
         try:
+            if state.auth is not None:
+                prefs = state.auth.users.preferences(user_id)
+                if prefs.get(
+                    'hide_public_playlists_by_default', True
+                ) and not prefs.get('public_playlists_initialized'):
+                    if state.manual_playlist_owners.hidden_set(user_id):
+                        state.auth.users.set_preferences(
+                            user_id, {'public_playlists_initialized': True}
+                        )
+                    else:
+                        apply_hide_public_playlists(user_id)
             hidden_keys = state.manual_playlist_owners.hidden_set(user_id)
         except Exception:
             pass
@@ -1567,7 +1586,9 @@ def apply_hide_public_playlists(user_id: int) -> None:
     if not user_id or state.manual_playlist_owners is None:
         return
     try:
-        catalog_names, manual_owners, monitored_owners, _, _ = _playlist_meta_maps()
+        catalog_names, manual_owners, monitored_owners, _, _ = (
+            _playlist_meta_maps()
+        )
         ctx = library_context()
         found = list_library_playlists(
             ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs
@@ -1601,7 +1622,13 @@ def apply_hide_public_playlists(user_id: int) -> None:
         for key, oid in manual_owners.items():
             if oid != user_id and key != 'downtify liked songs':
                 non_owned.add(key)
-        state.manual_playlist_owners.hide_all_non_owned_for_user(user_id, non_owned)
+        state.manual_playlist_owners.hide_all_non_owned_for_user(
+            user_id, non_owned
+        )
+        if state.auth is not None:
+            state.auth.users.set_preferences(
+                user_id, {'public_playlists_initialized': True}
+            )
     except Exception:
         logger.opt(exception=True).debug(
             'Could not apply hide public playlists for user {}', user_id
@@ -2342,7 +2369,9 @@ def add_track_to_playlist_internal_sync(
                 'duration': meta.get('duration') or 0,
             }
             state.playlist_catalog.ensure_playlist(clean_name, user_id=user_id)
-            state.playlist_catalog.upsert_track(clean_name, song, clean_file, full)
+            state.playlist_catalog.upsert_track(
+                clean_name, song, clean_file, full
+            )
             if user_id:
                 auto_hide_new_playlist_for_others(clean_name, user_id)
         invalidate_library_paths_cache()
@@ -2396,7 +2425,8 @@ def _register_download_playlists_on_disk(
             )
         except Exception:
             logger.opt(exception=True).debug(
-                'Failed adding downloaded track to playlist {!r}', playlist_name
+                'Failed adding downloaded track to playlist {!r}',
+                playlist_name,
             )
 
     affected = _playlists_for_successful_download(
@@ -2597,7 +2627,11 @@ def get_latest_apk() -> Response:
     if state.update_checker is not None:
         apk_url = getattr(state.update_checker, '_apk_url', None)
     if not apk_url:
-        repo = getattr(state.update_checker, '_repo', 'Eleyon17/downtify') if state.update_checker else 'Eleyon17/downtify'
+        repo = (
+            getattr(state.update_checker, '_repo', 'Eleyon17/downtify')
+            if state.update_checker
+            else 'Eleyon17/downtify'
+        )
         apk_url = f'https://github.com/{repo}/releases'
     return RedirectResponse(url=apk_url, status_code=307)
 
@@ -3502,16 +3536,16 @@ def _downtify_share_details(base_url: str, share_id: str) -> dict[str, Any]:
     )
     title = str(data.get('title') or 'Shared Content').strip()
     raw_cover = str(data.get('cover_url') or '')
-    cover_url = f'{base_url}{raw_cover}' if raw_cover.startswith('/') else raw_cover
+    cover_url = (
+        f'{base_url}{raw_cover}' if raw_cover.startswith('/') else raw_cover
+    )
     tracks = []
     for idx, tr in enumerate(data.get('tracks') or []):
         t_cover = str(tr.get('cover_url') or '')
         if t_cover.startswith('/'):
             t_cover = f'{base_url}{t_cover}'
         artists = (
-            [str(tr.get('artist') or '').strip()]
-            if tr.get('artist')
-            else []
+            [str(tr.get('artist') or '').strip()] if tr.get('artist') else []
         )
         tracks.append({
             'name': str(tr.get('title') or ''),
@@ -4654,7 +4688,6 @@ async def _finish_playlist_batch(
             cover_cache=state.cover_cache,
             metadata_cache=state.metadata_cache,
         )
-
 
     if playlist_name and user_id:
         auto_hide_new_playlist_for_others(playlist_name, user_id)
@@ -6021,30 +6054,40 @@ def on_track_path_changed(
         try:
             spotify_id = state.track_index.spotify_id_for_filename(old_file)
             if spotify_id:
-                state.track_index.register(spotify_id, new_file, full_path=full_path)
+                state.track_index.register(
+                    spotify_id, new_file, full_path=full_path
+                )
             else:
                 state.track_index.remove_by_filename(old_file)
         except Exception:
-            logger.opt(exception=True).debug('Failed updating track_index on path change')
+            logger.opt(exception=True).debug(
+                'Failed updating track_index on path change'
+            )
 
     if state.likes is not None:
         try:
             state.likes.update_path(old_file, new_file)
             _announce_likes()
         except Exception:
-            logger.opt(exception=True).debug('Failed updating likes on path change')
+            logger.opt(exception=True).debug(
+                'Failed updating likes on path change'
+            )
 
     if state.playlist_catalog is not None:
         try:
             state.playlist_catalog.update_filename(old_file, new_file)
         except Exception:
-            logger.opt(exception=True).debug('Failed updating playlist_catalog on path change')
+            logger.opt(exception=True).debug(
+                'Failed updating playlist_catalog on path change'
+            )
 
     if state.cover_cache is not None:
         try:
             state.cover_cache.forget_by_stored_path(old_file)
         except Exception:
-            logger.opt(exception=True).debug('Failed clearing cover_cache on path change')
+            logger.opt(exception=True).debug(
+                'Failed clearing cover_cache on path change'
+            )
 
     loop = state.loop
     if loop is not None and state.connections is not None:
@@ -6058,7 +6101,9 @@ def on_track_path_changed(
                 loop,
             )
         except Exception:
-            logger.opt(exception=True).debug('Failed broadcasting track_path_changed')
+            logger.opt(exception=True).debug(
+                'Failed broadcasting track_path_changed'
+            )
 
     announce_library_changed()
 
@@ -6357,7 +6402,9 @@ def set_playlist_visibility_sync(
 
     clean_name = str(name or '').strip()
     if not clean_name:
-        raise HTTPException(status_code=400, detail='Playlist name is required')
+        raise HTTPException(
+            status_code=400, detail='Playlist name is required'
+        )
     if is_liked_playlist(clean_name):
         raise HTTPException(
             status_code=400, detail='Liked songs cannot be made public'
@@ -6396,7 +6443,9 @@ def clone_playlist_sync(
 
     clean_name = str(name or '').strip()
     if not clean_name:
-        raise HTTPException(status_code=400, detail='Playlist name is required')
+        raise HTTPException(
+            status_code=400, detail='Playlist name is required'
+        )
     match = playlist_entry_for_request(clean_name, request)
     if match is None:
         raise HTTPException(status_code=404, detail='Playlist not found')
@@ -6455,7 +6504,9 @@ def set_playlist_hidden_sync(
 
     clean_name = str(name or '').strip()
     if not clean_name:
-        raise HTTPException(status_code=400, detail='Playlist name is required')
+        raise HTTPException(
+            status_code=400, detail='Playlist name is required'
+        )
     match = playlist_entry_for_request(clean_name, request)
     if match is None:
         raise HTTPException(status_code=404, detail='Playlist not found')
@@ -6491,7 +6542,9 @@ def change_playlist_owner_sync(
 
     clean_name = str(name or '').strip()
     if not clean_name:
-        raise HTTPException(status_code=400, detail='Playlist name is required')
+        raise HTTPException(
+            status_code=400, detail='Playlist name is required'
+        )
     if is_liked_playlist(clean_name):
         raise HTTPException(
             status_code=400, detail='Cannot change ownership of Liked Songs'
@@ -6509,7 +6562,9 @@ def change_playlist_owner_sync(
             raise HTTPException(status_code=500, detail='Auth store not ready')
         user = state.auth.users.get(target_id)
         if user is None:
-            raise HTTPException(status_code=404, detail='Target user not found')
+            raise HTTPException(
+                status_code=404, detail='Target user not found'
+            )
         target_name = user['username']
 
     match = playlist_entry_for_request(clean_name, request)
@@ -6520,7 +6575,9 @@ def change_playlist_owner_sync(
     if state.manual_playlist_owners is not None:
         state.manual_playlist_owners.set_owner(actual_name, target_id)
         if target_id:
-            state.manual_playlist_owners.set_hidden(target_id, actual_name, False)
+            state.manual_playlist_owners.set_hidden(
+                target_id, actual_name, False
+            )
 
     if state.playlist_catalog is not None:
         state.playlist_catalog.set_owner(actual_name, target_id)
@@ -6554,7 +6611,9 @@ async def change_playlist_owner_endpoint(request: Request) -> dict[str, Any]:
 
     payload = await _json_object(request)
     name = str(payload.get('name') or '').strip()
-    user_id = int(payload.get('user_id', payload.get('target_user_id', 0)) or 0)
+    user_id = int(
+        payload.get('user_id', payload.get('target_user_id', 0)) or 0
+    )
     return await asyncio.to_thread(
         change_playlist_owner_sync, name, user_id, request
     )
@@ -6609,6 +6668,7 @@ async def _delete_playlist_by_name(
     if match is not None:
         result = await _delete_owned_playlist(request, match)
     elif is_admin:
+
         def _run() -> dict[str, Any]:
             assert state.downloader is not None
             return delete_playlist_from_library(
@@ -6728,10 +6788,7 @@ async def playlist_suggestions_endpoint(
         except Exception:
             payload = {}
     pl_name = str(
-        payload.get('name')
-        or payload.get('playlist_name')
-        or name
-        or ''
+        payload.get('name') or payload.get('playlist_name') or name or ''
     ).strip()
     if not pl_name:
         raise HTTPException(
@@ -9059,7 +9116,9 @@ def get_share_endpoint(share_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail='Share not found')
     files, title, playlist_cover = _resolve_share_files(share)
     if not files:
-        raise HTTPException(status_code=404, detail='No tracks found for share')
+        raise HTTPException(
+            status_code=404, detail='No tracks found for share'
+        )
 
     ctx = library_context()
     entries = list_entries_for_stored_paths(ctx, files)
@@ -9080,7 +9139,9 @@ def get_share_endpoint(share_id: str) -> dict[str, Any]:
             'lyrics_url': f'/api/share/{share["id"]}/lyrics/{idx}',
         })
 
-    has_cover = playlist_cover is not None or any(t['has_cover'] for t in tracks)
+    has_cover = playlist_cover is not None or any(
+        t['has_cover'] for t in tracks
+    )
     cover_url = (
         f'/api/share/{share["id"]}/playlist-cover'
         if playlist_cover
@@ -9100,7 +9161,9 @@ def get_share_endpoint(share_id: str) -> dict[str, Any]:
 
 
 @router.api_route('/api/share/{share_id}/stream', methods=['GET', 'HEAD'])
-@router.api_route('/api/share/{share_id}/stream/{track_idx}', methods=['GET', 'HEAD'])
+@router.api_route(
+    '/api/share/{share_id}/stream/{track_idx}', methods=['GET', 'HEAD']
+)
 def share_stream_endpoint(share_id: str, track_idx: int = 0) -> FileResponse:
     """Stream audio for track_idx within the shared item."""
     share = _require_shares().get_share(share_id)
@@ -9124,7 +9187,9 @@ def share_stream_endpoint(share_id: str, track_idx: int = 0) -> FileResponse:
 
 
 @router.api_route('/api/share/{share_id}/cover', methods=['GET', 'HEAD'])
-@router.api_route('/api/share/{share_id}/cover/{track_idx}', methods=['GET', 'HEAD'])
+@router.api_route(
+    '/api/share/{share_id}/cover/{track_idx}', methods=['GET', 'HEAD']
+)
 def share_cover_endpoint(share_id: str, track_idx: int = 0) -> Response:
     """Cover art for track_idx within the shared item."""
     share = _require_shares().get_share(share_id)
@@ -9161,7 +9226,9 @@ def share_cover_endpoint(share_id: str, track_idx: int = 0) -> Response:
     )
 
 
-@router.api_route('/api/share/{share_id}/playlist-cover', methods=['GET', 'HEAD'])
+@router.api_route(
+    '/api/share/{share_id}/playlist-cover', methods=['GET', 'HEAD']
+)
 def share_playlist_cover_endpoint(share_id: str) -> FileResponse:
     """Playlist sidecar cover image for a shared playlist."""
     share = _require_shares().get_share(share_id)
@@ -9191,7 +9258,9 @@ def share_export_csv_endpoint(share_id: str) -> Response:
         raise HTTPException(status_code=404, detail='Share not found')
     files, title, _ = _resolve_share_files(share)
     if not files:
-        raise HTTPException(status_code=404, detail='No tracks found for share')
+        raise HTTPException(
+            status_code=404, detail='No tracks found for share'
+        )
     ctx = library_context()
     entries = list_entries_for_stored_paths(ctx, files)
     output = io.StringIO()
@@ -9280,7 +9349,9 @@ def list_shares_endpoint(request: Request) -> list[dict[str, Any]]:
     """List active shares created by the caller (or all if admin)."""
     user_id = request_user_id(request)
     is_admin = request_is_admin(request)
-    shares = _require_shares().list_shares(user_id=None if is_admin else user_id)
+    shares = _require_shares().list_shares(
+        user_id=None if is_admin else user_id
+    )
     base = str(request.base_url).rstrip('/')
     return [{**s, 'url': f'{base}/share/{s["id"]}'} for s in shares]
 
@@ -9373,7 +9444,7 @@ def build_daily_suggested_mix(
     for tr in selected:
         c = str(tr.get('cover') or tr.get('cover_url') or '')
         if not c and tr.get('has_cover') and tr.get('file'):
-            c = f"/cover?file={quote(tr['file'])}"
+            c = f'/cover?file={quote(tr["file"])}'
         if c and c not in seen_covers:
             seen_covers.add(c)
             covers.append(c)

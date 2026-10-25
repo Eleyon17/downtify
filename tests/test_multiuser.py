@@ -17,8 +17,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
-import secrets
-
 from starlette.requests import Request
 
 from downtify import account_routes, api, mobile_routes
@@ -519,7 +517,9 @@ def test_shared_library_shows_all_entries_to_users(monkeypatch, tmp_path):
 
     mine = api._filter_entries_for(entries, _request(5))
     assert [e['file'] for e in mine] == ['a.mp3', 'b.mp3']
-    assert [e['file'] for e in api._filter_entries_for(entries, _request(7))] == ['a.mp3', 'b.mp3']
+    assert [
+        e['file'] for e in api._filter_entries_for(entries, _request(7))
+    ] == ['a.mp3', 'b.mp3']
     assert api._filter_entries_for(entries, _admin_request()) == entries
 
 
@@ -637,7 +637,8 @@ def test_playlist_listing_is_scoped_with_a_personal_liked(
 
     manual.set_hidden(5, 'Theirs', True)
     theirs_hidden = next(
-        p for p in api._filter_playlists_for(found, _request(5))
+        p
+        for p in api._filter_playlists_for(found, _request(5))
         if p['name'] == 'Theirs'
     )
     assert theirs_hidden['hidden'] is True
@@ -667,10 +668,47 @@ def test_hide_public_playlists_by_default(tmp_path, monkeypatch):
     assert 'playlistc' in manual.hidden_set(user2['id'])
     assert 'playlistc' not in manual.hidden_set(user3['id'])
 
-    users.set_preferences(user2['id'], {'hide_public_playlists_by_default': False})
+    users.set_preferences(
+        user2['id'], {'hide_public_playlists_by_default': False}
+    )
     api.auto_hide_new_playlist_for_others('PlaylistD', user3['id'])
     assert 'playlistd' not in manual.hidden_set(user2['id'])
 
+
+def test_new_user_public_playlists_auto_hidden(tmp_path, monkeypatch):
+    manual = ManualPlaylistOwners(tmp_path / 'manual.db')
+    users = UserStore(tmp_path / 'auth.db')
+    users.ensure_default_admin()
+    user2 = users.create('user2', 'password123')
+    user3 = users.create('user3', 'password123')
+
+    manual.set_owner('PlaylistA', user2['id'])
+    manual.set_public('PlaylistA', True)
+
+    auth = _auth_with(users)
+    monkeypatch.setattr(api.state, 'manual_playlist_owners', manual)
+    monkeypatch.setattr(api.state, 'auth', auth)
+
+    found = [
+        {
+            'name': 'PlaylistA',
+            'files': ['a.mp3'],
+            'cover': '',
+            'liked': False,
+            'manual': True,
+        }
+    ]
+    # user3 is brand new and has hide_public_playlists_by_default=True
+    # Initially hidden_set is empty
+    assert manual.hidden_set(user3['id']) == set()
+
+    res = api._filter_playlists_for(found, _request(user3['id']))
+    assert len(res) == 1
+    assert res[0]['name'] == 'PlaylistA'
+    assert res[0]['hidden'] is True
+    assert 'playlista' in manual.hidden_set(user3['id'])
+    prefs = users.preferences(user3['id'])
+    assert prefs.get('public_playlists_initialized') is True
 
 
 # ── first-start backfill ─────────────────────────────────────────────
@@ -1415,19 +1453,21 @@ def test_admin_change_playlist_owner(monkeypatch, tmp_path):
     monkeypatch.setattr(api.state, 'manual_playlist_owners', manual)
 
     auth = AuthStore(tmp_path / 'auth.db', tmp_path / '.secret')
-    auth.users.create('alice', 'password123') # id 2
-    auth.users.create('bob', 'password123') # id 3
+    auth.users.create('alice', 'password123')  # id 2
+    auth.users.create('bob', 'password123')  # id 3
     monkeypatch.setattr(api.state, 'auth', auth)
 
-    found = [{
-        'name': 'Rock',
-        'files': [],
-        'count': 0,
-        'added': 0,
-        'cover': '',
-        'liked': False,
-        'manual': True,
-    }]
+    found = [
+        {
+            'name': 'Rock',
+            'files': [],
+            'count': 0,
+            'added': 0,
+            'cover': '',
+            'liked': False,
+            'manual': True,
+        }
+    ]
     monkeypatch.setattr(api, 'list_library_playlists', lambda *args: found)
 
     # Alice owns it initially
@@ -1472,15 +1512,17 @@ def test_mobile_delete_playlist(monkeypatch, tmp_path):
     auth.users.create('bob', 'password123')
     monkeypatch.setattr(api.state, 'auth', auth)
 
-    found = [{
-        'name': 'Jazz',
-        'files': [],
-        'count': 0,
-        'added': 0,
-        'cover': '',
-        'liked': False,
-        'manual': True,
-    }]
+    found = [
+        {
+            'name': 'Jazz',
+            'files': [],
+            'count': 0,
+            'added': 0,
+            'cover': '',
+            'liked': False,
+            'manual': True,
+        }
+    ]
     monkeypatch.setattr(api, 'list_library_playlists', lambda *args: found)
 
     # Bob (non-owner, non-admin) cannot see Jazz when private -> 404
@@ -1498,7 +1540,11 @@ def test_mobile_delete_playlist(monkeypatch, tmp_path):
     # Cannot delete Liked Songs
     alice_req = _request(2)
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(mobile_routes.mobile_delete_playlist('Downtify Liked Songs', alice_req))
+        asyncio.run(
+            mobile_routes.mobile_delete_playlist(
+                'Downtify Liked Songs', alice_req
+            )
+        )
     assert exc.value.status_code == 400
 
     # Admin CAN delete another user's playlist
@@ -1506,7 +1552,9 @@ def test_mobile_delete_playlist(monkeypatch, tmp_path):
         api.state, 'downloader', MagicMock(download_dir=str(tmp_path))
     )
     monkeypatch.setattr(
-        api, 'delete_playlist_from_library', lambda *args, **kwargs: {'ok': True}
+        api,
+        'delete_playlist_from_library',
+        lambda *args, **kwargs: {'ok': True},
     )
     admin_req = _admin_request()
     res = asyncio.run(mobile_routes.mobile_delete_playlist('Jazz', admin_req))
