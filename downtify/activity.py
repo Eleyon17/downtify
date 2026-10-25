@@ -242,6 +242,7 @@ class ActivityLog:
         user_id: int = 0,
         days: int = 90,
         genre_map: Optional[dict[str, str]] = None,
+        artist_genre_map: Optional[dict[str, str]] = None,
     ) -> dict[str, Any]:
         """Aggregate listening statistics from playback activity:
         by genre, artist, day, weekday, hour, and top tracks."""
@@ -263,6 +264,7 @@ class ActivityLog:
             ).fetchall()
 
         genre_map = genre_map or {}
+        artist_genre_map = artist_genre_map or {}
         artist_counts: dict[str, int] = collections.defaultdict(int)
         artist_durations: dict[str, float] = collections.defaultdict(float)
         genre_counts: dict[str, int] = collections.defaultdict(int)
@@ -314,17 +316,19 @@ class ActivityLog:
                     artist_durations[artist] += dur
 
             file_path = str(track.get('file') or '').strip()
+            norm_file = file_path.replace('\\', '/')
             genre = (
                 str(track.get('genre') or '').strip()
                 or genre_map.get(file_path, '')
+                or genre_map.get(norm_file, '')
+                or artist_genre_map.get(artist.lower(), '')
             )
-            if genre:
+            if genre and genre.lower() != 'unknown':
                 for g in [
                     p.strip() for p in re.split(r'[/,;&]', genre) if p.strip()
                 ]:
-                    genre_counts[g.capitalize()] += 1
-            else:
-                genre_counts['Unknown'] += 1
+                    if g and g.lower() != 'unknown':
+                        genre_counts[g.capitalize()] += 1
 
         top_artists = [
             {
@@ -336,17 +340,19 @@ class ActivityLog:
                 artist_counts.items(), key=lambda x: x[1], reverse=True
             )[:20]
         ]
+        known_genre_total = sum(genre_counts.values())
         top_genres = [
             {
                 'genre': g,
                 'plays': c,
-                'percentage': round((c / total_plays) * 100, 1)
-                if total_plays
+                'percentage': round((c / known_genre_total) * 100, 1)
+                if known_genre_total
                 else 0,
             }
             for g, c in sorted(
                 genre_counts.items(), key=lambda x: x[1], reverse=True
             )[:15]
+            if g.lower() != 'unknown'
         ]
         top_tracks_list = [
             {'track': t, 'plays': c}

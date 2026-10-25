@@ -506,6 +506,45 @@ async def report_playback(request: Request) -> dict[str, Any]:
     return {'ok': True}
 
 
+def _build_genre_maps() -> tuple[dict[str, str], dict[str, str]]:
+    genre_map: dict[str, str] = {}
+    artist_genre_map: dict[str, str] = {}
+    entries: list[dict[str, Any]] = []
+    try:
+        entries = listing_for_request(api.library_context())
+        for e in entries:
+            f = str(e.get('file') or '').strip()
+            art = str(e.get('artist') or '').strip().lower()
+            g = str(e.get('genre') or '').strip()
+            if g and g.lower() != 'unknown':
+                if f:
+                    genre_map[f] = g
+                    genre_map[f.replace('\\', '/')] = g
+                if art and art not in artist_genre_map:
+                    artist_genre_map[art] = g
+    except Exception:
+        pass
+
+    try:
+        from . import artist_profile  # noqa: PLC0415
+
+        download_dir = api._artist_profile_download_dir()
+        for e in entries:
+            art = str(e.get('artist') or '').strip()
+            if art and art.lower() not in artist_genre_map:
+                try:
+                    prof = artist_profile.load_profile(download_dir, art)
+                    pg = str(prof.get('genre') or '').strip()
+                    if pg and pg.lower() != 'unknown':
+                        artist_genre_map[art.lower()] = pg
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    return genre_map, artist_genre_map
+
+
 @router.get('/api/me/stats')
 async def my_listening_stats(
     request: Request, days: int = Query(90, ge=1, le=365)
@@ -515,17 +554,13 @@ async def my_listening_stats(
     log = api.state.activity
     if log is None:
         return {'total_plays': 0, 'days': days}
-    try:
-        entries = listing_for_request(api.library_context())
-        genre_map = {
-            e['file']: str(e.get('genre') or '')
-            for e in entries
-            if e.get('file') and e.get('genre')
-        }
-    except Exception:
-        genre_map = {}
+    genre_map, artist_genre_map = _build_genre_maps()
     return await asyncio.to_thread(
-        log.stats, user_id=me.user_id, days=days, genre_map=genre_map
+        log.stats,
+        user_id=me.user_id,
+        days=days,
+        genre_map=genre_map,
+        artist_genre_map=artist_genre_map,
     )
 
 
@@ -534,22 +569,18 @@ async def activity_listening_stats(
     request: Request,
     user_id: Optional[int] = Query(None),
     days: int = Query(90, ge=1, le=365),
-) -> dict[str, Any]:
+    ) -> dict[str, Any]:
     """Listening statistics for admins (across everyone or filtered by user_id)."""
     _me(request)
     log = api.state.activity
     if log is None:
         return {'total_plays': 0, 'days': days}
-    try:
-        entries = listing_for_request(api.library_context())
-        genre_map = {
-            e['file']: str(e.get('genre') or '')
-            for e in entries
-            if e.get('file') and e.get('genre')
-        }
-    except Exception:
-        genre_map = {}
+    genre_map, artist_genre_map = _build_genre_maps()
     uid = user_id or 0
     return await asyncio.to_thread(
-        log.stats, user_id=uid, days=days, genre_map=genre_map
+        log.stats,
+        user_id=uid,
+        days=days,
+        genre_map=genre_map,
+        artist_genre_map=artist_genre_map,
     )

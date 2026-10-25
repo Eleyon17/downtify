@@ -3,7 +3,7 @@
     <!-- Header Controls -->
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <h2 class="text-display text-xl font-bold">{{ t('nav.stats') || 'Listening Stats' }}</h2>
+        <h2 class="text-display text-xl font-bold">{{ t('nav.stats') }}</h2>
         <p class="text-xs text-muted">Your listening trends across artists, genres, and days</p>
       </div>
       <div class="flex items-center gap-2">

@@ -33,6 +33,7 @@ export default {
     charts: 'Paradas de sucesso',
     similar: 'Similares',
     settings: 'Configurações',
+    stats: 'Estatísticas de reprodução',
     more: 'Mais',
     playlists: 'Playlists',
     back: 'Voltar',

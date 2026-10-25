@@ -83,6 +83,7 @@ export function normalizeTrack(row) {
     albumArtist,
     trackNumber: Number(raw.track_number) || 0,
     year: String(raw.year || ''),
+    genre: String(raw.genre || '').trim(),
     duration: Number(raw.duration) || 0,
     added: Number(raw.added) || 0,
     size: Number(raw.size) || 0,

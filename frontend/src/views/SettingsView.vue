@@ -1072,7 +1072,7 @@ const sections = computed(() =>
       {
         id: 'stats',
         icon: 'trending',
-        label: t('nav.stats') || 'Listening Stats',
+        label: t('nav.stats'),
       },
       {
         id: 'sources',

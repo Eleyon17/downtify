@@ -82,8 +82,8 @@
             <h1 class="text-display text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl text-fg">
               Daily Mix
             </h1>
-            <p class="text-sm sm:text-base text-muted max-w-md">
-              {{ suggestedMix.subtitle || `${suggestedMix.count || suggestedMix.tracks.length} songs picked from your library for today` }}
+            <p class="text-sm sm:text-base text-muted max-w-lg line-clamp-2">
+              {{ mixSubtitle }}
             </p>
           </div>
 
@@ -113,21 +113,25 @@
             <div
               v-for="(orb, idx) in orbs"
               :key="idx"
-              class="group relative shrink-0 overflow-hidden rounded-full bg-surface-3 shadow-xl transition-all duration-300 hover:scale-110 hover:z-40 hover:ring-2 hover:ring-accent cursor-pointer"
-              :class="[orb.sizeClass, orb.zIndex, orb.border, 'border-surface']"
+              :title="orb.artist"
+              class="group relative shrink-0 overflow-hidden rounded-full bg-surface-3 shadow-xl ring-2 ring-surface border border-line-2 transition-all duration-200 hover:scale-110 hover:z-40 hover:ring-accent cursor-pointer select-none"
+              :class="[orb.sizeClass, orb.zIndex]"
               @click="playSuggestedMix"
             >
               <img
-                :src="orb.cover"
-                class="size-full object-cover transition-transform duration-500 group-hover:scale-105"
-                alt=""
+                :src="orb.photo"
+                class="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+                :alt="orb.artist"
                 loading="lazy"
+                @error="onOrbImageError($event, orb.fallbackCover)"
               />
+              <!-- Quick Fade-in Artist Name Overlay -->
               <div
-                v-if="orb.isCenter"
-                class="absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px]"
+                class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/60 p-2 text-center opacity-0 transition-opacity duration-150 group-hover:opacity-100"
               >
-                <AppIcon name="play" :size="32" class="text-white drop-shadow-md" />
+                <span class="text-xs sm:text-sm font-bold text-white drop-shadow-md line-clamp-2 px-1 leading-snug">
+                  {{ orb.artist }}
+                </span>
               </div>
             </div>
           </div>
@@ -286,7 +290,8 @@ import { useLibrary } from '/src/model/library'
 import { usePlayer } from '/src/model/player'
 import { usePlaylistActions } from '/src/model/playlistActions'
 import { useTrackActions } from '/src/model/trackActions'
-import { itemTrackCount } from '/src/lib/library'
+import { itemTrackCount, normalizeTrack } from '/src/lib/library'
+import { proxiedArtistPhotoUrl } from '/src/lib/artistPhotoProxy'
 import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
@@ -371,154 +376,157 @@ const onboarding = computed(() => [
 
 const suggestedMix = ref(null)
 
-const mixCovers = computed(() => {
-  if (!suggestedMix.value) return []
-  const list = []
-  if (suggestedMix.value.covers?.length) {
-    list.push(...suggestedMix.value.covers)
+const topArtists = computed(() => {
+  if (!suggestedMix.value?.tracks?.length) return []
+  const counts = new Map()
+  for (const track of suggestedMix.value.tracks) {
+    const artist = String(track.artist || '').trim()
+    if (!artist) continue
+    counts.set(artist, (counts.get(artist) || 0) + 1)
   }
-  if (suggestedMix.value.tracks?.length) {
-    for (const tr of suggestedMix.value.tracks) {
-      const c =
-        tr.cover ||
-        tr.cover_url ||
-        (tr.has_cover && tr.file
-          ? `/cover?file=${encodeURIComponent(tr.file)}`
-          : '')
-      if (c && !list.includes(c)) {
-        list.push(c)
-      }
-      if (list.length >= 6) break
-    }
-  }
-  return list
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([artist]) => artist)
 })
 
+const mixSubtitle = computed(() => {
+  if (!suggestedMix.value?.tracks?.length) return ''
+  const artists = topArtists.value
+  if (!artists.length) {
+    return `Your personalized mix from your library`
+  }
+  if (artists.length === 1) {
+    return `Your personalized mix including ${artists[0]}...`
+  }
+  if (artists.length === 2) {
+    return `Your personalized mix including ${artists[0]} and ${artists[1]}...`
+  }
+  return `Your personalized mix including ${artists[0]}, ${artists[1]}, and ${artists[2]}...`
+})
+
+function getArtistFallbackCover(artist) {
+  if (!suggestedMix.value?.tracks?.length) return ''
+  const track = suggestedMix.value.tracks.find(
+    (t) => String(t.artist || '').trim().toLowerCase() === artist.toLowerCase()
+  )
+  if (!track) return ''
+  return (
+    track.cover ||
+    track.cover_url ||
+    (track.has_cover && track.file
+      ? `/cover?file=${encodeURIComponent(track.file)}`
+      : '')
+  )
+}
+
+function onOrbImageError(event, fallback) {
+  if (fallback && event.target.src !== fallback) {
+    event.target.src = fallback
+  }
+}
+
 const orbs = computed(() => {
-  const covers = mixCovers.value
-  if (!covers.length) return []
-  if (covers.length === 1) {
+  const artists = topArtists.value
+  if (!artists.length) return []
+
+  const list = artists.slice(0, 5).map((artist) => ({
+    artist,
+    photo: proxiedArtistPhotoUrl(artist),
+    fallbackCover: getArtistFallbackCover(artist),
+  }))
+
+  if (list.length === 1) {
     return [
       {
-        cover: covers[0],
+        ...list[0],
         sizeClass: 'size-28 sm:size-36 md:size-40',
         zIndex: 'z-30',
-        border: 'border-4',
-        isCenter: true,
       },
     ]
   }
-  if (covers.length === 2) {
+  if (list.length === 2) {
     return [
       {
-        cover: covers[0],
+        ...list[0],
         sizeClass: 'size-26 sm:size-32 md:size-36',
         zIndex: 'z-30',
-        border: 'border-4',
-        isCenter: true,
       },
       {
-        cover: covers[1],
+        ...list[1],
         sizeClass: 'size-20 sm:size-24 md:size-28',
         zIndex: 'z-20',
-        border: 'border-3',
-        isCenter: false,
       },
     ]
   }
-  if (covers.length === 3) {
+  if (list.length === 3) {
     return [
       {
-        cover: covers[1],
+        ...list[1],
         sizeClass: 'size-20 sm:size-24 md:size-28',
         zIndex: 'z-20',
-        border: 'border-3',
-        isCenter: false,
       },
       {
-        cover: covers[0],
+        ...list[0],
         sizeClass: 'size-28 sm:size-36 md:size-40',
         zIndex: 'z-30',
-        border: 'border-4',
-        isCenter: true,
       },
       {
-        cover: covers[2],
+        ...list[2],
         sizeClass: 'size-20 sm:size-24 md:size-28',
         zIndex: 'z-20',
-        border: 'border-3',
-        isCenter: false,
       },
     ]
   }
-  if (covers.length === 4) {
+  if (list.length === 4) {
     return [
       {
-        cover: covers[2],
+        ...list[2],
         sizeClass: 'size-16 sm:size-20 md:size-22',
         zIndex: 'z-10',
-        border: 'border-2',
-        isCenter: false,
       },
       {
-        cover: covers[0],
+        ...list[0],
         sizeClass: 'size-28 sm:size-36 md:size-40',
         zIndex: 'z-30',
-        border: 'border-4',
-        isCenter: true,
       },
       {
-        cover: covers[1],
+        ...list[1],
         sizeClass: 'size-22 sm:size-26 md:size-28',
         zIndex: 'z-20',
-        border: 'border-3',
-        isCenter: false,
       },
       {
-        cover: covers[3],
+        ...list[3],
         sizeClass: 'size-16 sm:size-20 md:size-22',
         zIndex: 'z-10',
-        border: 'border-2',
-        isCenter: false,
       },
     ]
   }
-  // 5 or more
+  // 5 artists: layout order [2, 1, 0, 3, 4] with #0 at center
   return [
     {
-      cover: covers[2],
+      ...list[2],
       sizeClass: 'size-16 sm:size-20 md:size-22',
       zIndex: 'z-10',
-      border: 'border-2',
-      isCenter: false,
     },
     {
-      cover: covers[1],
+      ...list[1],
       sizeClass: 'size-22 sm:size-26 md:size-28',
       zIndex: 'z-20',
-      border: 'border-3',
-      isCenter: false,
     },
     {
-      cover: covers[0],
+      ...list[0],
       sizeClass: 'size-28 sm:size-36 md:size-40',
       zIndex: 'z-30',
-      border: 'border-4',
-      isCenter: true,
     },
     {
-      cover: covers[3],
+      ...list[3],
       sizeClass: 'size-22 sm:size-26 md:size-28',
       zIndex: 'z-20',
-      border: 'border-3',
-      isCenter: false,
     },
     {
-      cover: covers[4],
+      ...list[4],
       sizeClass: 'size-16 sm:size-20 md:size-22',
       zIndex: 'z-10',
-      border: 'border-2',
-      isCenter: false,
     },
   ]
 })
@@ -534,11 +542,15 @@ async function loadSuggestedMix() {
 
 function playSuggestedMix() {
   if (!suggestedMix.value?.tracks?.length) return
-  actions.play(suggestedMix.value.tracks, 0, {
+  const tracks = suggestedMix.value.tracks.map(normalizeTrack)
+  actions.play(tracks, 0, {
     type: 'playlist',
     title: 'Daily Mix',
     subtitle: suggestedMix.value.date,
-    cover: suggestedMix.value.covers?.[0],
+    cover:
+      orbs.value[0]?.fallbackCover ||
+      orbs.value[0]?.photo ||
+      suggestedMix.value.covers?.[0],
   })
 }
 

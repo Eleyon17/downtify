@@ -33,6 +33,7 @@ export default {
     charts: 'Charts',
     similar: 'Similar',
     settings: 'Settings',
+    stats: 'Listening Stats',
     more: 'More',
     playlists: 'Playlists',
     back: 'Back',

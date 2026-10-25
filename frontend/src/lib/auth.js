@@ -42,6 +42,7 @@ export function playbackReport(track, { player, state, position = 0 }) {
       title: track.title || '',
       artist: (track.artists || []).join(', ') || track.artist || '',
       album: track.album || '',
+      ...(track.genre ? { genre: track.genre } : {}),
       duration: Number(track.duration) || 0,
     },
   }

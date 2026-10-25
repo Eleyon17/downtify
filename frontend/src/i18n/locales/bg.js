@@ -33,6 +33,7 @@ export default {
     charts: 'Класации',
     similar: 'Подобни',
     settings: 'Настройки',
+    stats: 'Статистика на слушане',
     more: 'Още',
     playlists: 'Плейлисти',
     back: 'Назад',

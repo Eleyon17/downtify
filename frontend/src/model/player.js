@@ -120,7 +120,9 @@ function ensureAudio() {
 }
 
 function toTrack(item) {
-  return typeof item === 'string' ? normalizeTrack(item) : item
+  if (typeof item === 'string') return normalizeTrack(item)
+  if (item && !item.url && item.file) return normalizeTrack(item)
+  return item
 }
 
 // ── Shuffle order ────────────────────────────────────────────────────

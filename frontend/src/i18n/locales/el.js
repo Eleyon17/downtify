@@ -33,6 +33,7 @@ export default {
     charts: 'Λίστες επιτυχιών',
     similar: 'Παρόμοια',
     settings: 'Ρυθμίσεις',
+    stats: 'Στατιστικά ακρόασης',
     more: 'Περισσότερα',
     playlists: 'Λίστες',
     back: 'Πίσω',

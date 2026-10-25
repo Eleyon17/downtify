@@ -33,6 +33,7 @@ export default {
     charts: 'Müzik listeleri',
     similar: 'Benzerler',
     settings: 'Ayarlar',
+    stats: 'Dinleme İstatistikleri',
     more: 'Daha fazla',
     playlists: 'Çalma listeleri',
     back: 'Geri',

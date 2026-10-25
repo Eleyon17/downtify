@@ -33,6 +33,7 @@ export default {
     charts: 'Toplisták',
     similar: 'Hasonlók',
     settings: 'Beállítások',
+    stats: 'Hallgatási statisztikák',
     more: 'Továbbiak',
     playlists: 'Lejátszási listák',
     back: 'Vissza',
