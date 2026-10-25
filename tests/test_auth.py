@@ -823,3 +823,13 @@ def test_google_oauth_endpoints(client):
     assert 'accounts.google.com/o/oauth2/v2/auth' in loc
     assert 'client_id=test.apps.googleusercontent.com' in loc
     assert 'openid' in loc
+
+    # 7. GET /api/auth/google/login with client-specified redirect_uri
+    custom_uri = 'http://myapp.local:8000/api/auth/google/callback'
+    res_custom = client.get(
+        f'/api/auth/google/login?redirect_uri={custom_uri}', follow_redirects=False
+    )
+    assert res_custom.status_code == 303
+    loc2 = res_custom.headers['location']
+    assert 'redirect_uri=http%3A%2F%2Fmyapp.local%3A8000%2Fapi%2Fauth%2Fgoogle%2Fcallback' in loc2
+    assert 'downtify_oauth_redirect_uri=' in res_custom.headers['set-cookie']

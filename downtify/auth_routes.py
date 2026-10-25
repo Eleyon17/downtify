@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import os
 import secrets
 import urllib.parse
 from ipaddress import ip_address
@@ -103,13 +104,54 @@ def _own_device(request: Request, device_id: str) -> dict[str, Any]:
 def _is_https(request: Request) -> bool:
     if request.url.scheme == 'https':
         return True
-    peer = request.client.host if request.client else ''
     forwarded = request.headers.get('x-forwarded-proto', '')
+    if forwarded.lower() == 'https':
+        return True
+    if '"scheme":"https"' in request.headers.get('cf-visitor', ''):
+        return True
+    peer = request.client.host if request.client else ''
     return bool(
         _TRUSTED
         and forwarded.lower() == 'https'
         and any(_in(peer, net) for net in _TRUSTED)
     )
+
+
+def _get_request_host(request: Request) -> str:
+    host = request.headers.get('x-forwarded-host') or request.headers.get('host') or ''
+    if host:
+        return host.split(',')[0].strip()
+    return request.url.netloc
+
+
+def _get_base_url(request: Request) -> str:
+    env_base = os.environ.get('DOWNTIFY_BASE_URL') or os.environ.get('BASE_URL')
+    if env_base and env_base.strip():
+        return env_base.strip().rstrip('/')
+    store = _store()
+    cfg_base = store.users.get_config('base_url')
+    if cfg_base and cfg_base.strip():
+        return cfg_base.strip().rstrip('/')
+    scheme = 'https' if _is_https(request) else request.url.scheme
+    host = _get_request_host(request)
+    return f'{scheme}://{host}'
+
+
+def _get_google_redirect_uri(request: Request, client_redirect_uri: Optional[str] = None) -> str:
+    store = _store()
+    env_redirect = os.environ.get('DOWNTIFY_GOOGLE_REDIRECT_URI')
+    if env_redirect and env_redirect.strip():
+        return env_redirect.strip()
+    cfg_redirect = store.users.get_config('google_redirect_uri')
+    if cfg_redirect and cfg_redirect.strip():
+        return cfg_redirect.strip()
+    if client_redirect_uri:
+        uri = client_redirect_uri.strip()
+        parsed = urllib.parse.urlparse(uri)
+        if parsed.scheme in ('http', 'https') and parsed.path.rstrip('/').endswith('/api/auth/google/callback'):
+            return uri.rstrip('/')
+    base_url = _get_base_url(request)
+    return f'{base_url}/api/auth/google/callback'
 
 
 def _in(address: str, network: Any) -> bool:
@@ -305,6 +347,7 @@ def auth_status(request: Request) -> dict[str, Any]:
         else store.users.notice(),
         'google_auth_enabled': bool(google_client_id),
         'google_client_id': google_client_id or '',
+        'google_redirect_uri': _get_google_redirect_uri(request),
     }
 
 
@@ -510,7 +553,10 @@ async def google_auth(request: Request, response: Response) -> dict[str, Any]:
 
 
 @router.get('/api/auth/google/login')
-def google_login(request: Request) -> Response:
+def google_login(
+    request: Request,
+    redirect_uri: Optional[str] = Query(None),
+) -> Response:
     """Redirect to Google's OAuth 2.0 authorization page."""
     store = _store()
     if store.auth_disabled:
@@ -525,15 +571,12 @@ def google_login(request: Request) -> Response:
             detail='Google Sign-In is not configured on this server.',
         )
 
-    base_url = str(request.base_url).rstrip('/')
-    if _is_https(request) and base_url.startswith('http://'):
-        base_url = 'https://' + base_url[7:]
-    redirect_uri = f'{base_url}/api/auth/google/callback'
+    actual_redirect_uri = _get_google_redirect_uri(request, redirect_uri)
 
     state = secrets.token_urlsafe(24)
     params = {
         'client_id': client_id,
-        'redirect_uri': redirect_uri,
+        'redirect_uri': actual_redirect_uri,
         'response_type': 'code',
         'scope': 'openid email profile',
         'state': state,
@@ -544,6 +587,15 @@ def google_login(request: Request) -> Response:
     resp.set_cookie(
         'downtify_oauth_state',
         state,
+        max_age=600,
+        httponly=True,
+        samesite='lax',
+        secure=_is_https(request),
+        path='/',
+    )
+    resp.set_cookie(
+        'downtify_oauth_redirect_uri',
+        actual_redirect_uri,
         max_age=600,
         httponly=True,
         samesite='lax',
@@ -572,16 +624,14 @@ async def google_callback(
     client_id = store.users.get_google_client_id()
     client_secret = store.users.get_google_client_secret()
 
-    base_url = str(request.base_url).rstrip('/')
-    if _is_https(request) and base_url.startswith('http://'):
-        base_url = 'https://' + base_url[7:]
-    redirect_uri = f'{base_url}/api/auth/google/callback'
+    saved_redirect_uri = request.cookies.get('downtify_oauth_redirect_uri')
+    actual_redirect_uri = _get_google_redirect_uri(request, saved_redirect_uri)
 
     token_url = 'https://oauth2.googleapis.com/token'
     data = {
         'code': code,
         'client_id': client_id,
-        'redirect_uri': redirect_uri,
+        'redirect_uri': actual_redirect_uri,
         'grant_type': 'authorization_code',
     }
     if client_secret:
@@ -656,6 +706,8 @@ async def google_callback(
         )
 
     redirect = RedirectResponse('/', status_code=303)
+    redirect.delete_cookie('downtify_oauth_state', path='/')
+    redirect.delete_cookie('downtify_oauth_redirect_uri', path='/')
     _set_session(redirect, request, session_token)
     return redirect
 
@@ -665,15 +717,14 @@ def get_google_config(request: Request) -> dict[str, Any]:
     """Retrieve Google OAuth configuration (admins only)."""
     _me_admin(request)
     store = _store()
-    base_url = str(request.base_url).rstrip('/')
-    if _is_https(request) and base_url.startswith('http://'):
-        base_url = 'https://' + base_url[7:]
-    client_id = store.users.get_google_client_id()
-    secret = store.users.get_google_client_secret()
+    base_url = _get_base_url(request)
+    redirect_uri = _get_google_redirect_uri(request)
+    custom_redirect = store.users.get_config('google_redirect_uri') or ''
     return {
-        'client_id': client_id,
-        'has_secret': bool(secret),
-        'redirect_uri': f'{base_url}/api/auth/google/callback',
+        'client_id': store.users.get_google_client_id(),
+        'has_secret': bool(store.users.get_google_client_secret()),
+        'redirect_uri': redirect_uri,
+        'custom_redirect_uri': custom_redirect,
         'javascript_origin': base_url,
     }
 
@@ -686,6 +737,7 @@ async def set_google_config(request: Request) -> dict[str, Any]:
     payload = await _json(request)
     client_id = str(payload.get('client_id') or '').strip()
     client_secret = str(payload.get('client_secret') or '').strip()
+    custom_redirect = str(payload.get('redirect_uri') or '').strip()
 
     await asyncio.to_thread(store.users.set_config, 'google_client_id', client_id or None)
     if 'client_secret' in payload:
@@ -693,6 +745,12 @@ async def set_google_config(request: Request) -> dict[str, Any]:
             store.users.set_config,
             'google_client_secret',
             client_secret or None,
+        )
+    if 'redirect_uri' in payload:
+        await asyncio.to_thread(
+            store.users.set_config,
+            'google_redirect_uri',
+            custom_redirect or None,
         )
     return get_google_config(request)
 

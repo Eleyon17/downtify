@@ -1328,6 +1328,7 @@ export default {
     googleClientId: 'Google Client ID',
     googleClientSecret: 'Google Client Secret',
     googleRedirectUri: 'Εξουσιοδοτημένο URI ανακατεύθυνσης',
+    googleCustomRedirectUri: 'Προσαρμοσμένο URI ανακατεύθυνσης (προαιρετικό)',
   },
   activity: {
     nowTitle: 'Παίζει τώρα',

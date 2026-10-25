@@ -143,13 +143,40 @@
     >
       <div class="flex flex-col gap-4 text-sm text-pretty text-fg-2">
         <p>{{ t('auth.googleNotConfiguredBody') }}</p>
-        <div class="flex flex-col gap-1 rounded-control border border-line-2 bg-surface-2 p-3 text-xs">
-          <span class="text-muted font-medium">Authorized Redirect URI:</span>
+        <div class="flex flex-col gap-2 rounded-control border border-line-2 bg-surface-2 p-3 text-xs">
+          <div class="flex items-center justify-between">
+            <span class="text-muted font-medium">Authorized redirect URI:</span>
+            <button
+              type="button"
+              class="text-accent hover:underline text-[11px] font-semibold"
+              @click="copyText(redirectUri, 'uri')"
+            >
+              {{ copiedField === 'uri' ? 'Copied!' : 'Copy' }}
+            </button>
+          </div>
           <span class="font-mono select-all text-fg break-all">{{ redirectUri }}</span>
+
+          <div class="flex items-center justify-between mt-2 pt-2 border-t border-line">
+            <span class="text-muted font-medium">Authorized JavaScript origin:</span>
+            <button
+              type="button"
+              class="text-accent hover:underline text-[11px] font-semibold"
+              @click="copyText(origin, 'origin')"
+            >
+              {{ copiedField === 'origin' ? 'Copied!' : 'Copy' }}
+            </button>
+          </div>
+          <span class="font-mono select-all text-fg break-all">{{ origin }}</span>
         </div>
-        <p class="text-xs text-muted">
-          To connect Google sign-in, add <code class="font-mono text-fg">DOWNTIFY_GOOGLE_CLIENT_ID</code> to your docker-compose.yml, or sign in as an admin and configure it in Settings &rarr; Users.
-        </p>
+        <div class="text-xs text-muted space-y-1">
+          <p>
+            In Google Cloud Console under <strong>APIs &amp; Services &gt; Credentials &gt; OAuth 2.0 Client ID</strong>:
+          </p>
+          <ul class="list-disc pl-4 space-y-0.5">
+            <li>Add the <strong>Authorized redirect URI</strong> above.</li>
+            <li>Add the <strong>Authorized JavaScript origin</strong> above.</li>
+          </ul>
+        </div>
       </div>
       <template #footer>
         <UiButton variant="primary" @click="googleModalOpen = false">
@@ -213,12 +240,23 @@ const busy = ref(false)
 const error = ref('')
 
 const googleModalOpen = ref(false)
-const redirectUri = computed(() => {
-  if (typeof window !== 'undefined') {
-    return `${window.location.origin}/api/auth/google/callback`
-  }
-  return '/api/auth/google/callback'
+const copiedField = ref('')
+const origin = computed(() => {
+  return typeof window !== 'undefined' ? window.location.origin : ''
 })
+const redirectUri = computed(() => {
+  return auth.status.value?.google_redirect_uri || (origin.value ? `${origin.value}/api/auth/google/callback` : '/api/auth/google/callback')
+})
+
+function copyText(text, field) {
+  if (navigator?.clipboard?.writeText) {
+    navigator.clipboard.writeText(text)
+    copiedField.value = field
+    setTimeout(() => {
+      if (copiedField.value === field) copiedField.value = ''
+    }, 2000)
+  }
+}
 
 const notice = computed(() => auth.status.value?.notice || null)
 const noticeOpen = ref(false)
@@ -236,7 +274,9 @@ onMounted(() => {
   const err = params.get('error')
   if (err) {
     if (err === 'missing_code') error.value = 'Google sign-in was cancelled.'
-    else error.value = `Google sign-in failed (${err})`
+    else if (err.includes('redirect_uri_mismatch')) {
+      error.value = `Google redirect_uri_mismatch: Add ${redirectUri.value} to Authorized Redirect URIs in Google Cloud Console.`
+    } else error.value = `Google sign-in failed (${err})`
   }
 
   // If GIS is available and Google client ID is configured, initialize GIS
@@ -270,8 +310,9 @@ function useNotice() {
 
 function triggerGoogleAuth() {
   if (auth.status.value?.google_auth_enabled) {
-    // Initiate real Google OAuth flow
-    window.location.href = '/api/auth/google/login'
+    // Initiate real Google OAuth flow with explicit redirect_uri
+    const uri = redirectUri.value
+    window.location.href = `/api/auth/google/login?redirect_uri=${encodeURIComponent(uri)}`
     return
   }
   // Not configured yet on server -> show setup guidance modal

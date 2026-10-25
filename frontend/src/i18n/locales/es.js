@@ -1321,6 +1321,7 @@ export default {
     googleClientId: 'ID de cliente de Google',
     googleClientSecret: 'Secreto de cliente de Google',
     googleRedirectUri: 'URI de redirección autorizada',
+    googleCustomRedirectUri: 'URI de redirección personalizada (opcional)',
   },
   activity: {
     nowTitle: 'Sonando ahora',

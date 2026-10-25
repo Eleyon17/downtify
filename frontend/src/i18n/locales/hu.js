@@ -1321,6 +1321,7 @@ export default {
     googleClientId: 'Google Ügyfél-azonosító',
     googleClientSecret: 'Google Ügyféltitok',
     googleRedirectUri: 'Engedélyezett átirányítási URI',
+    googleCustomRedirectUri: 'Egyéni átirányítási URI (opcionális)',
   },
   activity: {
     nowTitle: 'Most szól',

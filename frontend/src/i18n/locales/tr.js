@@ -1315,6 +1315,7 @@ export default {
     googleClientId: 'Google İstemci Kimliği',
     googleClientSecret: 'Google İstemci Gizli Anahtarı',
     googleRedirectUri: 'Yetkili Yönlendirme URI’si',
+    googleCustomRedirectUri: 'Özel Yönlendirme URI’si (isteğe bağlı)',
   },
   activity: {
     nowTitle: 'Şimdi çalıyor',

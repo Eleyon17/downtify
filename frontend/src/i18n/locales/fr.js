@@ -1336,6 +1336,7 @@ export default {
     googleClientId: 'Identifiant client Google',
     googleClientSecret: 'Secret client Google',
     googleRedirectUri: 'URI de redirection autorisée',
+    googleCustomRedirectUri: 'URI de redirection personnalisée (facultatif)',
   },
   activity: {
     nowTitle: 'En cours de lecture',

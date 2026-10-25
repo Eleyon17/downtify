@@ -80,11 +80,21 @@
           :label="t('users.googleClientSecret')"
           :placeholder="hasGoogleSecret ? '••••••••••••••••' : 'Optional client secret'"
         />
+        <UiInput
+          v-model="googleCustomRedirectUri"
+          :label="t('users.googleCustomRedirectUri')"
+          placeholder="https://your-domain.com/api/auth/google/callback"
+        />
         <SettingRow
           :label="t('users.googleRedirectUri')"
-          description="Add this to Authorized redirect URIs in Google Cloud Console."
+          description="Must match exactly in Google Cloud Console > APIs & Services > Credentials > OAuth 2.0 Client ID > Authorized redirect URIs."
         >
-          <span class="font-mono text-xs select-all text-muted break-all">{{ googleRedirectUri }}</span>
+          <div class="flex items-center gap-2">
+            <span class="font-mono text-xs select-all text-fg break-all">{{ googleRedirectUri }}</span>
+            <UiButton size="sm" variant="ghost" @click="copyRedirectUri">
+              {{ copied ? 'Copied!' : 'Copy' }}
+            </UiButton>
+          </div>
         </SettingRow>
         <div class="flex justify-end">
           <UiButton
@@ -342,9 +352,21 @@ async function signOutAll() {
 
 const googleClientId = ref('')
 const googleClientSecret = ref('')
+const googleCustomRedirectUri = ref('')
 const hasGoogleSecret = ref(false)
 const googleRedirectUri = ref('')
 const savingGoogle = ref(false)
+const copied = ref(false)
+
+function copyRedirectUri() {
+  if (navigator?.clipboard?.writeText) {
+    navigator.clipboard.writeText(googleRedirectUri.value)
+    copied.value = true
+    setTimeout(() => {
+      copied.value = false
+    }, 2000)
+  }
+}
 
 async function loadGoogleConfig() {
   try {
@@ -352,6 +374,7 @@ async function loadGoogleConfig() {
     googleClientId.value = res.data.client_id || ''
     hasGoogleSecret.value = Boolean(res.data.has_secret)
     googleRedirectUri.value = res.data.redirect_uri || ''
+    googleCustomRedirectUri.value = res.data.custom_redirect_uri || ''
   } catch {
     // ignore
   }
@@ -360,7 +383,10 @@ async function loadGoogleConfig() {
 async function saveGoogleConfig() {
   savingGoogle.value = true
   try {
-    const payload = { client_id: googleClientId.value.trim() }
+    const payload = {
+      client_id: googleClientId.value.trim(),
+      redirect_uri: googleCustomRedirectUri.value.trim(),
+    }
     if (googleClientSecret.value) {
       payload.client_secret = googleClientSecret.value.trim()
     }

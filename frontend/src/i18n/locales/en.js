@@ -1288,6 +1288,7 @@ export default {
     googleClientId: 'Google Client ID',
     googleClientSecret: 'Google Client Secret',
     googleRedirectUri: 'Authorized Redirect URI',
+    googleCustomRedirectUri: 'Custom redirect URI (optional override)',
   },
   activity: {
     nowTitle: 'Playing now',

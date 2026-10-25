@@ -1310,6 +1310,7 @@ export default {
     googleClientId: 'Google клиентски идентификатор',
     googleClientSecret: 'Google клиентски секрет',
     googleRedirectUri: 'Оторизиран URI за пренасочване',
+    googleCustomRedirectUri: 'Персонализиран URI за пренасочване (по избор)',
   },
   activity: {
     nowTitle: 'Звучи сега',
