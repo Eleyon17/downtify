@@ -27,20 +27,20 @@
 
       <!-- BACK: Artist Bio, Popular Songs & Albums -->
       <div
-        class="absolute inset-0 flex size-full rotate-y-180 flex-col overflow-hidden rounded-[20px] border border-line-2 bg-surface/95 p-3.5 text-fg shadow-2xl backdrop-blur-2xl backface-hidden"
+        class="absolute inset-0 flex size-full rotate-y-180 flex-col overflow-hidden rounded-[20px] border border-white/10 bg-white/[0.08] p-4 text-white shadow-2xl backdrop-blur-3xl backface-hidden"
         @click.stop
       >
         <!-- Header -->
-        <div class="flex shrink-0 items-center justify-between border-b border-line pb-2.5">
+        <div class="flex shrink-0 items-center justify-between border-b border-white/10 pb-2.5">
           <div class="flex min-w-0 items-center gap-2">
-            <AppIcon name="user" :size="18" class="shrink-0 text-accent" />
-            <h3 class="truncate text-sm font-bold text-fg">
+            <AppIcon name="user" :size="18" class="shrink-0 text-white/70" />
+            <h3 class="truncate text-sm font-bold text-white">
               {{ currentArtist }}
             </h3>
           </div>
           <button
             type="button"
-            class="flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted transition-colors hover:bg-surface-3 hover:text-fg"
+            class="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
             :aria-label="t('common.close')"
             @click="toggleFlip"
           >
@@ -53,12 +53,12 @@
           <!-- Biography Section -->
           <section>
             <div class="mb-1.5 flex items-center justify-between">
-              <span class="text-[11px] font-bold tracking-wider text-muted uppercase">
+              <span class="text-[11px] font-bold tracking-wider text-white/50 uppercase">
                 {{ t('artistBio.title') }}
               </span>
               <span
                 v-if="overview?.bio_source === 'youtubemusic'"
-                class="text-[10px] text-faint font-medium"
+                class="text-[10px] text-white/40 font-medium"
               >
                 YouTube Music
               </span>
@@ -67,7 +67,7 @@
             <!-- Loading Spinner -->
             <div
               v-if="loading"
-              class="flex items-center justify-center py-4 text-accent"
+              class="flex items-center justify-center py-4 text-white/70"
             >
               <AppIcon name="refresh" :size="20" class="animate-spin" />
             </div>
@@ -76,17 +76,17 @@
             <div v-else>
               <p
                 v-if="overview?.bio"
-                class="text-xs leading-relaxed text-fg-2 whitespace-pre-line"
+                class="text-xs leading-relaxed text-white/80 whitespace-pre-line"
               >
                 {{ visibleBio }}
               </p>
-              <p v-else class="text-xs text-muted italic">
+              <p v-else class="text-xs text-white/50 italic">
                 {{ t('artistBio.empty') }}
               </p>
               <button
                 v-if="hasMoreBio"
                 type="button"
-                class="mt-1.5 inline-block text-xs font-semibold text-accent hover:underline cursor-pointer"
+                class="mt-1.5 inline-block text-xs font-semibold text-white/90 hover:text-white hover:underline cursor-pointer"
                 @click="bioLimit += BIO_CHUNK"
               >
                 {{ t('artistBio.showMore') }}
@@ -97,7 +97,7 @@
           <!-- Hit Songs Section -->
           <section v-if="overview?.top_songs?.length">
             <div class="mb-1.5 flex items-center justify-between">
-              <span class="text-[11px] font-bold tracking-wider text-muted uppercase">
+              <span class="text-[11px] font-bold tracking-wider text-white/50 uppercase">
                 Hit Songs
               </span>
             </div>
@@ -105,7 +105,7 @@
               <div
                 v-for="song in overview.top_songs"
                 :key="song.video_id || song.name"
-                class="group flex items-center gap-2.5 rounded-[10px] p-1.5 transition-colors hover:bg-surface-2 cursor-pointer border border-transparent hover:border-line"
+                class="group flex items-center gap-2.5 rounded-[10px] p-1.5 transition-colors hover:bg-white/10 cursor-pointer"
                 @click="queueSong(song)"
               >
                 <CoverArt
@@ -119,24 +119,24 @@
                 />
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-1.5">
-                    <span class="truncate text-xs font-semibold text-fg">
+                    <span class="truncate text-xs font-semibold text-white">
                       {{ song.name }}
                     </span>
                     <AppIcon
                       v-if="library.hasSong(songArtist(song), song.name)"
                       name="cloud"
                       :size="12"
-                      class="shrink-0 text-accent"
+                      class="shrink-0 text-white/60"
                       :title="t('search.inLibrary')"
                     />
                   </div>
-                  <p class="truncate text-[11px] text-muted">
+                  <p class="truncate text-[11px] text-white/55">
                     {{ [song.album_name, song.duration ? formatDuration(song.duration) : ''].filter(Boolean).join(' · ') }}
                   </p>
                 </div>
                 <button
                   type="button"
-                  class="flex size-7 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-3 hover:text-fg"
+                  class="flex size-7 shrink-0 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/15 hover:text-white"
                   :title="t('actions.playNext')"
                   @click.stop="queueSong(song)"
                 >
@@ -149,7 +149,7 @@
           <!-- Hit Albums Section -->
           <section v-if="overview?.top_albums?.length">
             <div class="mb-1.5 flex items-center justify-between">
-              <span class="text-[11px] font-bold tracking-wider text-muted uppercase">
+              <span class="text-[11px] font-bold tracking-wider text-white/50 uppercase">
                 Hit Albums
               </span>
             </div>
@@ -157,7 +157,7 @@
               <div
                 v-for="album in overview.top_albums"
                 :key="album.album_id || album.name"
-                class="group flex items-center gap-2.5 rounded-[10px] p-1.5 transition-colors hover:bg-surface-2 cursor-pointer border border-transparent hover:border-line"
+                class="group flex items-center gap-2.5 rounded-[10px] p-1.5 transition-colors hover:bg-white/10 cursor-pointer"
                 @click="queueAlbum(album)"
               >
                 <CoverArt
@@ -171,24 +171,24 @@
                 />
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-1.5">
-                    <span class="truncate text-xs font-semibold text-fg">
+                    <span class="truncate text-xs font-semibold text-white">
                       {{ album.name }}
                     </span>
                     <AppIcon
                       v-if="library.findAlbum(album.artist || currentArtist, album.name)"
                       name="cloud"
                       :size="12"
-                      class="shrink-0 text-accent"
+                      class="shrink-0 text-white/60"
                       :title="t('search.inLibrary')"
                     />
                   </div>
-                  <p class="truncate text-[11px] text-muted">
+                  <p class="truncate text-[11px] text-white/55">
                     {{ [album.release_type, album.year].filter(Boolean).join(' · ') }}
                   </p>
                 </div>
                 <button
                   type="button"
-                  class="flex size-7 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface-3 hover:text-fg"
+                  class="flex size-7 shrink-0 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/15 hover:text-white"
                   :title="t('actions.playNext')"
                   @click.stop="queueAlbum(album)"
                 >
