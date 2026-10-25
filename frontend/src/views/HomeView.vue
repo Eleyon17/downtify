@@ -157,6 +157,7 @@
           <CoverArt
             :src="entry.cover"
             :covers="entry.covers"
+            :fallback="entry.fallback"
             :name="entry.title"
             :icon="
               entry.type === 'artist'
@@ -291,6 +292,7 @@ import { usePlayer } from '/src/model/player'
 import { usePlaylistActions } from '/src/model/playlistActions'
 import { useTrackActions } from '/src/model/trackActions'
 import { itemTrackCount, normalizeTrack } from '/src/lib/library'
+import { coverURL } from '/src/lib/paths'
 import { proxiedArtistPhotoUrl } from '/src/lib/artistPhotoProxy'
 import { useI18n } from '/src/i18n'
 
@@ -324,21 +326,169 @@ const recentPlaylists = computed(() =>
     .slice(0, 6)
 )
 
+function normalizeCover(url) {
+  if (!url) return ''
+  const str = String(url).trim()
+  if (!str) return ''
+  if (
+    str.startsWith('/') ||
+    str.startsWith('http://') ||
+    str.startsWith('https://') ||
+    str.startsWith('data:')
+  ) {
+    return str
+  }
+  return coverURL(str)
+}
+
+function resolveJumpBackInEntry(entry) {
+  if (!entry?.type || !entry?.title) return null
+
+  if (entry.type === 'album') {
+    const artistName = String(entry.subtitle || entry.artist || '')
+    const albumTitle = String(entry.title || '')
+    const live =
+      library.findAlbum(artistName, albumTitle) ||
+      library.findAlbum(albumTitle, artistName) ||
+      library.albums.value.find(
+        (a) =>
+          a.title?.toLowerCase() === albumTitle.toLowerCase() &&
+          (!artistName || a.artist?.toLowerCase() === artistName.toLowerCase())
+      ) ||
+      library.albums.value.find(
+        (a) => a.title?.toLowerCase() === albumTitle.toLowerCase()
+      )
+    const liveTracks = live?.tracks || []
+    const trackWithCover =
+      liveTracks.find((t) => t.hasCover && t.cover) ||
+      liveTracks.find((t) => t.cover)
+    const trackCover =
+      trackWithCover?.cover ||
+      (trackWithCover?.file ? coverURL(trackWithCover.file) : '')
+    const allTrackCovers = liveTracks
+      .map((t) => t.cover || (t.file ? coverURL(t.file) : ''))
+      .filter(Boolean)
+    const rawCover = normalizeCover(entry.cover)
+    const artistPhoto = artistName ? proxiedArtistPhotoUrl(artistName) : ''
+    const liveCover = normalizeCover(live?.cover)
+    const primaryCover =
+      liveCover || trackCover || rawCover || artistPhoto || ''
+    const fallback = [
+      liveCover,
+      trackCover,
+      ...allTrackCovers,
+      rawCover,
+      artistPhoto,
+    ].filter((url, idx, arr) => url && arr.indexOf(url) === idx)
+    return {
+      ...entry,
+      title: live?.title || entry.title,
+      subtitle: live?.artist || entry.subtitle,
+      cover: primaryCover,
+      covers: live?.covers?.length ? live.covers : allTrackCovers.slice(0, 4),
+      fallback,
+      route: live
+        ? { name: 'Album', query: { artist: live.artist, title: live.title } }
+        : entry.route,
+    }
+  }
+
+  if (entry.type === 'artist') {
+    const artistName = String(entry.title || '')
+    const live =
+      library.findArtist(artistName) ||
+      library.artists.value.find(
+        (a) => a.name?.toLowerCase() === artistName.toLowerCase()
+      )
+    const artistPhoto = proxiedArtistPhotoUrl(artistName)
+    const liveTracks = live?.tracks || []
+    const trackWithCover =
+      liveTracks.find((t) => t.hasCover && t.cover) ||
+      liveTracks.find((t) => t.cover)
+    const trackCover =
+      trackWithCover?.cover ||
+      (trackWithCover?.file ? coverURL(trackWithCover.file) : '')
+    const rawCover = normalizeCover(entry.cover)
+    const liveCover = normalizeCover(live?.cover)
+    const primaryCover =
+      artistPhoto || liveCover || rawCover || trackCover || ''
+    const fallback = [
+      artistPhoto,
+      liveCover,
+      trackCover,
+      rawCover,
+    ].filter((url, idx, arr) => url && arr.indexOf(url) === idx)
+    return {
+      ...entry,
+      title: live?.name || entry.title,
+      cover: primaryCover,
+      fallback,
+      route: { name: 'Artist', query: { name: live?.name || entry.title } },
+    }
+  }
+
+  if (entry.type === 'playlist') {
+    const name = String(
+      entry.route?.query?.name || entry.title || entry.playlistName || ''
+    )
+    const live = library.findPlaylist(name)
+    const liveTracks = live?.tracks || []
+    const trackCovers = liveTracks
+      .map((t) => t.cover || (t.file ? coverURL(t.file) : ''))
+      .filter(Boolean)
+    const playlistCovers = (
+      live?.covers?.length ? live.covers : trackCovers
+    ).filter(Boolean)
+    const liveCover = normalizeCover(live?.cover)
+    const rawCover = normalizeCover(entry.cover)
+    const primaryCover =
+      liveCover || playlistCovers[0] || rawCover || ''
+    const fallback = [
+      liveCover,
+      ...playlistCovers,
+      rawCover,
+    ].filter((url, idx, arr) => url && arr.indexOf(url) === idx)
+    return {
+      ...entry,
+      title: live?.title || entry.title,
+      cover: primaryCover,
+      covers: playlistCovers,
+      fallback,
+      route: live
+        ? { name: 'Playlist', query: { name: live.name } }
+        : entry.route,
+    }
+  }
+
+  const artistName = String(entry.subtitle || entry.artist || '')
+  const trackTitle = String(entry.title || '')
+  const liveTrack = library.findTrack(artistName, trackTitle)
+  const liveTrackCover =
+    liveTrack?.cover || (liveTrack?.file ? coverURL(liveTrack.file) : '')
+  const rawCover = normalizeCover(entry.cover)
+  const artistPhoto = artistName ? proxiedArtistPhotoUrl(artistName) : ''
+  const primaryCover = liveTrackCover || rawCover || artistPhoto || ''
+  const fallback = [liveTrackCover, rawCover, artistPhoto].filter(
+    (url, idx, arr) => url && arr.indexOf(url) === idx
+  )
+  return {
+    ...entry,
+    title: liveTrack?.title || entry.title,
+    subtitle: liveTrack?.artist || entry.subtitle,
+    cover: primaryCover,
+    fallback,
+    route: liveTrack?.album
+      ? {
+          name: 'Album',
+          query: { artist: liveTrack.artist, title: liveTrack.album },
+        }
+      : entry.route,
+  }
+}
+
 const jumpBackIn = computed(() =>
   history.recent.value
-    .map((entry) => {
-      if (entry.type !== 'playlist') return entry
-      const name = String(entry.route?.query?.name || entry.title || '')
-      const live = library.findPlaylist(name)
-      if (!live) return null
-      return {
-        ...entry,
-        title: live.title,
-        cover: live.cover || live.covers[0] || entry.cover || '',
-        covers: live.covers,
-        route: { name: 'Playlist', query: { name: live.name } },
-      }
-    })
+    .map(resolveJumpBackInEntry)
     .filter(Boolean)
     .slice(0, 6)
 )

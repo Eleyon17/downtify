@@ -92,6 +92,7 @@ export default {
       playlist: 'Playlist',
       artist: 'Artista',
       library: 'Biblioteca',
+      track: 'Canción',
     },
     step1Title: 'Encuentra música',
     step1Body:

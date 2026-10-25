@@ -95,6 +95,7 @@ export default {
       playlist: 'Λίστα',
       artist: 'Καλλιτέχνης',
       library: 'Βιβλιοθήκη',
+      track: 'Τραγούδι',
     },
     step1Title: 'Βρες μουσική',
     step1Body:

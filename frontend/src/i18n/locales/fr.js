@@ -95,6 +95,7 @@ export default {
       playlist: 'Playlist',
       artist: 'Artiste',
       library: 'Bibliothèque',
+      track: 'Morceau',
     },
     step1Title: 'Trouvez de la musique',
     step1Body:

@@ -175,6 +175,7 @@ async def playlists(request: Request) -> list[dict[str, Any]]:
             'hidden': bool(p.get('hidden')),
             'count': p['count'],
             'cover': p['cover'],
+            'files': p.get('files') or [],
             'track_ids': [ids[f] for f in p['files'] if f in ids],
         }
         for p in found

@@ -96,6 +96,7 @@ export default {
       playlist: 'Çalma listesi',
       artist: 'Sanatçı',
       library: 'Kitaplık',
+      track: 'Şarkı',
     },
     step1Title: 'Müzik bul',
     step1Body:

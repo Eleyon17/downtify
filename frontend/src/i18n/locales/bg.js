@@ -92,6 +92,7 @@ export default {
       playlist: 'Плейлист',
       artist: 'Изпълнител',
       library: 'Библиотека',
+      track: 'Песен',
     },
     step1Title: 'Намери музика',
     step1Body:

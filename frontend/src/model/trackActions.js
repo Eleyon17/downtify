@@ -8,7 +8,7 @@ import { useUi } from '/src/model/ui'
 import { useAuth } from '/src/model/auth'
 import { useReplaceAudio } from '/src/model/replaceAudio'
 import { canReplace } from '/src/lib/replaceAudio'
-import { saveName } from '/src/lib/paths'
+import { coverURL, saveName } from '/src/lib/paths'
 import { useI18n } from '/src/i18n'
 import { useShares } from '/src/model/shares'
 
@@ -34,7 +34,33 @@ export function useTrackActions() {
     } else {
       player.setPlaylist(tracks, { startIndex: index, context })
     }
-    if (context && context.type !== 'library') history.remember(context)
+    if (context && context.type !== 'library') {
+      history.remember(context)
+    } else if (tracks[index]) {
+      const track = tracks[index]
+      if (track.album) {
+        history.remember({
+          type: 'album',
+          title: track.album,
+          subtitle: track.albumArtist || track.artist,
+          cover: track.cover || (track.file ? coverURL(track.file) : ''),
+          route: {
+            name: 'Album',
+            query: {
+              artist: track.albumArtist || track.artist,
+              title: track.album,
+            },
+          },
+        })
+      } else if (track.artist) {
+        history.remember({
+          type: 'artist',
+          title: track.artist,
+          cover: track.cover || (track.file ? coverURL(track.file) : ''),
+          route: { name: 'Artist', query: { name: track.artist } },
+        })
+      }
+    }
   }
 
   function playNext(tracks) {

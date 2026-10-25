@@ -37,4 +37,22 @@ describe('history', () => {
     const stored = JSON.parse(localStorage.getItem(KEY))
     expect(stored[0].title).toBe('Late night')
   })
+
+  it('remembers album contexts with covers', () => {
+    const history = useHistory()
+    history.remember({
+      type: 'album',
+      title: '1989',
+      subtitle: 'Taylor Swift',
+      cover: '/cover?file=1989.mp3',
+      route: { name: 'Album', query: { artist: 'Taylor Swift', title: '1989' } },
+    })
+    expect(history.recent.value).toHaveLength(1)
+    expect(history.recent.value[0]).toMatchObject({
+      type: 'album',
+      title: '1989',
+      subtitle: 'Taylor Swift',
+      cover: '/cover?file=1989.mp3',
+    })
+  })
 })

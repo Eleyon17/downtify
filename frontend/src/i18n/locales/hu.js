@@ -92,6 +92,7 @@ export default {
       playlist: 'Lejátszási lista',
       artist: 'Előadó',
       library: 'Könyvtár',
+      track: 'Dal',
     },
     step1Title: 'Keress zenét',
     step1Body:
