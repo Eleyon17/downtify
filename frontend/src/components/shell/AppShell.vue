@@ -4,6 +4,7 @@
     <UiToasts />
   </div>
   <SignIn v-else-if="auth.mustSignIn.value" />
+  <div v-else-if="!auth.loaded.value" class="min-h-dvh bg-bg" />
   <div v-else class="flex min-h-dvh bg-bg text-fg">
     <SideNav class="hidden md:flex" />
     <div class="flex min-w-0 flex-1 flex-col">
@@ -88,9 +89,15 @@ function viewKey(viewRoute) {
   return viewRoute.meta.viewKey || viewRoute.path
 }
 
-if (!route.path.startsWith('/share/')) {
-  useLibrary().load()
-}
+watch(
+  () => [auth.loaded.value, auth.mustSignIn.value],
+  ([loaded, mustSignIn]) => {
+    if (loaded && !mustSignIn && !route.path.startsWith('/share/')) {
+      useLibrary().load()
+    }
+  },
+  { immediate: true }
+)
 // The account's own preferences (theme, language...) and telling the
 // server what plays here, once someone is signed in.
 watch(

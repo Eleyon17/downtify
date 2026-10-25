@@ -6,8 +6,9 @@ import { v4 as uuidv4 } from 'uuid'
 
 import { coverURL, fileURL, saveName } from '/src/lib/paths'
 
+const apiPort = config.PORT !== '' ? `:${config.PORT}` : ''
 const API = axios.create({
-  baseURL: `${config.PROTOCOL}//${config.BACKEND}:${config.PORT}${config.BASEURL}`,
+  baseURL: `${config.PROTOCOL}//${config.BACKEND}${apiPort}${config.BASEURL}`,
 })
 
 const sessionID = uuidv4()

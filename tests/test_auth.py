@@ -833,3 +833,21 @@ def test_google_oauth_endpoints(client):
     loc2 = res_custom.headers['location']
     assert 'redirect_uri=http%3A%2F%2Fmyapp.local%3A8000%2Fapi%2Fauth%2Fgoogle%2Fcallback' in loc2
     assert 'downtify_oauth_redirect_uri=' in res_custom.headers['set-cookie']
+
+
+def test_session_cookie_parsed_with_google_gstate_cookie(client):
+    """Browsers that load Google Identity Services have g_state='{"i_l":0}'
+    set. _cookie must parse downtify_session regardless of other cookies."""
+    _sign_in(client)
+    session_token = client.cookies.get(SESSION_COOKIE)
+    assert session_token
+
+    # Clear test client cookies and pass raw Cookie header with g_state first
+    client.cookies.clear()
+    headers = {
+        'cookie': f'g_state={{"i_l":0}}; {SESSION_COOKIE}={session_token}; _ga=GA1.1.123'
+    }
+    status = client.get('/api/auth/status', headers=headers).json()
+    assert status['signed_in'] is True
+    assert status['via'] == 'session'
+    assert status['user']['username'] == 'admin'

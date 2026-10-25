@@ -1022,13 +1022,35 @@ def _cookie(scope: MutableMapping[str, Any], name: str) -> str:
     raw = _header(scope, 'cookie')
     if not raw:
         return ''
+    try:
+        from starlette.requests import cookie_parser
+        val = cookie_parser(raw).get(name)
+        if val is not None:
+            return val
+    except Exception:
+        pass
     jar = SimpleCookie()
     try:
         jar.load(raw)
+        morsel = jar.get(name)
+        if morsel:
+            return morsel.value
     except Exception:
-        return ''
-    morsel = jar.get(name)
-    return morsel.value if morsel else ''
+        pass
+    for chunk in raw.split(';'):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        if '=' in chunk:
+            k, v = chunk.split('=', 1)
+        else:
+            k, v = '', chunk
+        if k.strip() == name:
+            v = v.strip()
+            if len(v) >= 2 and v[0] == '"' and v[-1] == '"':
+                v = v[1:-1]
+            return v
+    return ''
 
 
 def _same_origin(scope: MutableMapping[str, Any], trusted: list[Any]) -> bool:
@@ -1045,9 +1067,17 @@ def _same_origin(scope: MutableMapping[str, Any], trusted: list[Any]) -> bool:
         if trusted and _in_networks(peer, trusted)
         else ''
     )
-    host = forwarded or _header(scope, 'host')
+    host = _header(scope, 'host')
     match = re.match(r'^[a-z][a-z0-9+.-]*://([^/]+)', origin, re.I)
-    return bool(match and host and match.group(1).lower() == host.lower())
+    if not match:
+        return False
+    origin_host = match.group(1).lower()
+    allowed_hosts = {
+        h.lower().split(',')[0].strip()
+        for h in (host, forwarded, _header(scope, 'x-forwarded-host'))
+        if h
+    }
+    return origin_host in allowed_hosts
 
 
 def identify(
