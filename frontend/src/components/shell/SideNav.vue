@@ -124,7 +124,7 @@
         v-if="auth.user.value && !auth.authDisabled.value"
         type="button"
         class="flex h-10 items-center gap-3 rounded-control px-3 text-left text-sm font-medium text-muted transition-colors hover:bg-surface-2/60 hover:text-fg"
-        :title="t('nav.signOutAs', { name: auth.user.value.username })"
+        :title="t('nav.signOutAs', { name: auth.user.value.display_name || auth.user.value.username })"
         @click="auth.signOut"
       >
         <AppIcon name="log-out" :size="18" />
@@ -132,7 +132,7 @@
         <span
           class="truncate text-[12px] text-faint"
           :class="collapsed ? 'hidden' : 'hidden xl:inline'"
-          >{{ auth.user.value.username }}</span
+          >{{ auth.user.value.display_name || auth.user.value.username }}</span
         >
       </button>
       <button

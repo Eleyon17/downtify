@@ -22,13 +22,18 @@
             class="flex size-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sm font-bold text-muted uppercase"
             aria-hidden="true"
           >
-            {{ user.username.slice(0, 1) }}
+            {{ (user.display_name || user.username).slice(0, 1) }}
           </span>
           <span class="flex min-w-0 flex-1 flex-col">
             <span class="flex items-center gap-2">
               <span class="truncate text-sm font-semibold">{{
-                user.username
+                user.display_name || user.username
               }}</span>
+              <span
+                v-if="user.display_name"
+                class="truncate text-xs text-muted"
+                >@{{ user.username }}</span
+              >
               <UiBadge
                 v-if="user.role === 'admin'"
                 tone="accent"

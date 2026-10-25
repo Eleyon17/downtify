@@ -129,7 +129,7 @@
               </span>
               {{ t('nav.signOut') }}
               <span class="ml-auto truncate text-[13px] text-faint">{{
-                auth.user.value.username
+                auth.user.value.display_name || auth.user.value.username
               }}</span>
             </button>
           </div>

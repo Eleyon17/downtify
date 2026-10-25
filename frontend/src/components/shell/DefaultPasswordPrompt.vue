@@ -6,7 +6,9 @@
   >
     <p class="text-sm text-pretty text-fg-2">
       {{
-        t('account.defaultPasswordBody', { name: auth.user.value?.username })
+        t('account.defaultPasswordBody', {
+          name: auth.user.value?.display_name || auth.user.value?.username,
+        })
       }}
     </p>
     <template #footer>

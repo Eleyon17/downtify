@@ -3,6 +3,7 @@ downtify/account_routes.py, downtify/activity.py)."""
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 
@@ -55,7 +56,7 @@ def test_upgrade_existing_v5_database_schema(tmp_path):
     does not fail with SQLite OperationalError."""
     db_file = tmp_path / 'legacy.db'
     conn = sqlite3.connect(db_file)
-    conn.execute('''
+    conn.execute("""
         CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -67,7 +68,7 @@ def test_upgrade_existing_v5_database_schema(tmp_path):
             last_login_at TEXT,
             last_login_ip TEXT NOT NULL DEFAULT ''
         )
-    ''')
+    """)
     conn.execute(
         'INSERT INTO users (username, password_hash, created_at) VALUES ("admin", ?, "2026-01-01")',
         (hash_password('downtify'),),
@@ -78,9 +79,9 @@ def test_upgrade_existing_v5_database_schema(tmp_path):
     store = UserStore(db_file)
     user = store.get(1)
     assert user['username'] == 'admin'
-    assert user['email'] == ''
-    assert user['google_id'] == ''
-    assert user['display_name'] == ''
+    assert not user['email']
+    assert not user['google_id']
+    assert not user['display_name']
 
     # Should allow setting email and unique index enforcement
     store.update(1, email='admin@example.com')
@@ -238,6 +239,8 @@ def test_google_oauth_and_merging(tmp_path):
     assert g_user['email'] == 'sam@example.com'
     assert g_user['display_name'] == 'Sam Smith'
     assert g_user['default_password'] is False
+    assert not g_user['username'].startswith('sam')
+    assert re.search(r'\d+', g_user['username']) is not None
 
     # Same Google ID signs in again
     re_login = users.authenticate_google(
@@ -273,16 +276,18 @@ def test_google_oauth_and_merging(tmp_path):
     assert users.authenticate(bob_pw['username'], PASSWORD) is not None
 
 
-def test_user_update_email_and_merge(tmp_path):
+def test_user_update_email_duplicate_fails(tmp_path):
     users = _users(tmp_path)
     u1 = users.create('userone', PASSWORD)
     u2 = users.create('usertwo', PASSWORD)
     users.update(u2['id'], email='shared@example.com')
 
-    # u1 adds the same email -> u2 gets merged into u1!
-    users.update(u1['id'], email='shared@example.com')
-    assert users.get(u2['id']) is None
-    assert users.get(u1['id'])['email'] == 'shared@example.com'
+    # u1 adds the same email -> rejected with UserError; accounts are not merged
+    with pytest.raises(UserError, match='email already exists'):
+        users.update(u1['id'], email='shared@example.com')
+    assert users.get(u2['id']) is not None
+    assert users.get(u2['id'])['email'] == 'shared@example.com'
+    assert not users.get(u1['id'])['email']
 
 
 def test_reset_brings_the_admin_back(tmp_path):
@@ -540,6 +545,9 @@ def test_signup_and_google_endpoints(client):
     assert gres.status_code == 200
     assert gres.json()['signed_in'] is True
     assert gres.json()['user']['email'] == 'googleuser@example.com'
+    assert gres.json()['user']['display_name'] == 'Google User'
+    assert not gres.json()['user']['username'].startswith('googleuser')
+    assert re.search(r'\d+', gres.json()['user']['username']) is not None
     assert client.get('/api/me').status_code == 200
 
 

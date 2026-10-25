@@ -5,10 +5,17 @@
         class="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent/15 text-base font-bold text-accent uppercase"
         aria-hidden="true"
       >
-        {{ (user?.username || '?').slice(0, 1) }}
+        {{ (user?.display_name || user?.username || '?').slice(0, 1) }}
       </span>
       <span class="flex min-w-0 flex-1 flex-col">
-        <span class="truncate text-sm font-semibold">{{ user?.username }}</span>
+        <span class="truncate text-sm font-semibold">{{
+          user?.display_name || user?.username
+        }}</span>
+        <span
+          v-if="user?.display_name"
+          class="truncate text-xs text-muted"
+          >@{{ user?.username }}</span
+        >
         <span class="text-[12px] text-muted">
           {{
             user?.role === 'admin'
@@ -60,7 +67,7 @@
 
     <SettingRow
       label="Profile Information"
-      description="Update your display name and email address. If you add an existing email, accounts will be merged."
+      description="Update your display name and email address."
       stacked
     >
       <form

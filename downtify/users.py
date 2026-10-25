@@ -61,6 +61,52 @@ DEFAULT_PASSWORD = 'downtify'
 _USERNAME_RE = re.compile(r'^[A-Za-z0-9._-]{3,32}$')
 _EMAIL_RE = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
 
+#: Words used to randomly generate usernames on Google OAuth sign-in.
+_RANDOM_WORDS: tuple[str, ...] = (
+    'acoustic',
+    'ambient',
+    'audio',
+    'bass',
+    'beat',
+    'chord',
+    'classic',
+    'cosmic',
+    'disco',
+    'drum',
+    'echo',
+    'fader',
+    'funk',
+    'groove',
+    'harmony',
+    'indie',
+    'jazz',
+    'listener',
+    'lofi',
+    'melody',
+    'music',
+    'note',
+    'player',
+    'pulse',
+    'radio',
+    'record',
+    'retro',
+    'rhythm',
+    'riff',
+    'rocker',
+    'sonic',
+    'sound',
+    'stereo',
+    'synth',
+    'tempo',
+    'track',
+    'tune',
+    'tuner',
+    'vibes',
+    'vinyl',
+    'vocal',
+    'wave',
+)
+
 #: The preferences a user keeps for themselves (Settings > General), with
 #: their type. Anything else sent is ignored.
 PREFERENCES: dict[str, type] = {
@@ -199,7 +245,9 @@ def public_user(row: Any) -> dict[str, Any]:
         'last_login_at': row['last_login_at'],
         'last_login_ip': row['last_login_ip'] or '',
         'email': (row['email'] or '') if 'email' in cols else '',
-        'display_name': (row['display_name'] or '') if 'display_name' in cols else '',
+        'display_name': (row['display_name'] or '')
+        if 'display_name' in cols
+        else '',
         'google_id': (row['google_id'] or '') if 'google_id' in cols else '',
     }
 
@@ -256,9 +304,7 @@ class UserStore:  # noqa: PLR0904
                     "ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''"
                 )
             if 'google_id' not in cols:
-                conn.execute(
-                    'ALTER TABLE users ADD COLUMN google_id TEXT'
-                )
+                conn.execute('ALTER TABLE users ADD COLUMN google_id TEXT')
             conn.execute("""
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email
                 ON users(email)
@@ -305,14 +351,18 @@ class UserStore:  # noqa: PLR0904
             self._set_config(conn, key, value)
 
     def get_google_client_id(self) -> str:
-        env_val = os.environ.get('DOWNTIFY_GOOGLE_CLIENT_ID') or os.environ.get('GOOGLE_CLIENT_ID')
+        env_val = os.environ.get(
+            'DOWNTIFY_GOOGLE_CLIENT_ID'
+        ) or os.environ.get('GOOGLE_CLIENT_ID')
         if env_val and env_val.strip():
             return env_val.strip()
         val = self.get_config('google_client_id')
         return val.strip() if val else ''
 
     def get_google_client_secret(self) -> str:
-        env_val = os.environ.get('DOWNTIFY_GOOGLE_CLIENT_SECRET') or os.environ.get('GOOGLE_CLIENT_SECRET')
+        env_val = os.environ.get(
+            'DOWNTIFY_GOOGLE_CLIENT_SECRET'
+        ) or os.environ.get('GOOGLE_CLIENT_SECRET')
         if env_val and env_val.strip():
             return env_val.strip()
         val = self.get_config('google_client_secret')
@@ -454,7 +504,8 @@ class UserStore:  # noqa: PLR0904
     def by_username(self, username: str) -> Optional[dict[str, Any]]:
         with self._connect() as conn:
             row = conn.execute(
-                'SELECT * FROM users WHERE username = ? COLLATE NOCASE', (username,)
+                'SELECT * FROM users WHERE username = ? COLLATE NOCASE',
+                (username,),
             ).fetchone()
         return public_user(row) if row else None
 
@@ -506,6 +557,21 @@ class UserStore:  # noqa: PLR0904
         return int(row['n'])
 
     # Changing
+
+    @classmethod
+    def _random_username(cls, conn: sqlite3.Connection) -> str:
+        """Generate a random username consisting of a word with numbers."""
+        for _ in range(100):
+            word = secrets.choice(_RANDOM_WORDS)
+            num = secrets.randbelow(9000) + 1000
+            candidate = f'{word}{num}'
+            row = conn.execute(
+                'SELECT id FROM users WHERE username = ? COLLATE NOCASE',
+                (candidate,),
+            ).fetchone()
+            if not row:
+                return candidate
+        return f'user{secrets.randbelow(900000) + 100000}'
 
     @staticmethod
     def _unique_username(
@@ -564,24 +630,37 @@ class UserStore:  # noqa: PLR0904
                         if (
                             not existing['password_hash']
                             or existing['default_password']
-                            or (existing['google_id'] and not existing['password_hash'])
+                            or (
+                                existing['google_id']
+                                and not existing['password_hash']
+                            )
                             or existing['default_password'] == 1
                         ):
                             conn.execute(
                                 'UPDATE users SET password_hash = ?, default_password = 0, '
                                 'display_name = CASE WHEN display_name = "" THEN ? ELSE display_name END '
                                 'WHERE id = ?',
-                                (hash_password(secret), disp_name, existing['id']),
+                                (
+                                    hash_password(secret),
+                                    disp_name,
+                                    existing['id'],
+                                ),
                             )
                             user_id = existing['id']
                             existing_merged = True
                         else:
-                            raise UserError('An account with this email already exists')
+                            raise UserError(
+                                'An account with this email already exists'
+                            )
 
                 if not existing_merged:
                     uname = str(username or '').strip()
                     if not uname:
-                        base = clean_em.split('@')[0] if clean_em else (disp_name or 'user')
+                        base = (
+                            clean_em.split('@')[0]
+                            if clean_em
+                            else (disp_name or 'user')
+                        )
                         uname = self._unique_username(conn, base)
                     else:
                         uname = clean_username(uname)
@@ -607,7 +686,9 @@ class UserStore:  # noqa: PLR0904
                         )
                     except sqlite3.IntegrityError as exc:
                         if 'email' in str(exc).lower():
-                            raise UserError('An account with this email already exists') from exc
+                            raise UserError(
+                                'An account with this email already exists'
+                            ) from exc
                         raise UserError('That username is taken') from exc
                     user_id = conn.execute(
                         'SELECT id FROM users WHERE username = ?', (uname,)
@@ -662,9 +743,8 @@ class UserStore:  # noqa: PLR0904
                         )
                         user_id = row['id']
                     else:
-                        # 3. Create new user
-                        base = clean_em.split('@')[0] if clean_em else (disp_name or 'user')
-                        uname = self._unique_username(conn, base)
+                        # 3. Create new user with randomly generated word+numbers username
+                        uname = self._random_username(conn)
                         conn.execute(
                             'INSERT INTO users (username, password_hash, role, created_at, '
                             'email, display_name, google_id, default_password) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
@@ -711,7 +791,8 @@ class UserStore:  # noqa: PLR0904
 
                 for table in ('auth_devices', 'auth_sessions'):
                     cols = {
-                        r[1] for r in conn.execute(f'PRAGMA table_info({table})')
+                        r[1]
+                        for r in conn.execute(f'PRAGMA table_info({table})')
                     }
                     if 'user_id' in cols:
                         conn.execute(
@@ -771,10 +852,10 @@ class UserStore:  # noqa: PLR0904
                             'SELECT id FROM users WHERE email = ? COLLATE NOCASE AND id != ?',
                             (clean_em, user_id),
                         ).fetchone()
-                    if other:
-                        self.merge_users(
-                            target_id=user_id, source_id=other['id']
-                        )
+                        if other:
+                            raise UserError(
+                                'An account with this email already exists'
+                            )
                 updates['email'] = clean_em
             if role is not None:
                 if role not in ROLES:
