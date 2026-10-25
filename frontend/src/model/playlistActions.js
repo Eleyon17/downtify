@@ -260,20 +260,27 @@ export function usePlaylistActions() {
 
   function addMenuItems(files) {
     const list = Array.isArray(files) ? files : [files]
-    const items = [
-      { heading: t('playlists.addTo') },
-      ...editables().map((playlist) => ({
-        label: playlist.title,
-        icon: 'playlist',
-        action: () => addFiles(playlist, list),
-      })),
+    const playlists = editables()
+    const children = [
       {
         label: t('playlists.new'),
         icon: 'plus',
         action: () => openCreate(list),
       },
+      ...(playlists.length ? [{ divider: true }] : []),
+      ...playlists.map((playlist) => ({
+        label: playlist.title,
+        icon: 'playlist',
+        action: () => addFiles(playlist, list),
+      })),
     ]
-    return items
+    return [
+      {
+        label: t('actions.addToPlaylist'),
+        icon: 'playlist',
+        children,
+      },
+    ]
   }
 
   async function downloadMissing(playlist) {

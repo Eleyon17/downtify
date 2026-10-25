@@ -237,6 +237,7 @@ def test_google_oauth_and_merging(tmp_path):
     assert g_user['google_id'] == 'gid_123'
     assert g_user['email'] == 'sam@example.com'
     assert g_user['display_name'] == 'Sam Smith'
+    assert g_user['default_password'] is False
 
     # Same Google ID signs in again
     re_login = users.authenticate_google(

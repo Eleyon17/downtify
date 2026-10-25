@@ -78,7 +78,7 @@
       <div class="flex items-center justify-center gap-1 md:flex-1 md:gap-3">
         <UiIconButton
           v-if="canSimilar"
-          icon="wand"
+          icon="compass"
           :label="t('similar.findSimilar')"
           @click="goSimilar"
         />

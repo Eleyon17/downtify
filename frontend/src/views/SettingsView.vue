@@ -864,6 +864,36 @@
                 {{ t('settings.upToDate') }}
               </UiBadge>
             </div>
+            <!-- Library Statistics -->
+            <SettingGroup :title="t('home.yourLibrary')">
+              <div class="grid grid-cols-2 gap-4 sm:grid-cols-4 p-4">
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-xs text-muted">{{ t('library.tracks') }}</span>
+                  <span class="text-display tabular text-2xl font-bold text-fg">
+                    {{ library.trackCount.value.toLocaleString() }}
+                  </span>
+                </div>
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-xs text-muted">{{ t('library.albums') }}</span>
+                  <span class="text-display tabular text-2xl font-bold text-fg">
+                    {{ library.albumCount.value.toLocaleString() }}
+                  </span>
+                </div>
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-xs text-muted">{{ t('library.artists') }}</span>
+                  <span class="text-display tabular text-2xl font-bold text-fg">
+                    {{ library.artistCount.value.toLocaleString() }}
+                  </span>
+                </div>
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-xs text-muted">{{ t('home.size') }}</span>
+                  <span class="text-display tabular text-2xl font-bold text-fg">
+                    {{ formatBytes(library.totalSize.value) }}
+                  </span>
+                </div>
+              </div>
+            </SettingGroup>
+
             <SettingGroup>
               <SettingRow
                 :label="t('settings.source')"
@@ -975,6 +1005,8 @@ import { useAccount } from '/src/model/account'
 import { useAuth } from '/src/model/auth'
 import { settingsSectionsFor } from '/src/lib/auth'
 import { usePlayerPrefs } from '/src/model/playerPrefs'
+import { useLibrary } from '/src/model/library'
+import { formatBytes } from '/src/lib/format'
 import { intervalOptions } from '/src/components/monitor/intervals.js'
 import { CATEGORIES as UPGRADE_CATEGORIES, ARTWORK_SIZES } from '/src/lib/upgrade.js'
 import { useTheme } from '/src/model/theme'
@@ -991,6 +1023,7 @@ const theme = useTheme()
 const { showLyrics, translateLyrics } = usePlayerPrefs()
 const ui = useUi()
 const player = usePlayer()
+const library = useLibrary()
 const update = useUpdateCheck().status
 
 const hasTrack = computed(() => !!player.currentTrack.value)

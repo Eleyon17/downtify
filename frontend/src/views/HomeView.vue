@@ -2,215 +2,135 @@
   <div
     class="mx-auto flex max-w-[1680px] flex-col gap-10 px-4 pt-6 sm:px-6 md:pt-8 lg:px-10"
   >
-    <!-- Hero: paste or search -->
-    <div
-      class="grid gap-4 animate-rise lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]"
+    <!-- Active downloads (only when items are downloading) -->
+    <section
+      v-if="pending"
+      class="flex flex-col gap-3 rounded-panel border border-line-2 bg-surface p-4 sm:p-5 animate-rise"
     >
-      <section
-        class="relative flex flex-col gap-5 overflow-hidden rounded-panel border border-line-2 bg-surface p-6 sm:p-8"
-      >
-        <div
-          class="pointer-events-none absolute -top-24 -right-24 size-72 rounded-full bg-accent/10 blur-3xl"
-          aria-hidden="true"
-        />
-        <div class="relative flex flex-col gap-1.5">
-          <h1 class="text-display text-3xl font-bold sm:text-[32px]">
-            {{ greeting }}
-          </h1>
-          <p class="text-[15px] text-muted">{{ t('home.lead') }}</p>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <AppIcon name="download" :size="18" class="text-accent animate-pulse" />
+          <h2 class="text-sm font-semibold">{{ t('home.downloading') }}</h2>
         </div>
-        <form
-          class="relative flex flex-col gap-2 sm:flex-row"
-          @submit.prevent="submit"
+        <RouterLink
+          :to="{ name: 'Queue' }"
+          class="text-[13px] font-semibold text-accent hover:text-accent-hi"
         >
-          <label
-            class="flex h-14 min-w-0 flex-none items-center gap-3 rounded-[14px] sm:flex-1 border bg-bg px-4 transition-colors focus-within:border-accent"
-            :class="kind.type === 'link' ? 'border-accent/60' : 'border-line-3'"
-          >
-            <AppIcon
-              :name="kind.type === 'link' ? 'link' : 'search'"
-              :size="20"
-              :class="kind.type === 'link' ? 'text-accent' : 'text-faint'"
-            />
-            <span class="sr-only">{{ t('home.inputLabel') }}</span>
-            <input
-              v-model="text"
-              type="text"
-              enterkeyhint="go"
-              autocomplete="off"
-              :placeholder="t('home.inputPlaceholder')"
-              class="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-faint"
-            />
-          </label>
-          <UiButton
-            type="submit"
-            variant="primary"
-            size="lg"
-            class="!h-14 sm:!px-6"
-            :icon="kind.type === 'link' ? 'download' : 'search'"
-            :disabled="kind.type === 'empty'"
-          >
-            {{
-              kind.type === 'link' ? t('home.getIt') : t('search.searchButton')
-            }}
-          </UiButton>
-        </form>
-        <p v-if="unsupported" class="relative -mt-2 text-[13px] text-danger">
-          {{ unsupported }}
-        </p>
-        <div
-          class="relative flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-faint"
+          {{ t('home.openQueue') }}
+        </RouterLink>
+      </div>
+
+      <ul class="flex flex-col gap-2.5">
+        <li
+          v-for="item in activeItems"
+          :key="item.key"
+          class="flex items-center gap-3"
         >
-          <span class="flex items-center gap-1.5">
-            <AppIcon name="spotify" :size="14" class="text-spotify" />{{
-              t('home.hintSpotify')
-            }}
-          </span>
-          <span class="flex items-center gap-1.5">
-            <AppIcon name="youtube" :size="14" class="text-src-ytm" />{{
-              t('home.hintYoutube')
-            }}
-          </span>
-          <span class="flex items-center gap-1.5">
-            <AppIcon name="deezer" :size="14" class="text-deezer" />{{
-              t('home.hintDeezer')
-            }}
-          </span>
-          <button
-            type="button"
-            class="flex items-center gap-1.5 hover:text-fg"
-            @click="csvPicker?.click()"
-          >
-            <AppIcon name="file-music" :size="14" />{{ t('home.hintCsv') }}
-          </button>
-          <input
-            ref="csvPicker"
-            type="file"
-            accept=".csv,text/csv"
-            class="hidden"
-            @change="importCsv"
+          <CoverArt
+            :src="item.song.cover_url"
+            :name="item.song.album_name || item.song.name"
+            rounded="rounded-[8px]"
+            :letter-size="13"
+            class="size-10 shrink-0"
           />
-        </div>
-      </section>
-
-      <section
-        class="flex flex-col gap-4 rounded-panel border border-line-2 bg-surface p-6"
-      >
-        <div class="flex items-center justify-between">
-          <h2 class="text-[15px] font-semibold">
-            {{ pending ? t('home.downloading') : t('home.yourLibrary') }}
-          </h2>
-          <RouterLink
-            :to="{ name: pending ? 'Queue' : 'Library' }"
-            class="text-[13px] font-semibold text-accent hover:text-accent-hi"
-            >{{
-              pending ? t('home.openQueue') : t('home.openLibrary')
-            }}</RouterLink
-          >
-        </div>
-
-        <template v-if="pending">
-          <ul class="flex flex-col gap-3">
-            <li
-              v-for="item in activeItems"
-              :key="item.key"
-              class="flex items-center gap-3"
-            >
-              <CoverArt
-                :src="item.song.cover_url"
-                :name="item.song.album_name || item.song.name"
-                rounded="rounded-[8px]"
-                :letter-size="13"
-                class="size-11"
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center justify-between gap-2">
+              <span class="truncate text-[13px] font-semibold">{{
+                item.song.name
+              }}</span>
+              <SourceBadge
+                v-if="item.provider"
+                :source="item.provider"
+                compact
               />
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center justify-between gap-2">
-                  <span class="truncate text-[13px] font-semibold">{{
-                    item.song.name
-                  }}</span>
-                  <SourceBadge
-                    v-if="item.provider"
-                    :source="item.provider"
-                    compact
-                  />
-                </div>
-                <UiProgress
-                  class="mt-2"
-                  :value="item.progress"
-                  :indeterminate="!item.progress"
-                />
-              </div>
-            </li>
-          </ul>
-          <p
-            v-if="waiting"
-            class="border-t border-line pt-3 text-[13px] text-muted"
-          >
-            {{ t('home.waiting', { count: waiting }) }}
-          </p>
-        </template>
-
-        <dl v-else class="grid grid-cols-2 gap-4">
-          <div
-            v-for="stat in stats"
-            :key="stat.label"
-            class="flex flex-col gap-0.5"
-          >
-            <dt class="text-xs text-muted">{{ stat.label }}</dt>
-            <dd class="text-display tabular text-2xl font-semibold">
-              {{ stat.value }}
-            </dd>
+            </div>
+            <UiProgress
+              class="mt-1.5"
+              :value="item.progress"
+              :indeterminate="!item.progress"
+            />
           </div>
-        </dl>
-      </section>
-    </div>
+        </li>
+      </ul>
+      <p
+        v-if="waiting"
+        class="border-t border-line pt-2 text-xs text-muted"
+      >
+        {{ t('home.waiting', { count: waiting }) }}
+      </p>
+    </section>
 
-    <!-- Daily Suggested Mix -->
+    <!-- Daily Mix Hero -->
     <section
       v-if="suggestedMix && suggestedMix.tracks?.length"
-      class="relative overflow-hidden rounded-panel border border-line-2 bg-gradient-to-r from-surface via-surface to-surface-2 p-6 animate-rise"
+      class="relative overflow-hidden rounded-panel border border-line-2 bg-gradient-to-br from-surface via-surface-2/60 to-surface p-6 sm:p-8 md:p-10 animate-rise shadow-lg"
     >
+      <!-- Background ambient glow -->
       <div
-        class="pointer-events-none absolute -bottom-16 -right-16 size-64 rounded-full bg-accent/15 blur-3xl"
+        class="pointer-events-none absolute -top-24 -right-24 size-80 rounded-full bg-accent/15 blur-3xl"
         aria-hidden="true"
       />
-      <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex items-center gap-5 min-w-0">
-          <div class="relative size-24 shrink-0 overflow-hidden rounded-[14px] shadow-lg border border-line-3">
-            <CoverArt
-              :covers="suggestedMix.covers?.length ? suggestedMix.covers : undefined"
-              :src="suggestedMix.covers?.[0]"
-              name="Suggested Mix"
-              rounded="rounded-none"
-              class="size-24"
-            />
-          </div>
-          <div class="flex min-w-0 flex-col gap-1">
-            <div class="flex items-center gap-2">
-              <span class="rounded-full bg-accent/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-accent">
-                Daily Mix
-              </span>
-              <span class="text-xs text-muted">{{ suggestedMix.date }}</span>
-            </div>
-            <h2 class="text-display text-2xl font-bold tracking-tight text-fg truncate">
-              {{ suggestedMix.title }}
-            </h2>
-            <p class="text-sm text-muted line-clamp-1">
-              {{ suggestedMix.subtitle || `${suggestedMix.count} songs recommended for today` }}
+      <div
+        class="pointer-events-none absolute -bottom-24 -left-24 size-72 rounded-full bg-accent-2/10 blur-3xl"
+        aria-hidden="true"
+      />
+
+      <div class="relative flex flex-col-reverse items-center justify-between gap-8 md:flex-row md:gap-12">
+        <!-- Left: Text and Play Button -->
+        <div class="flex flex-col items-center gap-4 text-center md:items-start md:text-left min-w-0">
+          <div class="flex flex-col gap-1.5">
+            <h1 class="text-display text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl text-fg">
+              Daily Mix
+            </h1>
+            <p class="text-sm sm:text-base text-muted max-w-md">
+              {{ suggestedMix.subtitle || `${suggestedMix.count || suggestedMix.tracks.length} songs picked from your library for today` }}
             </p>
+          </div>
+
+          <div class="pt-2">
+            <UiButton
+              variant="primary"
+              size="lg"
+              icon="play"
+              class="!h-13 !px-7 text-base font-semibold shadow-lg shadow-accent/25 hover:shadow-accent/40 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+              @click="playSuggestedMix"
+            >
+              Play
+            </UiButton>
           </div>
         </div>
 
-        <div class="flex items-center gap-3 shrink-0">
-          <UiButton
-            variant="primary"
-            size="lg"
-            icon="play"
-            class="min-w-[130px] shadow-md"
-            @click="playSuggestedMix"
-          >
-            Play Mix
-          </UiButton>
+        <!-- Right: Stylized Album Art Orbs -->
+        <div class="relative flex items-center justify-center shrink-0 py-4 px-2">
+          <!-- Central ambient glow behind orbs -->
+          <div
+            class="pointer-events-none absolute size-48 sm:size-64 rounded-full bg-gradient-to-tr from-accent/20 to-accent-2/20 blur-2xl"
+            aria-hidden="true"
+          />
+
+          <!-- Orb cluster -->
+          <div class="relative flex items-center -space-x-5 sm:-space-x-7 md:-space-x-8">
+            <div
+              v-for="(orb, idx) in orbs"
+              :key="idx"
+              class="group relative shrink-0 overflow-hidden rounded-full bg-surface-3 shadow-xl transition-all duration-300 hover:scale-110 hover:z-40 hover:ring-2 hover:ring-accent cursor-pointer"
+              :class="[orb.sizeClass, orb.zIndex, orb.border, 'border-surface']"
+              @click="playSuggestedMix"
+            >
+              <img
+                :src="orb.cover"
+                class="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+                alt=""
+                loading="lazy"
+              />
+              <div
+                v-if="orb.isCenter"
+                class="absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[2px]"
+              >
+                <AppIcon name="play" :size="32" class="text-white drop-shadow-md" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -352,7 +272,6 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import API from '/src/model/api'
 import AppIcon from '/src/components/ui/AppIcon.vue'
 import CoverArt from '/src/components/ui/CoverArt.vue'
@@ -361,70 +280,22 @@ import SourceBadge from '/src/components/ui/SourceBadge.vue'
 import UiButton from '/src/components/ui/UiButton.vue'
 import UiProgress from '/src/components/ui/UiProgress.vue'
 import MediaTile from '/src/components/library/MediaTile.vue'
-import { useDownloadManager, useProgressTracker } from '/src/model/download'
+import { useProgressTracker } from '/src/model/download'
 import { useHistory } from '/src/model/history'
 import { useLibrary } from '/src/model/library'
 import { usePlayer } from '/src/model/player'
 import { usePlaylistActions } from '/src/model/playlistActions'
 import { useTrackActions } from '/src/model/trackActions'
-import { useUi } from '/src/model/ui'
-import { classifyInput } from '/src/lib/input'
-import { formatBytes } from '/src/lib/format'
 import { itemTrackCount } from '/src/lib/library'
 import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
-const router = useRouter()
 const library = useLibrary()
 const history = useHistory()
 const player = usePlayer()
 const tracker = useProgressTracker()
-const dm = useDownloadManager()
 const actions = useTrackActions()
 const playlistActions = usePlaylistActions()
-const ui = useUi()
-
-const text = ref('')
-const unsupported = ref('')
-const csvPicker = ref(null)
-const kind = computed(() => classifyInput(text.value))
-
-const greeting = computed(() => {
-  const hour = new Date().getHours()
-  if (hour < 5) return t('home.greetingNight')
-  if (hour < 12) return t('home.greetingMorning')
-  if (hour < 18) return t('home.greetingAfternoon')
-  return t('home.greetingEvening')
-})
-
-function submit() {
-  unsupported.value = ''
-  const result = kind.value
-  if (result.type === 'link') {
-    router.push({ name: 'Link', query: { url: result.url } })
-  } else if (result.type === 'search') {
-    router.push({ name: 'Search', params: { query: result.query } })
-  } else if (result.type === 'unsupported') {
-    unsupported.value = t('search.unsupportedLink')
-  }
-}
-
-async function importCsv(event) {
-  const file = event.target.files?.[0]
-  event.target.value = ''
-  if (!file) return
-  try {
-    const result = await dm.fromCsvFile(file, file.name.replace(/\.csv$/i, ''))
-    ui.toast(t('toast.csvQueued', { count: result?.count ?? 0 }), {
-      kind: 'success',
-    })
-    router.push({ name: 'Queue', params: { tab: 'queued' } })
-  } catch (err) {
-    ui.toast(err?.response?.data?.detail || t('queue.importFailed'), {
-      kind: 'error',
-    })
-  }
-}
 
 const queueItems = computed(() => {
   tracker.queueVersion.value
@@ -437,22 +308,6 @@ const waiting = computed(
   () => queueItems.value.filter((item) => item.state === 'queued').length
 )
 const pending = computed(() => activeItems.value.length + waiting.value)
-
-const stats = computed(() => [
-  {
-    label: t('library.tracks'),
-    value: library.trackCount.value.toLocaleString(),
-  },
-  {
-    label: t('library.albums'),
-    value: library.albumCount.value.toLocaleString(),
-  },
-  {
-    label: t('library.artists'),
-    value: library.artistCount.value.toLocaleString(),
-  },
-  { label: t('home.size'), value: formatBytes(library.totalSize.value) },
-])
 
 const recentAlbums = computed(() =>
   [...library.albums.value].sort((a, b) => b.added - a.added).slice(0, 12)
@@ -516,6 +371,158 @@ const onboarding = computed(() => [
 
 const suggestedMix = ref(null)
 
+const mixCovers = computed(() => {
+  if (!suggestedMix.value) return []
+  const list = []
+  if (suggestedMix.value.covers?.length) {
+    list.push(...suggestedMix.value.covers)
+  }
+  if (suggestedMix.value.tracks?.length) {
+    for (const tr of suggestedMix.value.tracks) {
+      const c =
+        tr.cover ||
+        tr.cover_url ||
+        (tr.has_cover && tr.file
+          ? `/cover?file=${encodeURIComponent(tr.file)}`
+          : '')
+      if (c && !list.includes(c)) {
+        list.push(c)
+      }
+      if (list.length >= 6) break
+    }
+  }
+  return list
+})
+
+const orbs = computed(() => {
+  const covers = mixCovers.value
+  if (!covers.length) return []
+  if (covers.length === 1) {
+    return [
+      {
+        cover: covers[0],
+        sizeClass: 'size-28 sm:size-36 md:size-40',
+        zIndex: 'z-30',
+        border: 'border-4',
+        isCenter: true,
+      },
+    ]
+  }
+  if (covers.length === 2) {
+    return [
+      {
+        cover: covers[0],
+        sizeClass: 'size-26 sm:size-32 md:size-36',
+        zIndex: 'z-30',
+        border: 'border-4',
+        isCenter: true,
+      },
+      {
+        cover: covers[1],
+        sizeClass: 'size-20 sm:size-24 md:size-28',
+        zIndex: 'z-20',
+        border: 'border-3',
+        isCenter: false,
+      },
+    ]
+  }
+  if (covers.length === 3) {
+    return [
+      {
+        cover: covers[1],
+        sizeClass: 'size-20 sm:size-24 md:size-28',
+        zIndex: 'z-20',
+        border: 'border-3',
+        isCenter: false,
+      },
+      {
+        cover: covers[0],
+        sizeClass: 'size-28 sm:size-36 md:size-40',
+        zIndex: 'z-30',
+        border: 'border-4',
+        isCenter: true,
+      },
+      {
+        cover: covers[2],
+        sizeClass: 'size-20 sm:size-24 md:size-28',
+        zIndex: 'z-20',
+        border: 'border-3',
+        isCenter: false,
+      },
+    ]
+  }
+  if (covers.length === 4) {
+    return [
+      {
+        cover: covers[2],
+        sizeClass: 'size-16 sm:size-20 md:size-22',
+        zIndex: 'z-10',
+        border: 'border-2',
+        isCenter: false,
+      },
+      {
+        cover: covers[0],
+        sizeClass: 'size-28 sm:size-36 md:size-40',
+        zIndex: 'z-30',
+        border: 'border-4',
+        isCenter: true,
+      },
+      {
+        cover: covers[1],
+        sizeClass: 'size-22 sm:size-26 md:size-28',
+        zIndex: 'z-20',
+        border: 'border-3',
+        isCenter: false,
+      },
+      {
+        cover: covers[3],
+        sizeClass: 'size-16 sm:size-20 md:size-22',
+        zIndex: 'z-10',
+        border: 'border-2',
+        isCenter: false,
+      },
+    ]
+  }
+  // 5 or more
+  return [
+    {
+      cover: covers[2],
+      sizeClass: 'size-16 sm:size-20 md:size-22',
+      zIndex: 'z-10',
+      border: 'border-2',
+      isCenter: false,
+    },
+    {
+      cover: covers[1],
+      sizeClass: 'size-22 sm:size-26 md:size-28',
+      zIndex: 'z-20',
+      border: 'border-3',
+      isCenter: false,
+    },
+    {
+      cover: covers[0],
+      sizeClass: 'size-28 sm:size-36 md:size-40',
+      zIndex: 'z-30',
+      border: 'border-4',
+      isCenter: true,
+    },
+    {
+      cover: covers[3],
+      sizeClass: 'size-22 sm:size-26 md:size-28',
+      zIndex: 'z-20',
+      border: 'border-3',
+      isCenter: false,
+    },
+    {
+      cover: covers[4],
+      sizeClass: 'size-16 sm:size-20 md:size-22',
+      zIndex: 'z-10',
+      border: 'border-2',
+      isCenter: false,
+    },
+  ]
+})
+
 async function loadSuggestedMix() {
   try {
     const res = await API.getSuggestedMix()
@@ -529,7 +536,7 @@ function playSuggestedMix() {
   if (!suggestedMix.value?.tracks?.length) return
   actions.play(suggestedMix.value.tracks, 0, {
     type: 'playlist',
-    title: suggestedMix.value.title || 'Daily Suggested Mix',
+    title: 'Daily Mix',
     subtitle: suggestedMix.value.date,
     cover: suggestedMix.value.covers?.[0],
   })

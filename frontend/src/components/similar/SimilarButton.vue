@@ -11,7 +11,7 @@
     :aria-label="t('similar.findSimilar')"
     @click.stop="go"
   >
-    <AppIcon name="wand" :size="16" />
+    <AppIcon name="compass" :size="16" />
   </button>
 </template>
 

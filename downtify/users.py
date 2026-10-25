@@ -667,7 +667,7 @@ class UserStore:  # noqa: PLR0904
                         uname = self._unique_username(conn, base)
                         conn.execute(
                             'INSERT INTO users (username, password_hash, role, created_at, '
-                            'email, display_name, google_id, default_password) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
+                            'email, display_name, google_id, default_password) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
                             (
                                 uname,
                                 '',
@@ -682,6 +682,11 @@ class UserStore:  # noqa: PLR0904
                             'SELECT id FROM users WHERE username = ?', (uname,)
                         ).fetchone()
                         user_id = new_row['id']
+                if user_id:
+                    conn.execute(
+                        'UPDATE users SET default_password = 0 WHERE id = ? AND default_password = 1 AND google_id != ""',
+                        (user_id,),
+                    )
             return self.get(user_id) or {}
 
     def merge_users(self, target_id: int, source_id: int) -> dict[str, Any]:

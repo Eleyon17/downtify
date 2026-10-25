@@ -184,7 +184,7 @@ const moreLinks = [
   { name: 'Monitor', icon: 'radar', label: 'nav.monitor' },
   { name: 'Podcasts', icon: 'mic', label: 'nav.podcasts' },
   { name: 'Charts', icon: 'trending', label: 'nav.charts' },
-  { name: 'Similar', icon: 'wand', label: 'nav.similar' },
+  { name: 'Similar', icon: 'compass', label: 'nav.similar' },
   { name: 'Settings', icon: 'settings', label: 'nav.settings' },
 ]
 

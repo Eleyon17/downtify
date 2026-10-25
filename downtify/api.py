@@ -9377,7 +9377,7 @@ def build_daily_suggested_mix(
         if c and c not in seen_covers:
             seen_covers.add(c)
             covers.append(c)
-        if len(covers) >= 4:
+        if len(covers) >= 5:
             break
 
     return {

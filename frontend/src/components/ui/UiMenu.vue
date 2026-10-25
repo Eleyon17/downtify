@@ -10,37 +10,90 @@
         v-if="open"
         ref="menuEl"
         role="menu"
-        class="fixed z-[70] min-w-52 max-w-72 overflow-hidden rounded-[12px] border border-line-3 bg-surface py-1.5 shadow-float"
+        class="fixed z-[70] min-w-56 max-w-80 overflow-hidden rounded-[12px] border border-line-3 bg-surface py-1.5 shadow-float"
         :style="position"
         @keydown="onKeydown"
       >
-        <template v-for="(item, i) in visibleItems" :key="i">
-          <div v-if="item.divider" class="my-1.5 h-px bg-line" />
-          <p v-else-if="item.heading" class="eyebrow px-3.5 pt-2 pb-1">
-            {{ item.heading }}
-          </p>
-          <button
-            v-else
-            type="button"
-            role="menuitem"
-            :disabled="item.disabled"
-            class="flex h-10 w-full items-center gap-3 px-3.5 text-left text-sm transition-colors focus:outline-none disabled:opacity-40"
-            :class="
-              item.danger
-                ? 'text-danger hover:bg-danger/10 focus:bg-danger/10'
-                : 'text-fg-2 hover:bg-surface-2 focus:bg-surface-2'
-            "
-            @click="run(item)"
-          >
-            <AppIcon v-if="item.icon" :name="item.icon" :size="17" />
-            <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
-            <AppIcon
-              v-if="item.checked"
-              name="check"
-              :size="16"
-              class="text-accent"
-            />
-          </button>
+        <!-- Submenu Header (Back button) -->
+        <template v-if="activeSubmenu">
+          <div class="flex items-center gap-2 border-b border-line px-2 pb-1.5 pt-0.5">
+            <button
+              type="button"
+              class="flex size-7 shrink-0 items-center justify-center rounded-[6px] text-muted hover:bg-surface-2 hover:text-fg transition-colors"
+              @click.stop="activeSubmenu = null"
+            >
+              <AppIcon name="arrow-left" :size="15" />
+            </button>
+            <span class="truncate text-xs font-semibold text-fg">{{ activeSubmenu.label }}</span>
+          </div>
+          <div class="max-h-72 overflow-y-auto overscroll-contain py-1 [scrollbar-width:thin]">
+            <template v-for="(item, i) in visibleSubmenuItems" :key="i">
+              <div v-if="item.divider" class="my-1.5 h-px bg-line" />
+              <p v-else-if="item.heading" class="eyebrow px-3.5 pt-2 pb-1">
+                {{ item.heading }}
+              </p>
+              <button
+                v-else
+                type="button"
+                role="menuitem"
+                :disabled="item.disabled"
+                class="flex h-10 w-full items-center gap-3 px-3.5 text-left text-sm transition-colors focus:outline-none disabled:opacity-40"
+                :class="
+                  item.danger
+                    ? 'text-danger hover:bg-danger/10 focus:bg-danger/10'
+                    : 'text-fg-2 hover:bg-surface-2 focus:bg-surface-2'
+                "
+                @click="run(item)"
+              >
+                <AppIcon v-if="item.icon" :name="item.icon" :size="17" />
+                <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
+                <AppIcon
+                  v-if="item.checked"
+                  name="check"
+                  :size="16"
+                  class="text-accent ml-auto"
+                />
+              </button>
+            </template>
+          </div>
+        </template>
+
+        <!-- Root Menu -->
+        <template v-else>
+          <template v-for="(item, i) in visibleItems" :key="i">
+            <div v-if="item.divider" class="my-1.5 h-px bg-line" />
+            <p v-else-if="item.heading" class="eyebrow px-3.5 pt-2 pb-1">
+              {{ item.heading }}
+            </p>
+            <button
+              v-else
+              type="button"
+              role="menuitem"
+              :disabled="item.disabled"
+              class="flex h-10 w-full items-center gap-3 px-3.5 text-left text-sm transition-colors focus:outline-none disabled:opacity-40"
+              :class="
+                item.danger
+                  ? 'text-danger hover:bg-danger/10 focus:bg-danger/10'
+                  : 'text-fg-2 hover:bg-surface-2 focus:bg-surface-2'
+              "
+              @click="item.children ? openSubmenu(item) : run(item)"
+            >
+              <AppIcon v-if="item.icon" :name="item.icon" :size="17" />
+              <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
+              <AppIcon
+                v-if="item.children"
+                name="chevron-right"
+                :size="16"
+                class="text-muted ml-auto"
+              />
+              <AppIcon
+                v-else-if="item.checked"
+                name="check"
+                :size="16"
+                class="text-accent ml-auto"
+              />
+            </button>
+          </template>
         </template>
       </div>
     </Transition>
@@ -61,12 +114,24 @@ const props = defineProps({
 })
 
 const open = ref(false)
+const activeSubmenu = ref(null)
 const triggerEl = ref(null)
 const menuEl = ref(null)
 const anchor = ref({ x: 0, y: 0, width: 0, height: 0, point: false })
 const position = ref({})
 
 const visibleItems = computed(() => props.items.filter((item) => !item.hidden))
+const visibleSubmenuItems = computed(() =>
+  (activeSubmenu.value?.children || []).filter((item) => !item.hidden)
+)
+
+function openSubmenu(item) {
+  activeSubmenu.value = item
+  nextTick(() => {
+    place()
+    menuEl.value?.querySelector('button:not(:disabled)')?.focus()
+  })
+}
 
 function place() {
   const menu = menuEl.value
@@ -83,6 +148,7 @@ function place() {
 }
 
 async function show(nextAnchor) {
+  activeSubmenu.value = null
   anchor.value = nextAnchor
   position.value = { left: '-9999px', top: '0px' }
   open.value = true
@@ -96,6 +162,7 @@ async function show(nextAnchor) {
 
 function hide() {
   open.value = false
+  activeSubmenu.value = null
   document.removeEventListener('pointerdown', onOutside, true)
   window.removeEventListener('resize', hide)
   window.removeEventListener('scroll', hide, true)
@@ -137,8 +204,16 @@ function onKeydown(event) {
   const buttons = [...menuEl.value.querySelectorAll('button:not(:disabled)')]
   const index = buttons.indexOf(document.activeElement)
   if (event.key === 'Escape') {
+    if (activeSubmenu.value) {
+      activeSubmenu.value = null
+      nextTick(place)
+      return
+    }
     hide()
     triggerEl.value?.querySelector('button')?.focus()
+  } else if (event.key === 'ArrowLeft' && activeSubmenu.value) {
+    activeSubmenu.value = null
+    nextTick(place)
   } else if (event.key === 'ArrowDown') {
     event.preventDefault()
     buttons[(index + 1) % buttons.length]?.focus()

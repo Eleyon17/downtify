@@ -48,6 +48,7 @@ const dismissed = ref(seen())
 const open = computed(
   () =>
     Boolean(auth.user.value?.default_password) &&
+    !auth.user.value?.google_id &&
     !auth.authDisabled.value &&
     !dismissed.value
 )

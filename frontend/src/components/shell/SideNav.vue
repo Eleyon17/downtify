@@ -226,7 +226,7 @@ const allItems = [
   },
   {
     name: 'Similar',
-    icon: 'wand',
+    icon: 'compass',
     label: 'nav.similar',
     pref: 'sidebarSimilar',
   },
