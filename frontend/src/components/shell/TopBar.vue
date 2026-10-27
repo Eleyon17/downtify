@@ -1,6 +1,8 @@
 <template>
   <header
     class="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/70"
+    @mouseenter="isHovered = true"
+    @mouseleave="isHovered = false"
   >
     <div
       class="mx-auto flex h-16 max-w-[1680px] items-center gap-2 px-4 sm:gap-3 sm:px-6 md:h-[72px] lg:px-10"
@@ -28,7 +30,10 @@
           @click="router.forward()"
         />
       </div>
-      <GlobalSearch class="min-w-0 flex-1 md:max-w-xl" />
+      <GlobalSearch
+        class="min-w-0 flex-1 md:max-w-xl"
+        :is-hovered="isHovered"
+      />
       <div class="ml-auto hidden items-center gap-1 sm:flex">
         <UiIconButton
           icon="keyboard"
@@ -51,7 +56,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppLogo from '../ui/AppLogo.vue'
 import UiIconButton from '../ui/UiIconButton.vue'
@@ -63,6 +68,7 @@ const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const theme = useTheme()
+const isHovered = ref(false)
 
 // vue-router records where history can go in history.state.
 const canGoBack = computed(() => {

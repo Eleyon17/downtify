@@ -525,7 +525,10 @@ def list_entries_for_stored_paths(
         seen.add(name)
         full = resolve_library_file(name, ctx)
         if full is not None:
-            pairs.append((name, full))
+            canonical = library_stored_path(
+                full, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs
+            ) or name
+            pairs.append((canonical, full))
     cache = ctx.metadata_cache
     if cache is not None:
         by_file = {

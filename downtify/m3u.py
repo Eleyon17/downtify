@@ -193,6 +193,20 @@ def read_m3u_tracks(
             resolved = (m3u_dir / line).resolve()
         except OSError:
             continue
+        if not resolved.is_file():
+            # Check if track exists on disk under a different audio extension (upgraded format)
+            audio_extensions = ('.flac', '.mp3', '.m4a', '.opus', '.ogg', '.wav', '.aac')
+            if resolved.suffix.lower() in audio_extensions:
+                for ext in audio_extensions:
+                    if ext == resolved.suffix.lower():
+                        continue
+                    alt = resolved.with_suffix(ext)
+                    try:
+                        if alt.is_file():
+                            resolved = alt
+                            break
+                    except OSError:
+                        pass
         stored = _stored_library_path(
             resolved, download_dir, slskd_root, extras
         )

@@ -1,6 +1,6 @@
 {
   "name": "downtify-web",
-  "version": "v7",
+  "version": "v8",
   "type": "module",
   "scripts": {
     "dev": "vite",

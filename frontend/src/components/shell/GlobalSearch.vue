@@ -1,8 +1,11 @@
 <template>
   <form
     role="search"
-    class="group relative flex h-11 items-center gap-2.5 rounded-[12px] border bg-surface pr-1.5 pl-3.5 transition-colors focus-within:border-accent"
-    :class="kind.type === 'link' ? 'border-accent/60' : 'border-line-2'"
+    class="group relative flex h-11 items-center gap-2.5 rounded-[12px] border bg-surface pr-1.5 pl-3.5 transition-all duration-200 focus-within:border-accent"
+    :class="[
+      kind.type === 'link' ? 'border-accent/60' : 'border-line-2',
+      isVisible ? 'opacity-100' : 'pointer-events-none opacity-0 invisible',
+    ]"
     @submit.prevent="submit"
   >
     <AppIcon
@@ -22,6 +25,8 @@
       autocomplete="off"
       :placeholder="t('search.placeholder')"
       class="h-full min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-faint [&::-webkit-search-cancel-button]:hidden"
+      @focus="isFocused = true"
+      @blur="isFocused = false"
     />
     <button
       v-if="text"
@@ -56,18 +61,28 @@ import { classifyInput } from '/src/lib/input'
 import { useUi } from '/src/model/ui'
 import { useI18n } from '/src/i18n'
 
+const props = defineProps({
+  isHovered: { type: Boolean, default: false },
+})
+
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const ui = useUi()
 const input = ref(null)
 const text = ref('')
+const isFocused = ref(false)
 const isMac =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
 const kind = computed(() => classifyInput(text.value))
 
+const isVisible = computed(() => {
+  return props.isHovered || isFocused.value || Boolean(text.value)
+})
+
 ui.registerSearchFocus(() => {
+  isFocused.value = true
   input.value?.focus()
   input.value?.select()
 })

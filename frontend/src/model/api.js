@@ -486,6 +486,13 @@ function getPublicShare(shareId) {
   return API.get(`/api/share/${encodeURIComponent(shareId)}`)
 }
 
+function getPublicShareLyrics(shareId, trackIdx = 0, lang = '') {
+  return API.get(
+    `/api/share/${encodeURIComponent(shareId)}/lyrics/${encodeURIComponent(trackIdx)}`,
+    { params: lang ? { lang } : {} }
+  )
+}
+
 function reconcileLibrary() {
   return API.post('/api/library/reconcile')
 }
@@ -934,6 +941,8 @@ export default {
   listShares,
   deleteShare,
   getPublicShare,
+  getPublicShareLyrics,
+  get: (url, cfg) => API.get(url, cfg),
   prepareLibraryArchive,
   libraryArchiveURL,
   reconcileLibrary,

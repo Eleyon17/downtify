@@ -2,7 +2,7 @@
   <Transition name="now-playing">
     <div
       v-if="track && !nowPlaying.isOpen.value"
-      class="relative flex h-16 items-center gap-3 overflow-hidden rounded-[16px] border border-line-3 bg-glass pr-2 pl-2 shadow-float backdrop-blur-xl md:h-[76px] md:gap-5 md:rounded-[18px] md:pr-5 md:pl-3"
+      class="relative flex h-[72px] items-center gap-2 overflow-hidden rounded-[16px] border border-line-3 bg-glass pr-2 pl-2 shadow-float backdrop-blur-xl md:h-[76px] md:gap-5 md:rounded-[18px] md:pr-5 md:pl-3"
     >
       <!-- Progress: a hairline on phones, a scrubber on desktop. -->
       <div class="absolute inset-x-3 bottom-0 h-0.5 bg-line-2 md:hidden">
@@ -75,77 +75,76 @@
         /></span>
       </div>
 
-      <div class="flex items-center justify-center gap-1 md:flex-1 md:gap-3">
-        <UiIconButton
-          v-if="canSimilar"
-          icon="compass"
-          :label="t('similar.findSimilar')"
-          @click="goSimilar"
-        />
-        <UiIconButton
-          icon="shuffle"
-          :label="t('player.shuffle')"
-          :active="player.shuffle.value"
-          toggle
-          class="hidden md:inline-flex"
-          @click="player.toggleShuffle()"
-        />
-        <UiIconButton
-          icon="prev"
-          :label="t('player.previous')"
-          class="hidden md:inline-flex"
-          @click="player.prev()"
-        />
-        <button
-          type="button"
-          class="flex size-11 items-center justify-center rounded-full text-fg md:bg-invert md:text-on-invert md:transition-transform md:hover:scale-105"
-          :aria-label="
-            player.isPlaying.value ? t('player.pause') : t('player.play')
-          "
-          @click="player.toggle()"
-        >
-          <span
-            v-if="player.isBuffering.value && player.isPlaying.value"
-            class="size-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+      <div class="flex flex-col items-center justify-center gap-0.5 md:flex-1 md:gap-1">
+        <!-- Top row: Discover (compass), Shuffle, Loop (repeat), plus download if streaming -->
+        <div class="flex items-center justify-center gap-1 sm:gap-2">
+          <UiIconButton
+            v-if="canSimilar"
+            icon="compass"
+            size="sm"
+            :label="t('similar.findSimilar')"
+            @click="goSimilar"
           />
-          <AppIcon
-            v-else
-            :name="player.isPlaying.value ? 'pause' : 'play'"
-            :size="18"
+          <UiIconButton
+            icon="shuffle"
+            size="sm"
+            :label="t('player.shuffle')"
+            :active="player.shuffle.value"
+            toggle
+            @click="player.toggleShuffle()"
           />
-        </button>
-        <UiIconButton
-          icon="next"
-          :label="t('player.next')"
-          @click="player.next()"
-        />
-        <UiIconButton
-          :icon="player.repeatMode.value === 'one' ? 'repeat-one' : 'repeat'"
-          :label="repeatLabel"
-          :active="player.repeatMode.value !== 'off'"
-          toggle
-          class="hidden md:inline-flex"
-          @click="player.cycleRepeat()"
-        />
-        <UiIconButton
-          v-if="showMiniDownload"
-          :icon="downloadBusy ? 'refresh' : 'download'"
-          :label="t('actions.downloadItem', { name: trackTitle })"
-          :disabled="downloadBusy"
-          :class="downloadBusy ? '[&_svg]:animate-spin' : ''"
-          @click="downloadCurrent"
-        />
-        <!-- Downloaded tracks show a static check in the download
-             button's slot: it does nothing, deleting happens from the
-             library rows. -->
-        <span
-          v-if="showDownloadedCheck"
-          class="inline-flex size-10 shrink-0 items-center justify-center text-accent"
-          :title="t('search.inLibrary')"
-          aria-hidden="true"
-        >
-          <AppIcon name="cloud" :size="18" />
-        </span>
+          <UiIconButton
+            :icon="player.repeatMode.value === 'one' ? 'repeat-one' : 'repeat'"
+            size="sm"
+            :label="repeatLabel"
+            :active="player.repeatMode.value !== 'off'"
+            toggle
+            @click="player.cycleRepeat()"
+          />
+          <UiIconButton
+            v-if="showMiniDownload"
+            :icon="downloadBusy ? 'refresh' : 'download'"
+            size="sm"
+            :label="t('actions.downloadItem', { name: trackTitle })"
+            :disabled="downloadBusy"
+            :class="downloadBusy ? '[&_svg]:animate-spin' : ''"
+            @click="downloadCurrent"
+          />
+        </div>
+
+        <!-- Bottom row: Skip Prev, Play/Pause, Skip Next -->
+        <div class="flex items-center justify-center gap-1 sm:gap-2">
+          <UiIconButton
+            icon="prev"
+            size="sm"
+            :label="t('player.previous')"
+            @click="player.prev()"
+          />
+          <button
+            type="button"
+            class="flex size-8 items-center justify-center rounded-full text-fg md:size-9 md:bg-invert md:text-on-invert md:transition-transform md:hover:scale-105"
+            :aria-label="
+              player.isPlaying.value ? t('player.pause') : t('player.play')
+            "
+            @click="player.toggle()"
+          >
+            <span
+              v-if="player.isBuffering.value && player.isPlaying.value"
+              class="size-3.5 animate-spin rounded-full border-2 border-current border-r-transparent"
+            />
+            <AppIcon
+              v-else
+              :name="player.isPlaying.value ? 'pause' : 'play'"
+              :size="16"
+            />
+          </button>
+          <UiIconButton
+            icon="next"
+            size="sm"
+            :label="t('player.next')"
+            @click="player.next()"
+          />
+        </div>
       </div>
 
       <div class="hidden items-center justify-end gap-1 md:flex md:w-[300px]">

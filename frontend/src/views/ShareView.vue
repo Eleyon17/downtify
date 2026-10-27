@@ -270,7 +270,7 @@
           />
           <div class="hidden items-center gap-2 md:flex flex-1">
             <UiIconButton
-              :icon="player.isMuted.value || player.volume.value === 0 ? 'volume-x' : 'volume-2'"
+              :icon="player.isMuted.value || player.volume.value === 0 ? 'volume-mute' : (player.volume.value < 0.5 ? 'volume-low' : 'volume')"
               :label="t('player.mute')"
               @click="player.toggleMute()"
             />

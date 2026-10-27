@@ -1021,11 +1021,24 @@ def upgrade_track(
                         for m3u_path in iter_m3u_files(ctx.download_dir):
                             try:
                                 text = m3u_path.read_text(encoding='utf-8')
-                                if old_stored in text:
-                                    m3u_path.write_text(
-                                        text.replace(old_stored, new_stored),
-                                        encoding='utf-8',
-                                    )
+                                m3u_dir = m3u_path.parent
+                                old_rel = os.path.relpath(full, start=m3u_dir)
+                                new_rel = os.path.relpath(final_path, start=m3u_dir)
+                                old_rel_posix = old_rel.replace('\\\\', '/')
+                                new_rel_posix = new_rel.replace('\\\\', '/')
+                                old_rel_win = old_rel.replace('/', '\\\\')
+                                new_rel_win = new_rel.replace('/', '\\\\')
+                                modified = False
+                                for o, n in (
+                                    (old_stored, new_stored),
+                                    (old_rel_posix, new_rel_posix),
+                                    (old_rel_win, new_rel_win),
+                                ):
+                                    if o in text:
+                                        text = text.replace(o, n)
+                                        modified = True
+                                if modified:
+                                    m3u_path.write_text(text, encoding='utf-8')
                             except Exception:
                                 pass
                     except Exception:

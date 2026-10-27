@@ -14,10 +14,7 @@ export function loadLyrics(file, lang = '') {
           const parts = file.split(':')
           const shareId = parts[1]
           const trackIdx = parts[2] || 0
-          return API.get(
-            `/api/share/${encodeURIComponent(shareId)}/lyrics/${encodeURIComponent(trackIdx)}`,
-            { params: lang ? { lang } : {} }
-          )
+          return API.getPublicShareLyrics(shareId, trackIdx, lang)
         })()
       : API.getLyrics(file, lang)
 

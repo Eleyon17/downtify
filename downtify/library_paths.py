@@ -289,4 +289,22 @@ def locate_library_file(
                 return path
         except OSError:
             continue
+
+    # Fallback: if exact file extension does not exist, check other audio extensions
+    # with the same stem (e.g. track was upgraded from .mp3 to .flac).
+    audio_extensions = ('.flac', '.mp3', '.m4a', '.opus', '.ogg', '.wav', '.aac')
+    for path in candidates:
+        if path.suffix.lower() in audio_extensions:
+            for ext in audio_extensions:
+                if ext == path.suffix.lower():
+                    continue
+                alt = path.with_suffix(ext)
+                if str(alt) not in seen:
+                    seen.add(str(alt))
+                    try:
+                        if alt.is_file():
+                            return alt
+                    except OSError:
+                        continue
+
     return None

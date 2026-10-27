@@ -196,14 +196,27 @@ export function groupArtists(tracks, albums = groupAlbums(tracks)) {
  * library tracks they reference and, when known, their Spotify
  * download tracking (`GET /api/playlists/batches`).
  */
+function stripExt(path) {
+  return String(path || '').replace(/\.[^./\\]+$/, '')
+}
+
 export function buildPlaylists(playlists, tracksByFile, batches = []) {
   const batchByName = new Map(
     batches.map((batch) => [String(batch.playlist_name || ''), batch])
   )
+  // Index tracks by file stem so upgraded tracks with changed extensions (.mp3 -> .flac) resolve
+  const tracksByStem = new Map()
+  for (const [filePath, track] of tracksByFile.entries()) {
+    const stem = stripExt(filePath)
+    if (!tracksByStem.has(stem)) tracksByStem.set(stem, track)
+  }
+
   const names = new Set(playlists.map((playlist) => playlist.name))
   const fromM3u = playlists.map((playlist) => {
     const files = playlist.files || []
-    const tracks = files.map((file) => tracksByFile.get(file)).filter(Boolean)
+    const tracks = files
+      .map((file) => tracksByFile.get(file) || tracksByStem.get(stripExt(file)))
+      .filter(Boolean)
     // Mosaic from the M3U paths so the sidebar does not wait for
     // GET /tracks rows. `/cover?file=` reads tags on its own.
     const covers = [...new Set(files.map((file) => coverURL(file)))].slice(0, 4)
