@@ -1,21 +1,24 @@
 <template>
+  <!-- Thin trigger zone at top of viewport so hovering top edge reveals the header -->
+  <div
+    v-if="!isAlwaysVisible && !isRevealed"
+    class="fixed top-0 inset-x-0 h-3 z-40 pointer-events-auto"
+    @mouseenter="isHovered = true"
+  />
+
   <header
-    class="sticky top-0 z-30 transition-all duration-300 border-b"
+    class="sticky top-0 z-30 transition-[height,max-height,opacity,background-color,border-color] duration-300 ease-in-out border-b"
     :class="
       isRevealed
-        ? 'border-line bg-bg/85 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/70'
-        : 'border-transparent bg-transparent pointer-events-auto'
+        ? 'h-16 md:h-[72px] max-h-20 border-line bg-bg/85 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/70 opacity-100 pointer-events-auto'
+        : 'h-0 max-h-0 border-transparent bg-transparent opacity-0 overflow-hidden pointer-events-none'
     "
     @mouseenter="isHovered = true"
     @mouseleave="isHovered = false"
   >
     <div
-      class="mx-auto flex h-16 max-w-[1680px] items-center gap-2 px-4 sm:gap-3 sm:px-6 md:h-[72px] lg:px-10 transition-all duration-300"
-      :class="
-        isRevealed
-          ? 'opacity-100 pointer-events-auto translate-y-0'
-          : 'opacity-0 pointer-events-none -translate-y-1'
-      "
+      class="mx-auto flex h-16 max-w-[1680px] items-center gap-2 px-4 sm:gap-3 sm:px-6 md:h-[72px] lg:px-10 transition-transform duration-300"
+      :class="isRevealed ? 'translate-y-0' : '-translate-y-2'"
     >
       <RouterLink
         :to="{ name: 'Home' }"
@@ -83,7 +86,13 @@ const theme = useTheme()
 const isHovered = ref(false)
 const isSearchFocused = ref(false)
 
-const isRevealed = computed(() => isHovered.value || isSearchFocused.value)
+const isAlwaysVisible = computed(
+  () => route.name === 'Search' || String(route.path || '').startsWith('/search')
+)
+
+const isRevealed = computed(
+  () => isAlwaysVisible.value || isHovered.value || isSearchFocused.value
+)
 
 function handleGlobalKeydown(e) {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {

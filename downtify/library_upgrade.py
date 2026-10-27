@@ -1070,7 +1070,7 @@ def upgrade_track(
                     )
 
                     invalidate_library_paths_cache(
-                        drop_entries=True, notify=True
+                        drop_entries=False, notify=False
                     )
                 except Exception:
                     logger.opt(exception=True).debug(

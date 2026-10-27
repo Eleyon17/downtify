@@ -24,14 +24,13 @@
         />
       </div>
 
-      <!-- The heart sits beside the button that opens Now playing, not
-           inside it, so tapping it never opens the overlay. -->
+      <!-- The heart sits beside the track info, so tapping it never opens the overlay. -->
       <div
-        class="flex min-w-0 flex-1 items-center gap-1 md:w-[300px] md:flex-none"
+        class="flex min-w-0 flex-1 items-center gap-2 md:w-[300px] md:flex-none"
       >
         <button
           type="button"
-          class="flex min-w-0 flex-1 items-center gap-3 text-left"
+          class="flex min-w-0 max-w-full items-center gap-3 text-left shrink"
           :aria-label="t('player.openNowPlaying')"
           @click="nowPlaying.open()"
         >
@@ -41,7 +40,7 @@
             rounded="rounded-[10px]"
             :letter-size="18"
             :icon-size="18"
-            class="size-11 md:size-[52px]"
+            class="size-11 shrink-0 md:size-[52px]"
           />
           <span class="flex min-w-0 flex-col">
             <span class="flex items-center gap-1.5">
@@ -66,37 +65,65 @@
             </span>
           </span>
         </button>
-        <!-- Phones have no room for it beside the transport buttons;
-             the rows and the full player carry the heart there. -->
-        <span
+        <LikeButton
           v-if="!track?.isPodcast && !track?.stream"
-          class="hidden sm:contents"
-          ><LikeButton :file="track.file"
-        /></span>
+          :file="track.file"
+          class="shrink-0"
+        />
       </div>
 
-      <div class="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 md:flex-1 md:flex-nowrap md:gap-2">
+      <div class="flex items-center justify-end md:justify-center gap-1.5 sm:gap-2 md:flex-1">
         <UiIconButton
           v-if="canSimilar"
           icon="compass"
           size="sm"
-          class="order-1 md:order-1"
+          class="hidden md:inline-flex"
           :label="t('similar.findSimilar')"
           @click="goSimilar"
         />
         <UiIconButton
           icon="shuffle"
           size="sm"
-          class="order-2 md:order-2"
+          class="hidden md:inline-flex"
           :label="t('player.shuffle')"
           :active="player.shuffle.value"
           toggle
           @click="player.toggleShuffle()"
         />
         <UiIconButton
+          icon="prev"
+          size="sm"
+          :label="t('player.previous')"
+          @click="player.prev()"
+        />
+        <button
+          type="button"
+          class="flex size-9 sm:size-10 items-center justify-center rounded-full bg-invert text-on-invert shadow-sm transition-transform hover:scale-105 active:scale-95 shrink-0"
+          :aria-label="
+            player.isPlaying.value ? t('player.pause') : t('player.play')
+          "
+          @click="player.toggle()"
+        >
+          <span
+            v-if="player.isBuffering.value && player.isPlaying.value"
+            class="size-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+          />
+          <AppIcon
+            v-else
+            :name="player.isPlaying.value ? 'pause' : 'play'"
+            :size="18"
+          />
+        </button>
+        <UiIconButton
+          icon="next"
+          size="sm"
+          :label="t('player.next')"
+          @click="player.next()"
+        />
+        <UiIconButton
           :icon="player.repeatMode.value === 'one' ? 'repeat-one' : 'repeat'"
           size="sm"
-          class="order-3 md:order-6"
+          class="hidden md:inline-flex"
           :label="repeatLabel"
           :active="player.repeatMode.value !== 'off'"
           toggle
@@ -106,47 +133,11 @@
           v-if="showMiniDownload"
           :icon="downloadBusy ? 'refresh' : 'download'"
           size="sm"
-          class="order-4 md:order-7"
+          class="hidden md:inline-flex"
           :label="t('actions.downloadItem', { name: trackTitle })"
           :disabled="downloadBusy"
           :class="downloadBusy ? '[&_svg]:animate-spin' : ''"
           @click="downloadCurrent"
-        />
-
-        <!-- Break to second row on narrow viewports so play controls don't overlap song title -->
-        <div class="basis-full h-0 md:hidden order-5" />
-
-        <UiIconButton
-          icon="prev"
-          size="sm"
-          class="order-6 md:order-3"
-          :label="t('player.previous')"
-          @click="player.prev()"
-        />
-        <button
-          type="button"
-          class="order-7 flex size-8 items-center justify-center rounded-full text-fg md:order-4 md:size-9 md:bg-invert md:text-on-invert md:transition-transform md:hover:scale-105"
-          :aria-label="
-            player.isPlaying.value ? t('player.pause') : t('player.play')
-          "
-          @click="player.toggle()"
-        >
-          <span
-            v-if="player.isBuffering.value && player.isPlaying.value"
-            class="size-3.5 animate-spin rounded-full border-2 border-current border-r-transparent"
-          />
-          <AppIcon
-            v-else
-            :name="player.isPlaying.value ? 'pause' : 'play'"
-            :size="16"
-          />
-        </button>
-        <UiIconButton
-          icon="next"
-          size="sm"
-          class="order-8 md:order-5"
-          :label="t('player.next')"
-          @click="player.next()"
         />
       </div>
 

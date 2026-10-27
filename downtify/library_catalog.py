@@ -558,7 +558,7 @@ def list_entries_for_stored_paths(
         if cached_pairs:
             by_stem = {os.path.splitext(s)[0]: (s, Path(r)) for s, r in cached_pairs}
             by_base = {os.path.splitext(os.path.basename(s))[0]: (s, Path(r)) for s, r in cached_pairs}
-            for name in unresolved:
+            for name in list(unresolved):
                 stem = os.path.splitext(name)[0]
                 base_stem = os.path.splitext(os.path.basename(name))[0]
                 match = by_stem.get(stem) or by_base.get(base_stem)
@@ -567,6 +567,17 @@ def list_entries_for_stored_paths(
                     if full.is_file() and canonical not in seen:
                         seen.add(canonical)
                         pairs.append((canonical, full))
+                        unresolved.remove(name)
+
+        if unresolved:
+            for name in list(unresolved):
+                cand = locate_library_file(name, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs)
+                if cand is not None and cand.is_file():
+                    canonical = library_stored_path(cand, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs) or name
+                    if canonical not in seen:
+                        seen.add(canonical)
+                        pairs.append((canonical, cand))
+                        unresolved.remove(name)
 
     cache = ctx.metadata_cache
     if cache is not None:

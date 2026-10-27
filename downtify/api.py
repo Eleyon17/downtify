@@ -1495,13 +1495,42 @@ def playlist_entry_for_request(
     if not wanted:
         return None
     visible_list = playlists_for_request(request)
+    entry = None
     for playlist in visible_list:
         if str(playlist.get('name') or '') == wanted:
-            return playlist
-    wanted_key = wanted.casefold()
-    for playlist in visible_list:
-        if str(playlist.get('name') or '').strip().casefold() == wanted_key:
-            return playlist
+            entry = playlist
+            break
+    if entry is None:
+        wanted_key = wanted.casefold()
+        for playlist in visible_list:
+            if str(playlist.get('name') or '').strip().casefold() == wanted_key:
+                entry = playlist
+                break
+    if entry is not None:
+        if state.playlist_catalog is not None:
+            try:
+                cat_rows = state.playlist_catalog.list_tracks(str(entry.get('name') or wanted))
+                if cat_rows:
+                    cat_files = [str(r.get('filename') or '').strip() for r in cat_rows if str(r.get('filename') or '').strip()]
+                    existing_files = list(entry.get('files') or [])
+                    existing_set = {f.replace('\\', '/') for f in existing_files}
+                    existing_stems = {os.path.splitext(f.replace('\\', '/'))[0] for f in existing_files}
+                    added = False
+                    for cf in cat_files:
+                        cf_norm = cf.replace('\\', '/')
+                        cf_stem = os.path.splitext(cf_norm)[0]
+                        if cf_norm not in existing_set and cf_stem not in existing_stems:
+                            existing_files.append(cf_norm)
+                            existing_set.add(cf_norm)
+                            existing_stems.add(cf_stem)
+                            added = True
+                    if added:
+                        entry = dict(entry)
+                        entry['files'] = existing_files
+                        entry['count'] = len(existing_files)
+            except Exception:
+                pass
+        return entry
     catalog = state.playlist_catalog
     if catalog is None:
         return None
@@ -4901,6 +4930,10 @@ def _known_spotify_playlist_sources(
             }
     if state.monitor_db is not None and user_id is None:
         for pl in state.monitor_db.list_playlists():
+            if getattr(pl, 'kind', 'playlist') != 'playlist':
+                continue
+            if getattr(pl, 'source', 'spotify') != 'spotify':
+                continue
             sid = str(pl.spotify_id or '').strip()
             if not sid:
                 continue

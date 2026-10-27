@@ -225,6 +225,17 @@ def read_m3u_tracks(
                         if alt.is_file():
                             resolved = alt.resolve()
                             break
+            if not resolved.is_file():
+                base_stem = Path(line_norm).stem
+                for ext in audio_extensions:
+                    local_alt = m3u_dir / f'{base_stem}{ext}'
+                    if local_alt.is_file():
+                        resolved = local_alt.resolve()
+                        break
+                    dl_alt = download_dir / f'{base_stem}{ext}'
+                    if dl_alt.is_file():
+                        resolved = dl_alt.resolve()
+                        break
 
         stored = _stored_library_path(
             resolved, download_dir, slskd_root, extras

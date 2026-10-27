@@ -256,7 +256,10 @@ export function buildPlaylists(playlists, tracksByFile, batches = []) {
           ? Boolean(playlist.can_edit)
           : isOwner && !liked,
       hidden: Boolean(playlist.hidden),
-      fileCount: playlist.count != null ? Number(playlist.count) : files.length,
+      fileCount: Math.max(
+        playlist.count != null ? Number(playlist.count) : files.length,
+        tracks.length
+      ),
       tracks,
       // Downloaded playlists keep their own artwork. Manual ones leave
       // this empty so CoverArt mosaics up to four track covers (the

@@ -568,7 +568,12 @@ function playlistSubtitle(item) {
     }
   }
   const batch = item.batch
-  if (batch?.expected_count) {
+  const count = itemTrackCount(item)
+  if (
+    batch?.expected_count &&
+    batch.expected_count > (count || batch.downloaded_count || 0) &&
+    batch.status !== 'complete'
+  ) {
     parts.push(
       t('playlists.progress', {
         have: batch.downloaded_count,
@@ -576,7 +581,7 @@ function playlistSubtitle(item) {
       })
     )
   } else {
-    parts.push(t('common.tracks', { count: itemTrackCount(item) }))
+    parts.push(t('common.tracks', { count }))
   }
   return parts.join(' · ')
 }

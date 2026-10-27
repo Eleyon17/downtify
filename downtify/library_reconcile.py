@@ -196,12 +196,39 @@ def prune_stale_and_backfill(
                 old_path, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs
             )
             if full is None:
+                # Before removing, check if track_index or library stem knows this track
+                alt_stored = track_index.filename_for(tid) if track_index is not None else None
+                if alt_stored:
+                    alt_full = locate_library_file(
+                        alt_stored, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs
+                    )
+                    if alt_full is not None:
+                        playlist_catalog.update_filename(old_path, alt_stored)
+                        continue
+                old_stem = Path(old_path).stem
+                found_by_stem = None
+                for ext in ('.flac', '.mp3', '.m4a', '.opus', '.ogg', '.wav', '.aac'):
+                    test_alt = ctx.download_dir / f'{old_stem}{ext}'
+                    if test_alt.is_file():
+                        found_by_stem = library_stored_path(test_alt, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs) or f'{old_stem}{ext}'
+                        break
+                if found_by_stem:
+                    playlist_catalog.update_filename(old_path, found_by_stem)
+                    continue
+
                 if playlist_catalog.remove_track(pl_name, tid):
                     pruned += 1
                     affected.add(pl_name)
                 if navidrome_index is not None:
                     navidrome_index.forget_filename(old_path)
                 continue
+
+            canonical = library_stored_path(
+                full, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs
+            ) or old_path
+            if canonical and canonical != old_path:
+                playlist_catalog.update_filename(old_path, canonical)
+
             ck = str(row.get('content_key') or '').strip()
             if not ck:
                 new_ck = file_content_key(full)
@@ -219,11 +246,30 @@ def prune_stale_and_backfill(
                 old_path, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs
             )
             if full is None:
+                old_stem = Path(old_path).stem
+                found_by_stem = None
+                for ext in ('.flac', '.mp3', '.m4a', '.opus', '.ogg', '.wav', '.aac'):
+                    test_alt = ctx.download_dir / f'{old_stem}{ext}'
+                    if test_alt.is_file():
+                        found_by_stem = library_stored_path(test_alt, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs) or f'{old_stem}{ext}'
+                        break
+                if found_by_stem:
+                    track_index.remove_by_filename(old_path)
+                    track_index.register(tid, found_by_stem)
+                    continue
                 if track_index.remove_by_filename(old_path):
                     pruned += 1
                 if navidrome_index is not None:
                     navidrome_index.forget_filename(old_path)
                 continue
+
+            canonical = library_stored_path(
+                full, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs
+            ) or old_path
+            if canonical and canonical != old_path:
+                track_index.remove_by_filename(old_path)
+                track_index.register(tid, canonical)
+
             ck = str(row.get('content_key') or '').strip()
             if not ck:
                 new_ck = file_content_key(full)
@@ -348,13 +394,58 @@ def refresh_playlists_after_moves(  # noqa: PLR0914
             if normalize_spotify_track_id(t)
         }
 
+        catalog_tids = {row['track_spotify_id'] for row in catalog_rows}
+        # Retroactive recovery: check if any missing tracks from spotify_tracks are in the library
+        for tid, meta in by_id.items():
+            if tid in catalog_tids:
+                continue
+            stored_file = track_index.filename_for(tid) if track_index is not None else None
+            if stored_file:
+                found_full = locate_library_file(stored_file, download_dir, slskd_dir)
+                if found_full is not None:
+                    actual = library_stored_path(found_full, download_dir, slskd_dir) or stored_file
+                    playlist_catalog.upsert_track(name, meta, actual, found_full)
+                    catalog_rows.append({
+                        'playlist_name': name,
+                        'track_spotify_id': tid,
+                        'filename': actual,
+                        'track_order': len(catalog_rows),
+                    })
+                    catalog_tids.add(tid)
+
+        if monitor_db is not None:
+            for mon_pl in monitor_db.list_playlists():
+                if mon_pl.name.strip().casefold() == name.strip().casefold() or (mon_pl.spotify_id and mon_pl.spotify_id == spotify_id):
+                    for d_track in monitor_db.list_downloaded_tracks(mon_pl.id):
+                        dt_tid = str(d_track.get('track_spotify_id') or '').strip()
+                        dt_file = str(d_track.get('filename') or '').strip()
+                        if dt_tid and dt_tid not in catalog_tids:
+                            full_cand = locate_library_file(dt_file, download_dir, slskd_dir)
+                            if full_cand is not None:
+                                actual_cand = library_stored_path(full_cand, download_dir, slskd_dir) or dt_file
+                                meta = by_id.get(dt_tid) or {'song_id': dt_tid}
+                                playlist_catalog.upsert_track(name, meta, actual_cand, full_cand)
+                                catalog_rows.append({
+                                    'playlist_name': name,
+                                    'track_spotify_id': dt_tid,
+                                    'filename': actual_cand,
+                                    'track_order': len(catalog_rows),
+                                })
+                                catalog_tids.add(dt_tid)
+
         entries: list[dict[str, Any]] = []
         songs_for_nav: list[dict[str, Any]] = []
         for row in catalog_rows:
             tid = row['track_spotify_id']
             filename = row['filename']
-            if not locate_library_file(filename, download_dir, slskd_dir):
+            full = locate_library_file(filename, download_dir, slskd_dir)
+            if full is None:
                 continue
+            actual_stored = library_stored_path(full, download_dir, slskd_dir) or filename
+            if actual_stored != filename:
+                playlist_catalog.update_filename(filename, actual_stored)
+                filename = actual_stored
+
             meta = by_id.get(tid) or {'song_id': tid}
             song = dict(meta)
             song['filename'] = filename
