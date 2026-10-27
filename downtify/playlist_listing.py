@@ -3,6 +3,7 @@ track id, ``GET /api/v1/playlists``)."""
 
 from __future__ import annotations
 
+import os
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Optional
@@ -70,20 +71,45 @@ def _scan_library_playlists(
     if not base.exists():
         return []
     known = _known_library_files(download_dir, slskd_dir, extra_dirs)
+    known_by_stem: dict[str, str] = {}
+    known_by_basename: dict[str, str] = {}
+    if known is not None:
+        for k in known:
+            kn = k.replace('\\', '/')
+            stem, _ = os.path.splitext(kn)
+            known_by_stem[stem] = kn
+            base_stem, _ = os.path.splitext(os.path.basename(kn))
+            if base_stem not in known_by_basename:
+                known_by_basename[base_stem] = kn
+
     playlists: list[dict[str, Any]] = []
     for m3u_path in m3u.iter_m3u_files(base):
         manual = m3u.is_manual_m3u(m3u_path)
-        tracks = [
-            stored
-            for stored in m3u.read_m3u_tracks(
-                m3u_path,
-                base,
-                slskd_dir,
-                extra_dirs,
-                keep_missing=True,
-            )
-            if known is None or stored in known
-        ]
+        raw_tracks = m3u.read_m3u_tracks(
+            m3u_path,
+            base,
+            slskd_dir,
+            extra_dirs,
+            keep_missing=True,
+        )
+        tracks: list[str] = []
+        for stored in raw_tracks:
+            stored_norm = stored.replace('\\', '/')
+            if known is None or stored_norm in known:
+                tracks.append(stored_norm)
+                continue
+            # Try matching by stem (e.g. format upgrade .mp3 -> .flac)
+            stem, _ = os.path.splitext(stored_norm)
+            if stem in known_by_stem:
+                tracks.append(known_by_stem[stem])
+                continue
+            # Try matching by basename stem (e.g. reorganized into artist/album folder)
+            base_stem, _ = os.path.splitext(os.path.basename(stored_norm))
+            if base_stem in known_by_basename:
+                tracks.append(known_by_basename[base_stem])
+                continue
+            tracks.append(stored_norm)
+
         if not tracks and not manual:
             continue
         # The sidecar artwork save_playlist_cover writes beside the M3U,

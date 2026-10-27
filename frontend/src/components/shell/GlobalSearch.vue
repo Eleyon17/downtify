@@ -2,10 +2,7 @@
   <form
     role="search"
     class="group relative flex h-11 items-center gap-2.5 rounded-[12px] border bg-surface pr-1.5 pl-3.5 transition-all duration-200 focus-within:border-accent"
-    :class="[
-      kind.type === 'link' ? 'border-accent/60' : 'border-line-2',
-      isVisible ? 'opacity-100' : 'pointer-events-none opacity-0 invisible',
-    ]"
+    :class="kind.type === 'link' ? 'border-accent/60' : 'border-line-2'"
     @submit.prevent="submit"
   >
     <AppIcon
@@ -25,8 +22,8 @@
       autocomplete="off"
       :placeholder="t('search.placeholder')"
       class="h-full min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-faint [&::-webkit-search-cancel-button]:hidden"
-      @focus="isFocused = true"
-      @blur="isFocused = false"
+      @focus="onFocus"
+      @blur="onBlur"
     />
     <button
       v-if="text"
@@ -65,6 +62,8 @@ const props = defineProps({
   isHovered: { type: Boolean, default: false },
 })
 
+const emit = defineEmits(['focus', 'blur'])
+
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
@@ -77,12 +76,19 @@ const isMac =
 
 const kind = computed(() => classifyInput(text.value))
 
-const isVisible = computed(() => {
-  return props.isHovered || isFocused.value || Boolean(text.value)
-})
+function onFocus() {
+  isFocused.value = true
+  emit('focus')
+}
+
+function onBlur() {
+  isFocused.value = false
+  emit('blur')
+}
 
 ui.registerSearchFocus(() => {
   isFocused.value = true
+  emit('focus')
   input.value?.focus()
   input.value?.select()
 })

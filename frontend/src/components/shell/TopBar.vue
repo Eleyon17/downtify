@@ -1,11 +1,21 @@
 <template>
   <header
-    class="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/70"
+    class="sticky top-0 z-30 transition-all duration-300 border-b"
+    :class="
+      isRevealed
+        ? 'border-line bg-bg/85 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/70'
+        : 'border-transparent bg-transparent pointer-events-auto'
+    "
     @mouseenter="isHovered = true"
     @mouseleave="isHovered = false"
   >
     <div
-      class="mx-auto flex h-16 max-w-[1680px] items-center gap-2 px-4 sm:gap-3 sm:px-6 md:h-[72px] lg:px-10"
+      class="mx-auto flex h-16 max-w-[1680px] items-center gap-2 px-4 sm:gap-3 sm:px-6 md:h-[72px] lg:px-10 transition-all duration-300"
+      :class="
+        isRevealed
+          ? 'opacity-100 pointer-events-auto translate-y-0'
+          : 'opacity-0 pointer-events-none -translate-y-1'
+      "
     >
       <RouterLink
         :to="{ name: 'Home' }"
@@ -33,6 +43,8 @@
       <GlobalSearch
         class="min-w-0 flex-1 md:max-w-xl"
         :is-hovered="isHovered"
+        @focus="isSearchFocused = true"
+        @blur="isSearchFocused = false"
       />
       <div class="ml-auto hidden items-center gap-1 sm:flex">
         <UiIconButton
@@ -56,7 +68,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppLogo from '../ui/AppLogo.vue'
 import UiIconButton from '../ui/UiIconButton.vue'
@@ -69,6 +81,23 @@ const router = useRouter()
 const route = useRoute()
 const theme = useTheme()
 const isHovered = ref(false)
+const isSearchFocused = ref(false)
+
+const isRevealed = computed(() => isHovered.value || isSearchFocused.value)
+
+function handleGlobalKeydown(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    isSearchFocused.value = true
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
+})
 
 // vue-router records where history can go in history.state.
 const canGoBack = computed(() => {

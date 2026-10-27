@@ -204,18 +204,32 @@ export function buildPlaylists(playlists, tracksByFile, batches = []) {
   const batchByName = new Map(
     batches.map((batch) => [String(batch.playlist_name || ''), batch])
   )
-  // Index tracks by file stem so upgraded tracks with changed extensions (.mp3 -> .flac) resolve
+  // Index tracks by file stem and basename so upgraded tracks with changed extensions (.mp3 -> .flac) resolve
   const tracksByStem = new Map()
+  const tracksByBaseName = new Map()
   for (const [filePath, track] of tracksByFile.entries()) {
-    const stem = stripExt(filePath)
+    const norm = String(filePath || '').replace(/\\/g, '/')
+    const stem = stripExt(norm)
     if (!tracksByStem.has(stem)) tracksByStem.set(stem, track)
+    const base = stem.split('/').pop()
+    if (!tracksByBaseName.has(base)) tracksByBaseName.set(base, track)
   }
 
   const names = new Set(playlists.map((playlist) => playlist.name))
   const fromM3u = playlists.map((playlist) => {
     const files = playlist.files || []
     const tracks = files
-      .map((file) => tracksByFile.get(file) || tracksByStem.get(stripExt(file)))
+      .map((file) => {
+        const norm = String(file || '').replace(/\\/g, '/')
+        const stem = stripExt(norm)
+        const base = stem.split('/').pop()
+        return (
+          tracksByFile.get(file) ||
+          tracksByFile.get(norm) ||
+          tracksByStem.get(stem) ||
+          tracksByBaseName.get(base)
+        )
+      })
       .filter(Boolean)
     // Mosaic from the M3U paths so the sidebar does not wait for
     // GET /tracks rows. `/cover?file=` reads tags on its own.

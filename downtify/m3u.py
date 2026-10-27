@@ -185,17 +185,23 @@ def read_m3u_tracks(
         return []
 
     tracks: list[str] = []
+    audio_extensions = ('.flac', '.mp3', '.m4a', '.opus', '.ogg', '.wav', '.aac')
+    new_lines: list[str] = []
+    needs_rewrite = False
+
     for raw in lines:
         line = raw.strip()
         if not line or line.startswith('#'):
+            new_lines.append(raw)
             continue
+        line_norm = line.replace('\\', '/')
         try:
-            resolved = (m3u_dir / line).resolve()
+            resolved = (m3u_dir / line_norm).resolve()
         except OSError:
+            new_lines.append(raw)
             continue
         if not resolved.is_file():
             # Check if track exists on disk under a different audio extension (upgraded format)
-            audio_extensions = ('.flac', '.mp3', '.m4a', '.opus', '.ogg', '.wav', '.aac')
             if resolved.suffix.lower() in audio_extensions:
                 for ext in audio_extensions:
                     if ext == resolved.suffix.lower():
@@ -207,13 +213,47 @@ def read_m3u_tracks(
                             break
                     except OSError:
                         pass
+        if not resolved.is_file():
+            # Fall back to locating via library roots
+            candidate = locate_library_file(line_norm, download_dir, slskd_root, extra_dirs)
+            if candidate is not None:
+                if candidate.is_file():
+                    resolved = candidate.resolve()
+                elif candidate.suffix.lower() in audio_extensions:
+                    for ext in audio_extensions:
+                        alt = candidate.with_suffix(ext)
+                        if alt.is_file():
+                            resolved = alt.resolve()
+                            break
+
         stored = _stored_library_path(
             resolved, download_dir, slskd_root, extras
         )
         if not stored:
+            new_lines.append(raw)
             continue
-        if resolved.is_file() or keep_missing:
+        if resolved.is_file():
             tracks.append(stored)
+            try:
+                new_rel = os.path.relpath(resolved, start=m3u_dir).replace('\\', '/')
+                if new_rel != line:
+                    needs_rewrite = True
+                new_lines.append(new_rel)
+            except ValueError:
+                new_lines.append(line_norm)
+        elif keep_missing:
+            tracks.append(stored)
+            new_lines.append(line_norm)
+        else:
+            new_lines.append(raw)
+
+    if needs_rewrite:
+        try:
+            m3u_path.write_text('\n'.join(new_lines) + '\n', encoding='utf-8')
+            logger.info('Auto-healed playlist M3U: {}', m3u_path)
+        except OSError:
+            pass
+
     return tracks
 
 

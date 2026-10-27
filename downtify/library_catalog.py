@@ -163,9 +163,27 @@ def _resolve_within_library(
 
 
 def resolve_library_file(stored: str, ctx: LibraryContext) -> Optional[Path]:
-    """Resolve a library-relative path if it points to an allowed audio file."""
+    """Resolve a library-relative path if it points to an allowed audio file.
 
-    return _resolve_within_library(stored, ctx, _is_audio)
+    If the exact file does not exist (e.g. upgraded from .mp3 to .flac),
+    checks other audio extensions with the same stem.
+    """
+
+    resolved = _resolve_within_library(stored, ctx, _is_audio)
+    if resolved is not None:
+        return resolved
+
+    # Fallback: check other audio extensions if upgraded (e.g. .mp3 -> .flac)
+    text = str(stored or '').strip().replace('\\', '/')
+    stem, ext = os.path.splitext(text)
+    if ext.lower() in AUDIO_EXTENSIONS:
+        for alt_ext in AUDIO_EXTENSIONS:
+            if alt_ext == ext.lower():
+                continue
+            alt_resolved = _resolve_within_library(stem + alt_ext, ctx, _is_audio)
+            if alt_resolved is not None:
+                return alt_resolved
+    return None
 
 
 def resolve_library_image(stored: str, ctx: LibraryContext) -> Optional[Path]:
@@ -513,11 +531,14 @@ def list_entries_for_stored_paths(
     """``GET /tracks`` rows for an explicit list of library keys.
 
     Used when a playlist page only needs its own songs, not the whole
-    library. Order follows *stored_paths*.
+    library. Order follows *stored_paths*. Resolves format upgrades
+    and re-located library files automatically.
     """
 
     pairs: list[tuple[str, Path]] = []
     seen: set[str] = set()
+    unresolved: list[str] = []
+
     for stored in stored_paths:
         name = str(stored or '').strip().replace('\\', '/')
         if not name or name in seen:
@@ -529,6 +550,24 @@ def list_entries_for_stored_paths(
                 full, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs
             ) or name
             pairs.append((canonical, full))
+        else:
+            unresolved.append(name)
+
+    if unresolved:
+        cached_pairs = peek_cached_path_pairs(ctx) or ()
+        if cached_pairs:
+            by_stem = {os.path.splitext(s)[0]: (s, Path(r)) for s, r in cached_pairs}
+            by_base = {os.path.splitext(os.path.basename(s))[0]: (s, Path(r)) for s, r in cached_pairs}
+            for name in unresolved:
+                stem = os.path.splitext(name)[0]
+                base_stem = os.path.splitext(os.path.basename(name))[0]
+                match = by_stem.get(stem) or by_base.get(base_stem)
+                if match is not None:
+                    canonical, full = match
+                    if full.is_file() and canonical not in seen:
+                        seen.add(canonical)
+                        pairs.append((canonical, full))
+
     cache = ctx.metadata_cache
     if cache is not None:
         by_file = {
