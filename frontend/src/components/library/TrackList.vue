@@ -60,7 +60,14 @@
 
     <div
       class="relative"
-      :style="virtual ? { height: `${totalSize}px` } : undefined"
+      :style="
+        virtual
+          ? {
+              height: `${totalSize}px`,
+              minHeight: `${props.tracks.length * ROW_HEIGHT}px`,
+            }
+          : undefined
+      "
       role="rowgroup"
     >
       <div
@@ -212,7 +219,15 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, ref, watch } from 'vue'
+import {
+  computed,
+  defineComponent,
+  h,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue'
 import { useWindowVirtualizer } from '@tanstack/vue-virtual'
 import AppIcon from '../ui/AppIcon.vue'
 import CoverArt from '../ui/CoverArt.vue'
@@ -291,24 +306,48 @@ const virtualizer = useWindowVirtualizer(
 
 function measureOffset() {
   if (!root.value) return
-  scrollMargin.value = root.value.getBoundingClientRect().top + window.scrollY
+  const rect = root.value.getBoundingClientRect()
+  const top = rect.top + window.scrollY
+  if (top > 0 && Math.abs(scrollMargin.value - top) > 2) {
+    scrollMargin.value = top
+  }
 }
-onMounted(measureOffset)
+
+onMounted(() => {
+  measureOffset()
+  window.addEventListener('resize', measureOffset, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', measureOffset)
+})
+
 watch(
   () => props.tracks.length,
   () => requestAnimationFrame(measureOffset)
 )
 
-const totalSize = computed(() => virtualizer.value.getTotalSize())
+const totalSize = computed(() => {
+  const measured = virtualizer.value.getTotalSize()
+  return Math.max(measured || 0, props.tracks.length * ROW_HEIGHT)
+})
 
 const rows = computed(() => {
   if (!virtual.value) {
     return props.tracks.map((track, index) => ({ track, index, start: 0 }))
   }
-  return virtualizer.value.getVirtualItems().map((item) => ({
+  const items = virtualizer.value.getVirtualItems()
+  if (!items || !items.length) {
+    return props.tracks.slice(0, 30).map((track, index) => ({
+      track,
+      index,
+      start: index * ROW_HEIGHT,
+    }))
+  }
+  return items.map((item) => ({
     track: props.tracks[item.index],
     index: item.index,
-    start: item.start - scrollMargin.value,
+    start: Math.max(0, item.start - (scrollMargin.value || 0)),
   }))
 })
 

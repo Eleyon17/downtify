@@ -59,7 +59,10 @@
           v-else
           ref="listRoot"
           class="relative"
-          :style="{ height: `${totalSize}px` }"
+          :style="{
+            height: `${totalSize}px`,
+            minHeight: `${items.length * 60}px`,
+          }"
         >
           <div
             v-for="row in rows"
@@ -137,7 +140,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useWindowVirtualizer } from '@tanstack/vue-virtual'
 import UiButton from '/src/components/ui/UiButton.vue'
@@ -238,31 +241,52 @@ const virtualizer = useWindowVirtualizer(
 
 function measureOffset() {
   if (!listRoot.value) return
-  scrollMargin.value =
-    listRoot.value.getBoundingClientRect().top + window.scrollY
+  const rect = listRoot.value.getBoundingClientRect()
+  const top = rect.top + window.scrollY
+  if (top > 0 && Math.abs(scrollMargin.value - top) > 2) {
+    scrollMargin.value = top
+  }
 }
 
 function measureRow(el) {
   if (el) virtualizer.value.measureElement(el)
 }
 
-onMounted(measureOffset)
+onMounted(() => {
+  measureOffset()
+  window.addEventListener('resize', measureOffset, { passive: true })
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', measureOffset)
+})
+
 watch(
   () => [tab.value, items.value.length],
   () => requestAnimationFrame(measureOffset)
 )
 
-const totalSize = computed(() => virtualizer.value.getTotalSize())
-const rows = computed(() =>
-  virtualizer.value
-    .getVirtualItems()
+const totalSize = computed(() => {
+  const measured = virtualizer.value.getTotalSize()
+  return Math.max(measured || 0, items.value.length * 60)
+})
+const rows = computed(() => {
+  const vItems = virtualizer.value.getVirtualItems()
+  if (!vItems || !vItems.length) {
+    return items.value.slice(0, 20).map((item, index) => ({
+      item,
+      index,
+      start: index * 60,
+    }))
+  }
+  return vItems
     .map((row) => ({
       item: items.value[row.index],
       index: row.index,
-      start: row.start - scrollMargin.value,
+      start: Math.max(0, row.start - (scrollMargin.value || 0)),
     }))
     .filter((row) => row.item)
-)
+})
 
 const subtitle = computed(() => {
   if (!queue.value.length) return ''
