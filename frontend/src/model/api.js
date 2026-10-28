@@ -242,6 +242,29 @@ function deleteArtistArt(name, kind) {
   return API.delete('/api/artists/art', { params: { name, kind } })
 }
 
+function getAlbumCoverCandidates(artist, title, query = '', file = '') {
+  return API.get('/api/library/album/covers', {
+    params: { artist, title, query: query || undefined, file: file || undefined },
+  })
+}
+
+function setAlbumCover(artist, title, coverUrl, lock = true, file = '') {
+  return API.post('/api/library/album/cover', {
+    artist,
+    title,
+    cover_url: coverUrl,
+    lock,
+    file: file || undefined,
+  })
+}
+
+function unlockAlbumCover(artist, title) {
+  return API.post('/api/library/album/cover/unlock', {
+    artist,
+    title,
+  })
+}
+
 // ── Artist profile: bio, social links, related artists, platform ids ──
 function getArtistProfile(name) {
   return API.get('/api/artists/profile', { params: { name } })
@@ -900,6 +923,9 @@ export default {
   setArtistArtFromUrl,
   uploadArtistArt,
   deleteArtistArt,
+  getAlbumCoverCandidates,
+  setAlbumCover,
+  unlockAlbumCover,
   getArtistProfile,
   getArtistOverview,
   ensureArtistProfile,

@@ -4,7 +4,7 @@
   >
     <PageHeader :title="t('library.title')" :subtitle="summary">
       <UiButton
-        v-if="library.trackCount.value"
+        v-if="auth.isAdmin.value && library.trackCount.value"
         variant="ghost"
         icon="wand"
         :to="{ name: 'Upgrade' }"
@@ -246,6 +246,7 @@ import PlaylistStatus from '/src/components/library/PlaylistStatus.vue'
 import SelectionBar from '/src/components/library/SelectionBar.vue'
 import TrackList from '/src/components/library/TrackList.vue'
 import API from '/src/model/api'
+import { useAuth } from '/src/model/auth'
 import { useLibrary } from '/src/model/library'
 import { usePlayer } from '/src/model/player'
 import { useTrackActions } from '/src/model/trackActions'
@@ -263,6 +264,7 @@ import { formatBytes, splitLength } from '/src/lib/format'
 import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
+const auth = useAuth()
 const route = useRoute()
 const router = useRouter()
 const library = useLibrary()

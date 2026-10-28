@@ -442,7 +442,7 @@ export function usePlaylistActions() {
       {
         label: t('playlists.rename'),
         icon: 'pencil',
-        hidden: !isOwner || !playlist.manual,
+        hidden: !isOwner || playlist.liked,
         action: () => openRename(playlist),
       },
       {

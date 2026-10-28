@@ -316,7 +316,7 @@ def track_findings(
     """Which categories this track is behind on."""
 
     found: list[str] = []
-    if int(entry.get('cover_px') or 0) < artwork_min_px:
+    if not entry.get('artwork_locked') and int(entry.get('cover_px') or 0) < artwork_min_px:
         found.append(CATEGORY_ARTWORK)
     existing = read_track_lyrics(full_path)
     if not (existing.get('synced') or existing.get('plain')):
@@ -534,12 +534,20 @@ def _pick_artwork(
     entry: dict[str, Any],
     *,
     options: UpgradeOptions,
+    deps: Optional[UpgradeDeps] = None,
 ) -> _Artwork:
     """A bigger cover than the file has, or the file's own size."""
 
     have = int(entry.get('cover_px') or 0)
     if CATEGORY_ARTWORK not in options.categories:
         return _Artwork(px=have)
+    if bool(entry.get('artwork_locked')):
+        return _Artwork(px=have)
+    if deps is not None and deps.metadata_cache is not None:
+        art = str(entry.get('album_artist') or entry.get('artist') or '').strip()
+        alb = str(entry.get('album') or '').strip()
+        if deps.metadata_cache.is_artwork_locked(art, alb):
+            return _Artwork(px=have)
     if have >= options.artwork_min_px:
         return _Artwork(px=have)
     better = cover_sources.best_cover(
@@ -680,7 +688,7 @@ def upgrade_track(
     )
 
     stage_now('artwork')
-    artwork = _pick_artwork(song, full, entry, options=options)
+    artwork = _pick_artwork(song, full, entry, options=options, deps=deps)
     stage_now('lyrics')
     new_lyrics = _pick_lyrics(song, full, deps=deps, options=options)
 

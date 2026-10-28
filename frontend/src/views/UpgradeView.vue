@@ -263,6 +263,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import AppIcon from '/src/components/ui/AppIcon.vue'
 import UiBadge from '/src/components/ui/UiBadge.vue'
@@ -275,10 +276,23 @@ import UiSwitch from '/src/components/ui/UiSwitch.vue'
 import PageHeader from '/src/components/library/PageHeader.vue'
 import { formatBytes } from '/src/lib/format'
 import { ARTWORK_SIZES } from '/src/lib/upgrade'
+import { useAuth } from '/src/model/auth'
 import { useUpgrade } from '/src/model/upgrade'
 import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
+const router = useRouter()
+const auth = useAuth()
+
+watch(
+  () => [auth.loaded.value, auth.isAdmin.value],
+  ([loaded, isAdmin]) => {
+    if (loaded && !isAdmin) {
+      router.replace({ name: 'Library' })
+    }
+  },
+  { immediate: true }
+)
 const {
   status,
   state,

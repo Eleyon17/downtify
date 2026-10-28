@@ -572,6 +572,25 @@ class PlaylistCatalog:
             for row in rows
         ]
 
+    def rename_playlist(self, old_name: str, new_name: str) -> None:
+        """Rename a playlist across playlists and playlist_tracks tables."""
+
+        old_clean = str(old_name or '').strip()
+        new_clean = str(new_name or '').strip()
+        if not old_clean or not new_clean or old_clean == new_clean:
+            return
+        with self._connect() as conn:
+            conn.execute('PRAGMA foreign_keys = OFF')
+            conn.execute(
+                'UPDATE playlists SET name = ? WHERE name = ?',
+                (new_clean, old_clean),
+            )
+            conn.execute(
+                'UPDATE playlist_tracks SET playlist_name = ? WHERE playlist_name = ?',
+                (new_clean, old_clean),
+            )
+            conn.execute('PRAGMA foreign_keys = ON')
+
 
 class ManualPlaylistOwners:
     """Who created each Library playlist (M3U files carry no owner).

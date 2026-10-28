@@ -11,6 +11,8 @@
         :kicker="[t('album.kicker'), album.year].filter(Boolean).join(' · ')"
         :cover="album.cover"
         :name="album.title"
+        photo-editable
+        @edit-photo="artModalOpen = true"
       >
         <template #subtitle>
           <RouterLink
@@ -40,6 +42,14 @@
             @click="actions.enqueue(album.tracks)"
           >
             {{ t('actions.addToQueue') }}
+          </UiButton>
+          <UiButton
+            variant="ghost"
+            icon="wand"
+            class="max-sm:hidden"
+            @click="artModalOpen = true"
+          >
+            {{ t('albumArt.changeArt') || 'Album Art' }}
           </UiButton>
           <UiButton
             variant="ghost"
@@ -98,6 +108,13 @@
           />
         </div>
       </section>
+
+      <AlbumArtModal
+        :open="artModalOpen"
+        :album="album"
+        @close="artModalOpen = false"
+        @saved="loadAlbum"
+      />
     </DetailState>
   </div>
 </template>
@@ -113,6 +130,7 @@ import DetailState from '/src/components/library/DetailState.vue'
 import MediaTile from '/src/components/library/MediaTile.vue'
 import PlayButton from '/src/components/library/PlayButton.vue'
 import TrackList from '/src/components/library/TrackList.vue'
+import AlbumArtModal from '/src/components/library/AlbumArtModal.vue'
 import { useLibrary } from '/src/model/library'
 import { usePlayer } from '/src/model/player'
 import { usePlaylistActions } from '/src/model/playlistActions'
@@ -130,6 +148,7 @@ const actions = useTrackActions()
 const playlistActions = usePlaylistActions()
 
 const ready = ref(false)
+const artModalOpen = ref(false)
 
 async function loadAlbum() {
   ready.value = false
@@ -162,6 +181,10 @@ function albumContext(item) {
 
 const context = computed(() => (album.value ? albumContext(album.value) : null))
 
+const isArtworkLocked = computed(() =>
+  Boolean(album.value?.tracks?.some((track) => track.artwork_locked))
+)
+
 const facts = computed(() => {
   const a = album.value
   const { hours, minutes } = splitLength(a.duration)
@@ -173,6 +196,9 @@ const facts = computed(() => {
       : t('common.lengthMinutes', { minutes }),
     formats,
     formatBytes(a.size),
+    isArtworkLocked.value
+      ? '🔒 ' + (t('albumArt.lockedBadge') || 'Art Locked')
+      : '',
   ].filter(Boolean)
 })
 
@@ -216,6 +242,13 @@ const menu = computed(() => [
     label: t('library.downloadZip'),
     icon: 'zip',
     action: () => actions.downloadZip(album.value.tracks),
+  },
+  {
+    label: t('albumArt.changeArt') || 'Change Album Art',
+    icon: 'wand',
+    action: () => {
+      artModalOpen.value = true
+    },
   },
   {
     label: t('album.searchMore'),

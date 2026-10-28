@@ -178,7 +178,7 @@
                   :title="t('share.removeFromQueue')"
                   @click.stop="removeTrack(idx)"
                 >
-                  <AppIcon name="close" :size="14" />
+                  <AppIcon name="x" :size="15" />
                 </button>
               </div>
             </div>
@@ -257,7 +257,7 @@
         <!-- Right side: Lyrics, Cast & Volume -->
         <div class="flex items-center gap-2 md:w-56 justify-end">
           <UiIconButton
-            icon="mic"
+            icon="lyrics"
             :label="t('player.lyrics') || 'Lyrics'"
             :active="showLyrics"
             @click="showLyrics = !showLyrics"

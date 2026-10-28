@@ -400,7 +400,8 @@ from .library_catalog import (
     resolve_library_file,
     resolve_library_image,
 )
-from .cover_art import extract_cover_art
+from .cover_art import embed_cover_art, extract_cover_art
+from .image_size import image_short_side
 from .shares import ShareStore, audio_media_type
 from .library_delete import (
     delete_library_files,
@@ -6315,6 +6316,7 @@ def library_upgrade_jobs(
 
 @router.post('/api/library/upgrade/scan')
 async def library_upgrade_scan(
+    request: Request,
     payload: dict[str, Any] = Body(default={}),
 ) -> dict[str, Any]:
     """Look at every library track and report what is behind.
@@ -6322,6 +6324,8 @@ async def library_upgrade_scan(
     Nothing is written: the scan fills a queue the client then confirms
     with ``/api/library/upgrade/start``.
     """
+    if not request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
 
     runner = _require_upgrade_runner()
     try:
@@ -6332,9 +6336,12 @@ async def library_upgrade_scan(
 
 @router.post('/api/library/upgrade/start')
 async def library_upgrade_start(
+    request: Request,
     payload: dict[str, Any] = Body(default={}),
 ) -> dict[str, Any]:
     """Begin upgrading the scanned tracks, for the chosen categories."""
+    if not request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
 
     runner = _require_upgrade_runner()
     categories = library_upgrade.normalize_categories(
@@ -6347,14 +6354,19 @@ async def library_upgrade_start(
 
 
 @router.post('/api/library/upgrade/pause')
-async def library_upgrade_pause() -> dict[str, Any]:
+async def library_upgrade_pause(request: Request) -> dict[str, Any]:
     """Stop after the track being worked on; the queue is kept."""
+    if not request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
 
     return _require_upgrade_runner().pause()
 
 
 @router.post('/api/library/upgrade/resume')
-async def library_upgrade_resume() -> dict[str, Any]:
+async def library_upgrade_resume(request: Request) -> dict[str, Any]:
+    if not request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
+
     runner = _require_upgrade_runner()
     try:
         return runner.resume()
@@ -6363,8 +6375,10 @@ async def library_upgrade_resume() -> dict[str, Any]:
 
 
 @router.post('/api/library/upgrade/cancel')
-async def library_upgrade_cancel() -> dict[str, Any]:
+async def library_upgrade_cancel(request: Request) -> dict[str, Any]:
     """Drop the rest of the queue. Finished tracks stay upgraded."""
+    if not request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
 
     return _require_upgrade_runner().cancel()
 
@@ -6427,6 +6441,188 @@ def library_albums(request: Request) -> list[dict[str, Any]]:
     return library_album_index(
         library_context(), allowed_keys=allowed_entry_keys(request)
     )
+
+
+@router.get('/api/library/album/covers')
+async def library_album_covers(
+    artist: str = Query(''),
+    title: str = Query(''),
+    query: Optional[str] = Query(None),
+    file: Optional[str] = Query(None),
+) -> dict[str, Any]:
+    """Search for scraped album cover options from iTunes, Deezer, Spotify, YouTube Music."""
+    candidates = await asyncio.to_thread(
+        cover_sources.search_cover_options,
+        artist,
+        title,
+        query_override=query,
+    )
+    ctx = library_context()
+    if file:
+        cur_path = resolve_library_file(file, ctx)
+        if cur_path and cur_path.is_file():
+            cur_data, _ = extract_cover_art(cur_path)
+            if cur_data:
+                px = image_short_side(cur_data) or 0
+                candidates.insert(
+                    0,
+                    {
+                        'source': 'current',
+                        'source_label': 'Current Embedded Art',
+                        'url': f'/api/cover?file={quote_plus(file)}',
+                        'width': px,
+                        'height': px,
+                        'title': title or 'Current Cover',
+                        'artist': artist,
+                    },
+                )
+
+    is_locked = False
+    if ctx.metadata_cache is not None and (artist or title):
+        is_locked = ctx.metadata_cache.is_artwork_locked(artist, title)
+
+    return {
+        'candidates': candidates,
+        'locked': is_locked,
+    }
+
+
+@router.post('/api/library/album/cover')
+async def library_set_album_cover(request: Request) -> dict[str, Any]:
+    """Apply chosen cover art to all tracks of an album and lock it against upgrades."""
+    payload = await _json_object(request)
+    artist = str(payload.get('artist') or '').strip()
+    title = str(payload.get('title') or '').strip()
+    cover_url = str(payload.get('cover_url') or '').strip()
+    file_target = str(payload.get('file') or '').strip()
+    lock = bool(payload.get('lock', True))
+
+    if not cover_url:
+        raise HTTPException(status_code=400, detail='Cover URL is required')
+
+    ctx = library_context()
+
+    cover_bytes: Optional[bytes] = None
+    mime = 'image/jpeg'
+    if '/api/cover' in cover_url:
+        from urllib.parse import parse_qs, urlparse
+
+        parsed = urlparse(cover_url)
+        params = parse_qs(parsed.query)
+        ref_file = (params.get('file') or [''])[0]
+        ref_path = resolve_library_file(ref_file, ctx) if ref_file else None
+        if ref_path and ref_path.is_file():
+            cover_bytes, detected_mime = extract_cover_art(ref_path)
+            if detected_mime:
+                mime = detected_mime
+    elif cover_url.startswith(('http://', 'https://')):
+        try:
+            resp = httpx.get(cover_url, timeout=20, follow_redirects=True)
+            resp.raise_for_status()
+            cover_bytes = resp.content
+            content_type = resp.headers.get('content-type', '')
+            if 'png' in content_type:
+                mime = 'image/png'
+            elif 'webp' in content_type:
+                mime = 'image/webp'
+        except Exception as exc:
+            logger.opt(exception=True).warning(
+                'Failed to fetch cover from {}', cover_url
+            )
+            raise HTTPException(
+                status_code=400, detail=f'Failed to fetch cover image: {exc}'
+            )
+
+    if not cover_bytes:
+        raise HTTPException(status_code=400, detail='Could not obtain image data')
+
+    width = image_short_side(cover_bytes)
+    if not width:
+        raise HTTPException(
+            status_code=400, detail='Invalid or unreadable image file'
+        )
+
+    files = list_library_paths(ctx)
+    tracks = list_entries_for_stored_paths(ctx, files)
+    matched_files: list[tuple[str, Path, str]] = []
+
+    if file_target:
+        full = resolve_library_file(file_target, ctx)
+        if full and full.is_file():
+            ck = entry_content_key(full)
+            matched_files.append((file_target, full, ck))
+    elif artist or title:
+        wanted_art = artist.casefold()
+        wanted_alb = title.casefold()
+        for t in tracks:
+            t_art = str(
+                t.get('album_artist') or t.get('artist') or ''
+            ).casefold()
+            t_alb = str(t.get('album') or '').casefold()
+            if (not wanted_art or t_art == wanted_art) and (
+                not wanted_alb or t_alb == wanted_alb
+            ):
+                stored = str(t.get('file') or '')
+                full = resolve_library_file(stored, ctx)
+                if full and full.is_file():
+                    ck = str(t.get('content_key') or entry_content_key(full))
+                    matched_files.append((stored, full, ck))
+
+    if not matched_files and file_target:
+        full = resolve_library_file(file_target, ctx)
+        if full and full.is_file():
+            matched_files.append((file_target, full, entry_content_key(full)))
+
+    if not matched_files:
+        raise HTTPException(
+            status_code=404, detail='No matching album tracks found'
+        )
+
+    updated_count = 0
+    folders_written: set[Path] = set()
+    for stored, full, ck in matched_files:
+        success = embed_cover_art(full, cover_bytes, mime=mime)
+        if success:
+            updated_count += 1
+            if ctx.metadata_cache is not None:
+                ctx.metadata_cache.set_track_artwork(
+                    ck, cover_px=width, locked=lock
+                )
+            folder = full.parent
+            if folder not in folders_written:
+                folders_written.add(folder)
+                try:
+                    (folder / 'cover.jpg').write_bytes(cover_bytes)
+                except Exception:
+                    pass
+
+    if ctx.metadata_cache is not None and artist and title:
+        if lock:
+            ctx.metadata_cache.lock_album_artwork(artist, title)
+        else:
+            ctx.metadata_cache.unlock_album_artwork(artist, title)
+
+    invalidate_library_paths_cache()
+
+    return {
+        'status': 'ok',
+        'tracks_updated': updated_count,
+        'cover_px': width,
+        'locked': lock,
+    }
+
+
+@router.post('/api/library/album/cover/unlock')
+async def library_unlock_album_cover(request: Request) -> dict[str, Any]:
+    """Unlock album artwork so Library Upgrade can update it again."""
+    payload = await _json_object(request)
+    artist = str(payload.get('artist') or '').strip()
+    title = str(payload.get('title') or '').strip()
+    ctx = library_context()
+    if ctx.metadata_cache is not None and artist and title:
+        ctx.metadata_cache.unlock_album_artwork(artist, title)
+    invalidate_library_paths_cache()
+    return {'status': 'ok', 'locked': False}
 
 
 @router.get('/api/library/artists')
@@ -6537,13 +6733,67 @@ async def edit_library_playlist_tracks_endpoint(
 
 @router.post('/api/library/playlists/rename')
 async def rename_library_playlist_endpoint(request: Request) -> dict[str, Any]:
-    """Rename a playlist the user created in the Library."""
+    """Rename a playlist the user created in the Library or a monitored playlist."""
 
     payload = await _json_object(request)
     name = str(payload.get('name') or '').strip()
     new_name = str(payload.get('new_name') or '').strip()
     require_playlist_owner(name, request)
     ctx = library_context()
+
+    # Check if this playlist is monitored
+    monitored_watch = None
+    if state.monitor_db is not None:
+        try:
+            for w in state.monitor_db.list_playlists():
+                if w.name.lower().strip() == name.lower().strip():
+                    monitored_watch = w
+                    break
+        except Exception:
+            pass
+
+    if monitored_watch is not None:
+        await asyncio.to_thread(
+            state.monitor_db.update_playlist, monitored_watch.id, name=new_name
+        )
+        if state.playlist_catalog is not None:
+            try:
+                await asyncio.to_thread(
+                    state.playlist_catalog.rename_playlist, name, new_name
+                )
+            except Exception:
+                logger.opt(exception=True).warning(
+                    'Failed to rename playlist in catalog from {!r} to {!r}',
+                    name,
+                    new_name,
+                )
+        m3u_path = m3u.find_m3u_for_name(ctx.download_dir, name)
+        if m3u_path is not None and m3u_path.is_file():
+            safe = m3u.sanitize_playlist_name(new_name)
+            dest = m3u_path.with_name(f'{safe}.m3u')
+            if dest != m3u_path:
+                try:
+                    m3u_path.rename(dest)
+                    old_cover = m3u_path.with_suffix('.jpg')
+                    new_cover = dest.with_suffix('.jpg')
+                    if old_cover.is_file() and not new_cover.exists():
+                        old_cover.rename(new_cover)
+                except Exception:
+                    logger.opt(exception=True).warning(
+                        'Failed to rename M3U file for playlist from {!r} to {!r}',
+                        name,
+                        new_name,
+                    )
+        if state.manual_playlist_owners is not None:
+            try:
+                await asyncio.to_thread(
+                    state.manual_playlist_owners.rename_owner, name, new_name
+                )
+            except Exception:
+                pass
+        invalidate_library_paths_cache()
+        return {'name': new_name, 'previous': name, 'manual': False}
+
     try:
         result = await asyncio.to_thread(
             rename_manual_playlist, ctx, name, new_name
@@ -6552,6 +6802,17 @@ async def rename_library_playlist_endpoint(request: Request) -> dict[str, Any]:
         raise HTTPException(
             status_code=exc.status_code, detail=str(exc)
         ) from exc
+    if state.playlist_catalog is not None:
+        try:
+            await asyncio.to_thread(
+                state.playlist_catalog.rename_playlist,
+                name,
+                str(result.get('name') or new_name),
+            )
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Could not rename playlist in catalog {!r}', name
+            )
     if state.manual_playlist_owners is not None:
         try:
             await asyncio.to_thread(
@@ -9106,6 +9367,42 @@ async def update_monitor_playlist(
         )
 
     kwargs: dict[str, Any] = {}
+    new_name = str(payload.get('name') or '').strip()
+    if new_name and new_name != current.name:
+        kwargs['name'] = new_name
+        if state.playlist_catalog is not None:
+            try:
+                await asyncio.to_thread(
+                    state.playlist_catalog.rename_playlist,
+                    current.name,
+                    new_name,
+                )
+            except Exception:
+                logger.opt(exception=True).warning(
+                    'Failed to rename playlist in catalog from {!r} to {!r}',
+                    current.name,
+                    new_name,
+                )
+        try:
+            ctx = library_context()
+            m3u_path = m3u.find_m3u_for_name(ctx.download_dir, current.name)
+            if m3u_path is not None and m3u_path.is_file():
+                safe = m3u.sanitize_playlist_name(new_name)
+                dest = m3u_path.with_name(f'{safe}.m3u')
+                if dest != m3u_path:
+                    m3u_path.rename(dest)
+                    old_cover = m3u_path.with_suffix('.jpg')
+                    new_cover = dest.with_suffix('.jpg')
+                    if old_cover.is_file() and not new_cover.exists():
+                        old_cover.rename(new_cover)
+        except Exception:
+            logger.opt(exception=True).warning(
+                'Failed to rename M3U file for playlist from {!r} to {!r}',
+                current.name,
+                new_name,
+            )
+        invalidate_library_paths_cache()
+
     if 'interval_minutes' in payload:
         kwargs['interval_minutes'] = int(payload['interval_minutes'])
     if 'enabled' in payload:

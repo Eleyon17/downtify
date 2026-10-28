@@ -22,7 +22,7 @@
           class="size-12"
         />
         <div class="min-w-0 flex-1">
-          <p class="truncate font-semibold text-fg">{{ watch.name }}</p>
+          <p class="truncate font-semibold text-fg">{{ name || watch.name }}</p>
           <p class="text-xs text-muted">
             {{
               kind === 'artist'
@@ -32,6 +32,16 @@
           </p>
         </div>
         <WatchSourceBadge :source="watch.source" />
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <UiInput
+          v-model="name"
+          :label="t('playlists.name') || 'Name'"
+          type="text"
+          :error="nameError"
+          required
+        />
       </div>
 
       <div class="flex flex-col gap-1.5">
@@ -155,7 +165,7 @@
         type="submit"
         :form="formId"
         :loading="saving"
-        :disabled="!dirty || !!urlError"
+        :disabled="!dirty || !!urlError || !!nameError"
       >
         {{ t('monitor.save') }}
       </UiButton>
@@ -192,6 +202,7 @@ const { t, locale } = useI18n()
 const ui = useUi()
 const formId = `watch-edit-${useId()}`
 
+const name = ref('')
 const url = ref('')
 const interval = ref(360)
 const enabled = ref(true)
@@ -204,6 +215,7 @@ watchValue(
   () => props.watch,
   (value) => {
     if (!value) return
+    name.value = value.name || ''
     url.value = value.url
     interval.value = value.interval_minutes
     enabled.value = value.enabled
@@ -215,6 +227,14 @@ watchValue(
 )
 
 const kind = computed(() => watchKind(props.watch))
+const trimmedName = computed(() => name.value.trim())
+const nameChanged = computed(
+  () => !!props.watch && trimmedName.value !== props.watch.name
+)
+const nameError = computed(() => {
+  if (props.watch && !trimmedName.value) return t('playlists.nameRequired') || 'Name is required'
+  return ''
+})
 const trimmedUrl = computed(() => url.value.trim())
 const urlChanged = computed(
   () => !!props.watch && trimmedUrl.value !== props.watch.url
@@ -236,6 +256,7 @@ const changes = computed(() => {
   const w = props.watch
   if (!w) return {}
   const out = {}
+  if (nameChanged.value && trimmedName.value) out.name = trimmedName.value
   if (urlChanged.value) out.url = trimmedUrl.value
   if (interval.value !== w.interval_minutes)
     out.interval_minutes = interval.value
@@ -270,7 +291,7 @@ async function copy() {
 }
 
 async function save() {
-  if (!dirty.value || urlError.value || saving.value) return
+  if (!dirty.value || urlError.value || nameError.value || saving.value) return
   saving.value = true
   error.value = ''
   const before = props.watch

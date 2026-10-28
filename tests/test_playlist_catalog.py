@@ -48,3 +48,22 @@ def test_upsert_track_non_spotify_id(tmp_path: Path) -> None:
     assert rows[0]['track_spotify_id'] == 'dQw4w9WgXcQ'
     assert rows[0]['filename'] == 'yt_song.mp3'
 
+
+def test_rename_playlist(tmp_path: Path) -> None:
+    catalog = PlaylistCatalog(tmp_path / 'lib.db')
+    track = tmp_path / 'song.mp3'
+    track.write_bytes(b'audio')
+    song = {'song_id': '4uLU6hMCjMI75M1A2tKUQC', 'name': 'Song'}
+    catalog.replace_playlist_tracks(
+        'Old Playlist',
+        [(song, 'song.mp3', track)],
+        spotify_id='playlist12345678901234567890',
+    )
+    assert len(catalog.list_tracks('Old Playlist')) == 1
+
+    catalog.rename_playlist('Old Playlist', 'New Playlist')
+    assert len(catalog.list_tracks('Old Playlist')) == 0
+    assert len(catalog.list_tracks('New Playlist')) == 1
+    assert catalog.list_tracks('New Playlist')[0]['filename'] == 'song.mp3'
+
+

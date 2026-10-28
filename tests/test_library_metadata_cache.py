@@ -166,3 +166,16 @@ def test_rows_from_older_cache_version_are_read_again(tmp_path: Path) -> None:
         assert read_meta.call_count == 1
         cache.get_entry('Artist - Song.mp3', track)
         assert read_meta.call_count == 1
+
+
+def test_artwork_locking(tmp_path: Path) -> None:
+    cache = LibraryMetadataCache(tmp_path / 'library.db')
+    assert not cache.is_artwork_locked('Pink Floyd', 'The Wall')
+
+    cache.lock_album_artwork('Pink Floyd', 'The Wall')
+    assert cache.is_artwork_locked('Pink Floyd', 'The Wall')
+    assert cache.is_artwork_locked('pink floyd', 'the wall')
+
+    cache.unlock_album_artwork('Pink Floyd', 'The Wall')
+    assert not cache.is_artwork_locked('Pink Floyd', 'The Wall')
+

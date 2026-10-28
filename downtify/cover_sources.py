@@ -16,6 +16,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import quote_plus
 
 import httpx
 from loguru import logger
@@ -209,3 +210,156 @@ def best_cover(
         return None
     best = max(candidates, key=lambda c: c.width)
     return best if best.width > have else None
+
+
+def search_cover_options(
+    artist: str,
+    album: str,
+    *,
+    file_path: Optional[Path] = None,
+    query_override: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    """Gather high-resolution album cover options from iTunes, Deezer, Spotify, and YouTube Music."""
+
+    candidates: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+
+    clean_artist = str(artist or '').strip()
+    clean_album = str(album or '').strip()
+    search_query = (query_override or f'{clean_artist} {clean_album}').strip()
+
+    def add_candidate(
+        source: str, url: str, width: int, title: str = '', subtitle: str = ''
+    ) -> None:
+        if not url or url in seen_urls:
+            return
+        seen_urls.add(url)
+        source_labels = {
+            'itunes': 'iTunes',
+            'deezer': 'Deezer',
+            'spotify': 'Spotify',
+            'youtube-music': 'YouTube Music',
+            'current': 'Current Track Art',
+        }
+        candidates.append({
+            'source': source,
+            'source_label': source_labels.get(source, source.capitalize()),
+            'url': url,
+            'width': width,
+            'height': width,
+            'title': title or clean_album,
+            'artist': subtitle or clean_artist,
+        })
+
+    # 1. iTunes Search (offers up to 1400x1400)
+    if search_query:
+        try:
+            itunes_albums: list[dict[str, Any]] = []
+            for entity in ('album', 'song'):
+                params = f'term={quote_plus(search_query)}&entity={entity}&limit=5'
+                url = f'https://itunes.apple.com/search?{params}'
+                try:
+                    resp = httpx.get(url, timeout=10)
+                    if resp.status_code == 200:
+                        itunes_albums.extend(
+                            (resp.json() or {}).get('results') or []
+                        )
+                except Exception:
+                    pass
+                if len(itunes_albums) >= 4:
+                    break
+
+            for item in itunes_albums:
+                raw_url = str(item.get('artworkUrl100') or '')
+                if not raw_url:
+                    continue
+                hi_res = re.sub(r'/\d+x\d+bb\.', '/1400x1400bb.', raw_url)
+                med_res = re.sub(r'/\d+x\d+bb\.', '/1000x1000bb.', raw_url)
+                item_title = str(
+                    item.get('collectionName')
+                    or item.get('trackName')
+                    or clean_album
+                )
+                item_artist = str(item.get('artistName') or clean_artist)
+                add_candidate('itunes', hi_res, 1400, item_title, item_artist)
+                add_candidate('itunes', med_res, 1000, item_title, item_artist)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'iTunes cover options search failed'
+            )
+
+    # 2. Deezer Search (offers cover_xl 1000x1000 and cover_big 500x500)
+    try:
+        from . import deezer
+
+        deezer_rows = (
+            deezer.search_albums_by(clean_artist, clean_album)
+            if clean_artist and clean_album
+            else []
+        )
+        if not deezer_rows and search_query:
+            q = f'{clean_artist} {clean_album}'.strip() or search_query
+            try:
+                deezer_data = (
+                    deezer._get_json(
+                        f'{deezer._FINDER_SEARCH_URL}/album', q=q, limit=5
+                    ).get('data')
+                    or []
+                )
+                deezer_rows = deezer._map_rows(
+                    deezer_data, deezer._finder_album_row
+                )
+            except Exception:
+                deezer_rows = []
+
+        for row in deezer_rows:
+            c_url = str(row.get('cover_url') or '')
+            if c_url:
+                add_candidate(
+                    'deezer',
+                    c_url,
+                    1000,
+                    str(row.get('title') or clean_album),
+                    str(row.get('artist') or clean_artist),
+                )
+    except Exception:
+        logger.opt(exception=True).debug('Deezer cover options search failed')
+
+    # 3. Spotify Search (offers 640x640)
+    try:
+        sp_results = spotify.search(search_query)
+        for alb in sp_results.get('albums') or []:
+            sp_url = spotify_upgrade_url(str(alb.get('cover_url') or ''))
+            if sp_url:
+                add_candidate(
+                    'spotify',
+                    sp_url,
+                    640,
+                    str(alb.get('name') or alb.get('title') or clean_album),
+                    str(alb.get('artist') or clean_artist),
+                )
+    except Exception:
+        logger.opt(exception=True).debug('Spotify cover options search failed')
+
+    # 4. YouTube Music Search
+    try:
+        ytm_songs = providers.search_songs(search_query, limit=3)
+        for s in ytm_songs:
+            ytm_url = str(s.get('cover_url') or '')
+            if ytm_url:
+                upscaled = re.sub(r'=w\d+-h\d+', '=w800-h800', ytm_url)
+                add_candidate(
+                    'youtube-music',
+                    upscaled,
+                    800,
+                    str(s.get('name') or clean_album),
+                    str((s.get('artists') or [clean_artist])[0]),
+                )
+    except Exception:
+        logger.opt(exception=True).debug(
+            'YouTube Music cover options search failed'
+        )
+
+    # Sort candidates by resolution descending (largest first)
+    candidates.sort(key=lambda c: int(c.get('width') or 0), reverse=True)
+    return candidates

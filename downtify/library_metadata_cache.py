@@ -39,13 +39,14 @@ _ADDED_COLUMNS = {
     'sample_rate': 'INTEGER NOT NULL DEFAULT 0',
     'channels': 'INTEGER NOT NULL DEFAULT 0',
     'genre': "TEXT NOT NULL DEFAULT ''",
+    'artwork_locked': 'INTEGER NOT NULL DEFAULT 0',
 }
 
 _ROW_COLUMNS = (
     'content_key, filename, file_mtime_ns, file_size, title, artist, '
     'album, has_cover, cover_px, album_artist, track_number, year, '
     'duration, meta_version, codec, bitrate, sample_rate, channels, '
-    'genre'
+    'genre, artwork_locked'
 )
 
 
@@ -90,6 +91,7 @@ def _row_entry(
         'genre': str(row['genre'] or '') if 'genre' in row.keys() else '',
         'has_cover': bool(int(row['has_cover'] or 0)),
         'cover_px': int(row['cover_px'] or 0),
+        'artwork_locked': bool(int(row['artwork_locked'] or 0)) if 'artwork_locked' in row.keys() else False,
         'added': int(item['mtime_ns']) // 1_000_000_000,
         'size': int(item['size']),
     }
@@ -107,6 +109,12 @@ class LibraryMetadataCache:
 
     def _init_db(self) -> None:
         with self._connect() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS locked_artworks (
+                    album_key TEXT PRIMARY KEY,
+                    locked_at TEXT NOT NULL
+                )
+            """)
             row = conn.execute(
                 "SELECT sql FROM sqlite_master WHERE name='library_metadata'"
             ).fetchone()
@@ -130,6 +138,7 @@ class LibraryMetadataCache:
                         sample_rate INTEGER NOT NULL DEFAULT 0,
                         channels INTEGER NOT NULL DEFAULT 0,
                         genre TEXT NOT NULL DEFAULT '',
+                        artwork_locked INTEGER NOT NULL DEFAULT 0,
                         file_mtime_ns INTEGER NOT NULL,
                         file_size INTEGER NOT NULL,
                         cached_at TEXT NOT NULL
@@ -143,6 +152,78 @@ class LibraryMetadataCache:
             if not (row[0] and 'content_key' in str(row[0])):
                 self._migrate_legacy_table(conn)
             self._ensure_columns(conn)
+
+    def lock_album_artwork(self, artist: str, album: str) -> None:
+        key = f"{artist.strip().lower()}::{album.strip().lower()}"
+        if not key or key == "::":
+            return
+        with self._connect() as conn:
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS locked_artworks (
+                    album_key TEXT PRIMARY KEY,
+                    locked_at TEXT NOT NULL
+                )"""
+            )
+            conn.execute(
+                """INSERT OR REPLACE INTO locked_artworks (album_key, locked_at)
+                   VALUES (?, datetime('now'))""",
+                (key,),
+            )
+            try:
+                conn.execute(
+                    """UPDATE library_metadata SET artwork_locked = 1
+                       WHERE (LOWER(album_artist) = LOWER(?) OR LOWER(artist) = LOWER(?))
+                       AND LOWER(album) = LOWER(?)""",
+                    (artist.strip(), artist.strip(), album.strip()),
+                )
+            except Exception:
+                pass
+
+    def unlock_album_artwork(self, artist: str, album: str) -> None:
+        key = f"{artist.strip().lower()}::{album.strip().lower()}"
+        with self._connect() as conn:
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS locked_artworks (
+                    album_key TEXT PRIMARY KEY,
+                    locked_at TEXT NOT NULL
+                )"""
+            )
+            conn.execute(
+                'DELETE FROM locked_artworks WHERE album_key = ?',
+                (key,),
+            )
+            try:
+                conn.execute(
+                    """UPDATE library_metadata SET artwork_locked = 0
+                       WHERE (LOWER(album_artist) = LOWER(?) OR LOWER(artist) = LOWER(?))
+                       AND LOWER(album) = LOWER(?)""",
+                    (artist.strip(), artist.strip(), album.strip()),
+                )
+            except Exception:
+                pass
+
+    def is_artwork_locked(self, artist: str = '', album: str = '') -> bool:
+        key = f"{artist.strip().lower()}::{album.strip().lower()}"
+        if not key or key == "::":
+            return False
+        with self._connect() as conn:
+            try:
+                row = conn.execute(
+                    'SELECT 1 FROM locked_artworks WHERE album_key = ?',
+                    (key,),
+                ).fetchone()
+                return bool(row)
+            except sqlite3.OperationalError:
+                return False
+
+    def set_track_artwork(self, content_key: str, cover_px: int, locked: bool = True) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """UPDATE library_metadata
+                   SET has_cover = 1, cover_px = ?, artwork_locked = ?
+                   WHERE content_key = ?""",
+                (cover_px, 1 if locked else 0, content_key),
+            )
 
     @staticmethod
     def _ensure_columns(conn: sqlite3.Connection) -> None:
