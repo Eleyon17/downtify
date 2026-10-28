@@ -148,7 +148,13 @@ class PlaylistCatalog:
         track_order: int = 0,
     ) -> None:
         pl_name = str(playlist_name or '').strip()
-        tid = normalize_spotify_track_id(song)
+        tid = normalize_spotify_track_id(song) or str(
+            song.get('song_id')
+            or song.get('youtube_id')
+            or song.get('id')
+            or Path(filename).name
+            or f'track_{track_order}'
+        ).strip()
         name = _norm_path(filename)
         if not pl_name or not tid or not name:
             return

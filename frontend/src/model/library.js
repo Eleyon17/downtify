@@ -262,6 +262,26 @@ async function loadPlaylistTracks(name) {
   if (!text) return
   const res = await API.listTracks({ playlist: text })
   mergeTrackRows(res.data)
+  const incomingFiles = (res.data || []).map((t) => t.file).filter(Boolean)
+  if (incomingFiles.length) {
+    const textLower = text.toLowerCase()
+    rawPlaylists.value = rawPlaylists.value.map((pl) => {
+      if (pl.name === text || (pl.name && pl.name.toLowerCase() === textLower)) {
+        const existing = new Set(pl.files || [])
+        let added = false
+        const updated = [...(pl.files || [])]
+        for (const f of incomingFiles) {
+          if (!existing.has(f)) {
+            updated.push(f)
+            existing.add(f)
+            added = true
+          }
+        }
+        return added ? { ...pl, files: updated, count: updated.length } : pl
+      }
+      return pl
+    })
+  }
   usePlayer().refreshTracks(tracksByFile.value)
 }
 

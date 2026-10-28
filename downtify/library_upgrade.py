@@ -1028,12 +1028,16 @@ def upgrade_track(
                                 new_rel_posix = new_rel.replace('\\', '/')
                                 old_rel_win = old_rel.replace('/', '\\')
                                 new_rel_win = new_rel.replace('/', '\\')
+                                old_stem = full.stem
+                                new_stem_file = f'{old_stem}.{effective_target_fmt}'
                                 modified = False
                                 for o, n in (
                                     (old_stored, new_stored),
                                     (old_stored.replace('\\', '/'), new_stored.replace('\\', '/')),
                                     (old_rel_posix, new_rel_posix),
                                     (old_rel_win, new_rel_win),
+                                    (full.name, final_path.name),
+                                    (f'{old_stem}{full.suffix}', new_stem_file),
                                 ):
                                     if o in text:
                                         text = text.replace(o, n)

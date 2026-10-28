@@ -112,6 +112,69 @@ def _scan_library_playlists(
 
         if not tracks and not manual:
             continue
+
+        # Retroactive playlist healing: check if the playlist's folder on disk
+        # contains downloaded audio tracks that were dropped or missing from the M3U.
+        audio_extensions = ('.flac', '.mp3', '.m4a', '.opus', '.ogg', '.wav', '.aac')
+        existing_stems = {
+            os.path.splitext(os.path.basename(t.replace('\\', '/')))[0].casefold()
+            for t in tracks
+        }
+        existing_names = {
+            os.path.basename(t.replace('\\', '/')).casefold() for t in tracks
+        }
+        recovered: list[str] = []
+
+        safe_name = m3u.sanitize_playlist_name(m3u_path.stem)
+        playlist_dirs = set()
+        if m3u_path.parent != base and m3u_path.parent != base / 'Playlists':
+            playlist_dirs.add(m3u_path.parent)
+        cand_pdir = base / safe_name
+        if cand_pdir.is_dir():
+            playlist_dirs.add(cand_pdir)
+        cand_pdir_raw = base / m3u_path.stem
+        if cand_pdir_raw.is_dir():
+            playlist_dirs.add(cand_pdir_raw)
+
+        for pdir in playlist_dirs:
+            try:
+                for f in sorted(pdir.iterdir()):
+                    if f.is_file() and f.suffix.lower() in audio_extensions:
+                        f_stem = f.stem.casefold()
+                        f_name = f.name.casefold()
+                        if f_stem not in existing_stems and f_name not in existing_names:
+                            cand_stored = library_stored_path(
+                                f, base, slskd_dir, extra_dirs
+                            )
+                            if cand_stored:
+                                recovered.append(cand_stored)
+                                existing_stems.add(f_stem)
+                                existing_names.add(f_name)
+            except OSError:
+                pass
+
+        if recovered:
+            tracks.extend(recovered)
+            try:
+                m3u_entries = [{'filename': t} for t in tracks]
+                pl_sub = (
+                    None
+                    if m3u_path.parent == base / 'Playlists'
+                    else safe_name
+                )
+                m3u.write_m3u(
+                    base,
+                    m3u_path.stem,
+                    m3u_entries,
+                    playlist_subdir=pl_sub,
+                    slskd_dir=slskd_dir,
+                    extra_dirs=extra_dirs,
+                    manual=manual,
+                    allow_empty=True,
+                )
+            except Exception:
+                pass
+
         # The sidecar artwork save_playlist_cover writes beside the M3U,
         # when the playlist has one of its own.
         cover = m3u_path.with_suffix('.jpg')

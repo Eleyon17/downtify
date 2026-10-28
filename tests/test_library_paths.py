@@ -49,3 +49,16 @@ def test_slskd_dir_from_downloader_falls_back_to_env_mount(
 
     monkeypatch.setenv('DOWNTIFY_SLSKD_SOURCE_DIR', str(slskd_mount))
     assert lp.slskd_dir_from_downloader(_Downloader()) == slskd_mount
+
+
+def test_locate_library_file_in_subdirectory_and_alternate_format(tmp_path):
+    download_dir = tmp_path / 'downloads'
+    download_dir.mkdir()
+    pl_dir = download_dir / 'My Playlist'
+    pl_dir.mkdir()
+    track = pl_dir / '01. Artist - Song.flac'
+    track.write_bytes(b'audio')
+
+    found = lp.locate_library_file('01. Artist - Song.mp3', download_dir, None)
+    assert found == track.resolve()
+

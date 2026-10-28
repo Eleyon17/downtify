@@ -571,6 +571,7 @@ function playlistSubtitle(item) {
   const count = itemTrackCount(item)
   if (
     batch?.expected_count &&
+    batch.expected_count > 1 &&
     batch.expected_count > (count || batch.downloaded_count || 0) &&
     batch.status !== 'complete'
   ) {

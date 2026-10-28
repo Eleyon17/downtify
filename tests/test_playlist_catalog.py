@@ -35,3 +35,16 @@ def test_update_filename_by_content_key(tmp_path: Path) -> None:
     names = catalog.update_filename_by_content_key(ck, 'new/t.mp3')
     assert 'Pl' in names
     assert catalog.list_tracks('Pl')[0]['filename'] == 'new/t.mp3'
+
+
+def test_upsert_track_non_spotify_id(tmp_path: Path) -> None:
+    catalog = PlaylistCatalog(tmp_path / 'lib.db')
+    track = tmp_path / 'yt_song.mp3'
+    track.write_bytes(b'audio')
+    song = {'song_id': 'dQw4w9WgXcQ', 'name': 'YouTube Track'}
+    catalog.upsert_track('YouTube Playlist', song, 'yt_song.mp3', track)
+    rows = catalog.list_tracks('YouTube Playlist')
+    assert len(rows) == 1
+    assert rows[0]['track_spotify_id'] == 'dQw4w9WgXcQ'
+    assert rows[0]['filename'] == 'yt_song.mp3'
+

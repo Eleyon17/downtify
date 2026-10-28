@@ -307,4 +307,33 @@ def locate_library_file(
                     except OSError:
                         continue
 
+    # Fallback 2: if file was relocated into or out of a playlist/artist subdirectory,
+    # or was upgraded, search for its basename/stem across library directories.
+    base_stem = Path(text).stem
+    if base_stem:
+        roots_to_check: list[Path] = [download_dir]
+        if slskd_dir is not None:
+            roots_to_check.append(slskd_dir)
+        for root_dir in roots_to_check:
+            try:
+                # 1. Check root directly
+                for ext in audio_extensions:
+                    cand = (root_dir / f'{base_stem}{ext}').resolve()
+                    if str(cand) not in seen:
+                        seen.add(str(cand))
+                        if cand.is_file():
+                            return cand
+                # 2. Check 1-level subdirectories (playlist folders, artist folders)
+                if root_dir.is_dir():
+                    for sub in root_dir.iterdir():
+                        if sub.is_dir() and not sub.name.startswith('.'):
+                            for ext in audio_extensions:
+                                cand = (sub / f'{base_stem}{ext}').resolve()
+                                if str(cand) not in seen:
+                                    seen.add(str(cand))
+                                    if cand.is_file():
+                                        return cand
+            except OSError:
+                continue
+
     return None

@@ -585,7 +585,10 @@ def list_entries_for_stored_paths(
             str(row.get('file') or ''): row
             for row in cache.get_entries_batch(pairs)
         }
-        return [by_file[name] for name, _full in pairs if name in by_file]
+        return [
+            by_file.get(name) or library_entry_for_file(name, full)
+            for name, full in pairs
+        ]
     return [library_entry_for_file(stored, full) for stored, full in pairs]
 
 

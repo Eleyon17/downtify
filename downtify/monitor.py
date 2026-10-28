@@ -722,6 +722,34 @@ class PlaylistMonitorDB:
             )
         return self.playlists_for_track(tid)
 
+    def update_filename(
+        self, old_filename: str, new_filename: str
+    ) -> set[str]:
+        """Update downloaded_tracks when a file path changes on disk."""
+        old = str(old_filename or '').strip().replace('\\', '/')
+        new = str(new_filename or '').strip().replace('\\', '/')
+        if not old or not new or old == new:
+            return set()
+        old_stem = os.path.splitext(old)[0]
+        old_base = os.path.basename(old)
+        old_base_stem = os.path.splitext(old_base)[0]
+        with self._connect() as conn:
+            conn.execute(
+                """UPDATE downloaded_tracks SET filename = ?
+                   WHERE filename = ?
+                      OR filename = ?
+                      OR filename LIKE ?
+                      OR filename LIKE ?""",
+                (new, old, old.replace('/', '\\'), f"%{old_base_stem}.%", f"%{old_stem}.%"),
+            )
+            rows = conn.execute(
+                """SELECT DISTINCT p.name FROM downloaded_tracks dt
+                   JOIN monitored_playlists p ON p.id = dt.playlist_id
+                   WHERE dt.filename = ?""",
+                (new,),
+            ).fetchall()
+        return {str(r['name']) for r in rows}
+
     def mark_track_downloaded(
         self,
         playlist_id: int,
@@ -970,7 +998,7 @@ async def check_playlist(
                 # downloads and a slow/hung track further down the list
                 # never holds up what's already on disk.
                 await asyncio.to_thread(
-                    _regenerate_m3u, playlist, tracks, downloader, resolved
+                    _regenerate_m3u, playlist, tracks, downloader, resolved, None, db
                 )
             if delay_seconds > 0 and index != len(new_tracks) - 1:
                 await asyncio.sleep(delay_seconds)
@@ -996,6 +1024,7 @@ async def check_playlist(
                 downloader,
                 None,
                 known_tracks,
+                db,
             )
         await asyncio.to_thread(
             _sync_library_playlist,
@@ -1446,6 +1475,7 @@ def _regenerate_m3u(
     downloader: Downloader,
     resolved: Optional[dict[str, str]] = None,
     known_tracks: Optional[dict[str, Optional[str]]] = None,
+    db: Optional[PlaylistMonitorDB] = None,
 ) -> Optional[Path]:
     """Rewrite the playlist's M3U, in playlist order. Returns its path,
     or ``None`` when nothing was written.
@@ -1470,19 +1500,31 @@ def _regenerate_m3u(
     slskd_dir = slskd_dir_from_downloader(downloader)
     entries: list[dict[str, Any]] = []
     for song in tracks:
-        if resolved is not None:
-            filename = resolved.get(song.get('song_id') or '')
-        else:
-            filename = (known_tracks or {}).get(song.get('song_id') or '')
-            if not (
-                filename
-                and locate_library_file(filename, download_dir, slskd_dir)
-            ):
-                filename = downloader.existing_filename_for(
-                    song, subdir=pl_subdir
-                )
+        sid = str(song.get('song_id') or '').strip()
+        filename = None
+        if resolved is not None and sid in resolved:
+            cand = resolved.get(sid)
+            if cand and locate_library_file(cand, download_dir, slskd_dir):
+                filename = cand
+        if not filename and known_tracks is not None:
+            cand = known_tracks.get(sid)
+            if cand and locate_library_file(cand, download_dir, slskd_dir):
+                filename = cand
+        if not filename:
+            filename = downloader.existing_filename_for(
+                song, subdir=pl_subdir
+            ) or downloader.find_existing_download(
+                song, subdir=pl_subdir
+            )
         if not filename:
             continue
+        if resolved is not None and sid:
+            resolved[sid] = filename
+        if sid and db is not None:
+            try:
+                db.mark_track_downloaded(playlist.id, sid, filename)
+            except Exception:
+                pass
         entries.append({
             'filename': filename,
             'title': song.get('name', ''),
