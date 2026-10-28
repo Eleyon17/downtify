@@ -30,10 +30,20 @@ export function settingsSectionsFor(role, sections, { authDisabled } = {}) {
  * (a player track: `{ file, title, artists, album, duration, ... }`).
  * `null` for nothing worth reporting (no track, a preview, a podcast).
  */
-export function playbackReport(track, { player, state, position = 0 }) {
-  if (state === 'stopped') return { player, state, track: {}, position: 0 }
+export function playbackReport(
+  track,
+  { player, state, position = 0, listened = null, skipped = false }
+) {
+  if (state === 'stopped') {
+    const out = { player, state, track: {}, position: 0 }
+    if (listened !== null) {
+      out.listened = Math.max(0, Math.round(Number(listened) || 0))
+    }
+    if (skipped) out.skipped = true
+    return out
+  }
   if (!track?.file || track.isPodcast || track.isPreview) return null
-  return {
+  const out = {
     player,
     state,
     position: Math.max(0, Math.round(Number(position) || 0)),
@@ -46,6 +56,11 @@ export function playbackReport(track, { player, state, position = 0 }) {
       duration: Number(track.duration) || 0,
     },
   }
+  if (listened !== null) {
+    out.listened = Math.max(0, Math.round(Number(listened) || 0))
+  }
+  if (skipped) out.skipped = true
+  return out
 }
 
 /**

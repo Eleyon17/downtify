@@ -29,6 +29,16 @@
         >
           {{ t('common.refresh') }}
         </UiButton>
+        <UiButton
+          v-if="lifetimeStats?.total_plays > 0 || rollingStats?.total_plays > 0"
+          variant="danger"
+          size="sm"
+          icon="trash"
+          :loading="clearing"
+          @click="confirmClearStats"
+        >
+          Clear Data
+        </UiButton>
       </div>
     </div>
 
@@ -595,6 +605,30 @@
           </ul>
         </SettingGroup>
       </template>
+
+      <!-- Per-User Listening Data Management -->
+      <SettingGroup
+        title="Listening Data & Privacy"
+        description="Real playback time is tracked continuously as you listen; songs skipped within 15 seconds do not count toward your stats."
+      >
+        <div class="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
+          <div class="min-w-0">
+            <div class="text-sm font-semibold text-fg">Clear all listening data</div>
+            <div class="text-xs text-muted">
+              Permanently reset your Rolling (30-Day) and Lifetime listening statistics and playback history for your account only. Your downloaded library, playlists, and liked songs are untouched.
+            </div>
+          </div>
+          <UiButton
+            variant="danger"
+            size="sm"
+            icon="trash"
+            :loading="clearing"
+            @click="confirmClearStats"
+          >
+            Clear Listening Data
+          </UiButton>
+        </div>
+      </SettingGroup>
     </template>
   </div>
 </template>
@@ -607,12 +641,15 @@ import UiSegmented from '../ui/UiSegmented.vue'
 import UiSkeleton from '../ui/UiSkeleton.vue'
 import SettingGroup from './SettingGroup.vue'
 import API from '/src/model/api'
+import { useUi } from '/src/model/ui'
 import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
+const ui = useUi()
 const mode = ref('rolling') // 'rolling' (Last 30 Days) | 'lifetime' (All Time)
 const loading = ref(true)
 const refreshing = ref(false)
+const clearing = ref(false)
 const rawResponse = ref(null)
 const lastUpdatedAt = ref(null)
 
@@ -722,6 +759,26 @@ async function fetchStats(isManualRefresh = false) {
   } finally {
     loading.value = false
     refreshing.value = false
+  }
+}
+
+async function confirmClearStats() {
+  const ok = await ui.confirm({
+    title: 'Clear all listening data?',
+    body: 'Are you sure you want to permanently delete all of your Rolling (30-Day) and Lifetime listening statistics and playback history? This only clears data for your account — your library, playlists, and liked songs will not be affected.',
+    confirmLabel: 'Clear my listening data',
+    danger: true,
+  })
+  if (!ok) return
+  clearing.value = true
+  try {
+    await API.clearMyStats()
+    ui.toast('Listening data cleared', { kind: 'success' })
+    await fetchStats(true)
+  } catch (err) {
+    ui.toast('Failed to clear listening data', { kind: 'error' })
+  } finally {
+    clearing.value = false
   }
 }
 

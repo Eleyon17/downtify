@@ -469,11 +469,12 @@ def now_playing() -> list[dict[str, Any]]:
 @router.post('/api/activity/playback')
 async def report_playback(request: Request) -> dict[str, Any]:
     """A player says what it's playing: ``{player, state, track,
-    position}`` - ``player`` any id stable for this player (a browser
-    tab, an app install), ``state`` ``playing``, ``paused`` or
+    position, listened, skipped}`` - ``player`` any id stable for this player
+    (a browser tab, an app install), ``state`` ``playing``, ``paused`` or
     ``stopped``, ``track`` ``{title, artist, album, file | track_id,
-    duration, cover}``. Send it when a song starts, on pause/resume and
-    stop, and about every 30 s while playing."""
+    duration, cover}``, ``listened`` real playback seconds accumulated on
+    this play, ``skipped`` whether the song was skipped before reaching the
+    minimum listen threshold."""
 
     me = _me(request)
     payload = await _json(request)
@@ -487,22 +488,89 @@ async def report_playback(request: Request) -> dict[str, Any]:
         position = float(payload.get('position') or 0)
     except (TypeError, ValueError):
         position = 0.0
+    raw_listened = payload.get('listened')
+    listened: Optional[float] = None
+    if raw_listened is not None:
+        try:
+            listened = max(0.0, float(raw_listened))
+        except (TypeError, ValueError):
+            listened = None
+    skipped = bool(payload.get('skipped'))
+
     client = await asyncio.to_thread(api.client_label, request, me)
     player = str(payload.get('player') or me.device_id or 'web')[:64]
+    player_key = f'{me.device_id}:{player}'
+
+    prev_session = api.state.now_playing.get_session(me.user_id, player_key)
+    new_song = str(track.get('track_id') or track.get('file') or '')
+    prev_song = str((prev_session or {}).get('song') or '')
+    prev_act_id = int((prev_session or {}).get('activity_id') or 0)
+    prev_listened = float((prev_session or {}).get('listened_seconds') or 0.0)
+    prev_tracked = bool((prev_session or {}).get('has_listened_tracking'))
+    prev_dur = float(((prev_session or {}).get('track') or {}).get('duration') or 0.0)
+    min_req = min(15.0, max(5.0, prev_dur * 0.5)) if prev_dur > 0 else 15.0
+
+    # If the report explicitly marks the current/outgoing track as skipped, or
+    # switches to a new song before the previous song reached the 15s threshold,
+    # remove the skipped song's playback entry so skipped songs never count!
+    if api.state.activity is not None and prev_act_id:
+        is_same_song = not new_song or new_song == prev_song
+        if skipped and is_same_song:
+            await asyncio.to_thread(api.state.activity.delete_entry, prev_act_id)
+        elif (
+            not is_same_song
+            and prev_tracked
+            and prev_listened < min_req
+        ):
+            await asyncio.to_thread(api.state.activity.delete_entry, prev_act_id)
+
+    if skipped and state == 'stopped':
+        api.state.now_playing.report(
+            user_id=me.user_id,
+            username=me.username,
+            player=player_key,
+            client=client,
+            state='stopped',
+            track={},
+            position=0.0,
+            ip=api.request_ip(request),
+        )
+        return {'ok': True}
+
     started = api.state.now_playing.report(
         user_id=me.user_id,
         username=me.username,
-        player=f'{me.device_id}:{player}',
+        player=player_key,
         client=client,
         state=state,
         track=track,
         position=position,
+        listened=listened,
         ip=api.request_ip(request),
     )
-    if started:
-        await api.log_activity(
-            request, 'playback', track_label(track), {'track': track}
+    if started and not skipped:
+        detail_payload: dict[str, Any] = {'track': track}
+        if listened is not None:
+            detail_payload['listened_seconds'] = round(listened, 1)
+        act_id = await api.log_activity(
+            request, 'playback', track_label(track), detail_payload
         )
+        if act_id:
+            api.state.now_playing.set_activity_id(
+                me.user_id, player_key, act_id, listened_seconds=listened
+            )
+    elif not started and api.state.activity is not None:
+        cur_session = api.state.now_playing.get_session(me.user_id, player_key)
+        cur_act_id = int((cur_session or {}).get('activity_id') or prev_act_id or 0)
+        if cur_act_id and (listened is not None or track):
+            await asyncio.to_thread(
+                api.state.activity.update_playback,
+                cur_act_id,
+                listened_seconds=listened,
+                position=position,
+                track=track,
+                skipped=True if skipped else None,
+            )
     return {'ok': True}
 
 
@@ -670,6 +738,39 @@ async def my_listening_stats(
         days=days,
         include_legacy_unowned=include_legacy,
     )
+
+
+@router.delete('/api/me/stats')
+async def clear_my_listening_stats(request: Request) -> dict[str, Any]:
+    """Clear all listening data (playback history and discover listens) for the signed-in user only."""
+    me = _me(request)
+    include_legacy = bool(me.role == 'admin' or me.user_id in (0, 1))
+    cleared_plays = 0
+    cleared_discover = 0
+    if api.state.activity is not None:
+        cleared_plays = await asyncio.to_thread(
+            api.state.activity.clear_playback,
+            me.user_id,
+            include_legacy_unowned=include_legacy,
+        )
+    if api.state.discover is not None:
+        try:
+            cleared_discover = await asyncio.to_thread(
+                api.state.discover.clear_listens, me.user_id
+            )
+            if include_legacy and me.user_id != 0:
+                cleared_discover += await asyncio.to_thread(
+                    api.state.discover.clear_listens, 0
+                )
+        except Exception:
+            pass
+    if api.state.now_playing is not None:
+        api.state.now_playing.forget_user(me.user_id)
+    return {
+        'ok': True,
+        'cleared_plays': cleared_plays,
+        'cleared_discover': cleared_discover,
+    }
 
 
 @router.get('/api/activity/stats')

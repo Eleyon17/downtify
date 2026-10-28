@@ -147,12 +147,13 @@ class ActivityLog:
         detail: Optional[dict[str, Any]] = None,
         client: str = '',
         ip: str = '',
-    ) -> None:
+    ) -> int:
         """Add an entry. *summary* is the one line shown for it (a song,
-        a file, a username); *detail* anything else worth keeping."""
+        a file, a username); *detail* anything else worth keeping.
+        Returns the inserted entry id."""
 
         with self._connect() as conn:
-            conn.execute(
+            cur = conn.execute(
                 'INSERT INTO activity (at, user_id, username, kind, '
                 'summary, detail_json, client, ip) '
                 'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -167,6 +168,7 @@ class ActivityLog:
                     _clip(ip, 64),
                 ),
             )
+            row_id = int(cur.lastrowid or 0)
         with self._lock:
             self._since_prune += 1
             due = self._since_prune >= _PRUNE_EVERY
@@ -174,6 +176,74 @@ class ActivityLog:
                 self._since_prune = 0
         if due:
             self.prune()
+        return row_id
+
+    def update_playback(
+        self,
+        entry_id: int,
+        *,
+        listened_seconds: Optional[float] = None,
+        position: Optional[float] = None,
+        track: Optional[dict[str, Any]] = None,
+        skipped: Optional[bool] = None,
+    ) -> None:
+        """Update real playback duration and track metadata on an active playback row."""
+        if not entry_id:
+            return
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT detail_json FROM activity WHERE id = ? AND kind = 'playback'",
+                (int(entry_id),),
+            ).fetchone()
+            if row is None:
+                return
+            try:
+                detail = json.loads(row['detail_json'])
+            except Exception:
+                detail = {}
+            if listened_seconds is not None:
+                prev_ls = float(detail.get('listened_seconds') or 0.0)
+                detail['listened_seconds'] = round(max(prev_ls, float(listened_seconds)), 1)
+            if position is not None:
+                detail['position'] = round(max(0.0, float(position)), 1)
+            if skipped is not None:
+                detail['skipped'] = bool(skipped)
+            if track:
+                existing_track = dict(detail.get('track') or {})
+                for k, v in track.items():
+                    if v and (not existing_track.get(k) or k == 'duration'):
+                        existing_track[k] = v
+                detail['track'] = existing_track
+            conn.execute(
+                'UPDATE activity SET detail_json = ? WHERE id = ?',
+                (json.dumps(detail)[:4000], int(entry_id)),
+            )
+
+    def delete_entry(self, entry_id: int) -> int:
+        """Delete a single activity row (e.g. a song skipped before reaching the play threshold)."""
+        if not entry_id:
+            return 0
+        with self._connect() as conn:
+            return conn.execute(
+                "DELETE FROM activity WHERE id = ? AND kind = 'playback'",
+                (int(entry_id),),
+            ).rowcount
+
+    def clear_playback(
+        self, user_id: int, *, include_legacy_unowned: bool = False
+    ) -> int:
+        """Delete all playback activity rows for *user_id* (per-user clear)."""
+        uid = int(user_id or 0)
+        with self._connect() as conn:
+            if include_legacy_unowned and uid:
+                return conn.execute(
+                    "DELETE FROM activity WHERE kind = 'playback' AND user_id IN (?, 0)",
+                    (uid,),
+                ).rowcount
+            return conn.execute(
+                "DELETE FROM activity WHERE kind = 'playback' AND user_id = ?",
+                (uid,),
+            ).rowcount
 
     def entries(
         self,
@@ -311,15 +381,13 @@ class ActivityLog:
 
         for row in rows:
             dt_str = str(row['at'] or '')
-            if not first_play_at and dt_str:
-                first_play_at = dt_str
-            if dt_str:
-                last_play_at = dt_str
 
             try:
                 detail = json.loads(row['detail_json'])
             except Exception:
                 detail = {}
+            if detail.get('skipped'):
+                continue
             track = detail.get('track') or {}
             artist = str(track.get('artist') or '').strip()
             title = str(track.get('title') or '').strip()
@@ -364,9 +432,27 @@ class ActivityLog:
             if artist and art_meta.get('display_name'):
                 artist = str(art_meta['display_name'])
 
-            dur = float(track.get('duration') or meta.get('duration') or 0.0)
-            if dur <= 0 and (artist or title):
-                dur = float(art_meta.get('avg_duration') or 210.0)
+            track_dur = float(track.get('duration') or meta.get('duration') or 0.0)
+            if track_dur <= 0 and (artist or title):
+                track_dur = float(art_meta.get('avg_duration') or 210.0)
+
+            # Real minute-by-minute / second-by-second playback tracking:
+            # When the player reports real `listened_seconds`, enforce the minimum
+            # play threshold (15s, or 50% for very short tracks) so skipped songs
+            # never count, and use the exact `listened_seconds` for all time totals.
+            if 'listened_seconds' in detail and detail['listened_seconds'] is not None:
+                listened_sec = float(detail.get('listened_seconds') or 0.0)
+                min_threshold = min(15.0, max(5.0, track_dur * 0.5)) if track_dur > 0 else 15.0
+                if listened_sec < min_threshold:
+                    continue
+                dur = listened_sec
+            else:
+                dur = track_dur
+
+            if not first_play_at and dt_str:
+                first_play_at = dt_str
+            if dt_str:
+                last_play_at = dt_str
 
             genre = (
                 str(track.get('genre') or '').strip()
@@ -725,6 +811,30 @@ class NowPlaying:
         # a paused song after >90s does not log a duplicate play.
         self._last_session: dict[tuple[int, str], dict[str, Any]] = {}
 
+    def get_session(
+        self, user_id: int, player: str
+    ) -> Optional[dict[str, Any]]:
+        key = (int(user_id), player)
+        with self._lock:
+            entry = self._players.get(key) or self._last_session.get(key)
+            return dict(entry) if entry is not None else None
+
+    def set_activity_id(
+        self,
+        user_id: int,
+        player: str,
+        activity_id: int,
+        listened_seconds: Optional[float] = None,
+    ) -> None:
+        key = (int(user_id), player)
+        with self._lock:
+            for store in (self._players, self._last_session):
+                entry = store.get(key)
+                if entry is not None:
+                    entry['activity_id'] = int(activity_id)
+                    if listened_seconds is not None:
+                        entry['listened_seconds'] = float(listened_seconds)
+
     def report(
         self,
         *,
@@ -735,6 +845,7 @@ class NowPlaying:
         state: str,
         track: dict[str, Any],
         position: float = 0.0,
+        listened: Optional[float] = None,
         ip: str = '',
     ) -> bool:
         """Note a player's report; whether it started a new song (the
@@ -761,6 +872,16 @@ class NowPlaying:
             )
             started = previous is None or previous['song'] != song or replayed_same
             max_pos = pos if started else max(prev_max, pos)
+            prev_ls = float((previous or {}).get('listened_seconds') or 0.0)
+            cur_ls = (
+                float(listened)
+                if listened is not None and started
+                else (
+                    max(prev_ls, float(listened))
+                    if listened is not None
+                    else (0.0 if started else prev_ls)
+                )
+            )
             entry = {
                 'user_id': int(user_id),
                 'username': username,
@@ -771,6 +892,12 @@ class NowPlaying:
                 'paused': state == 'paused',
                 'position': pos,
                 'max_position': max_pos,
+                'listened_seconds': cur_ls,
+                'has_listened_tracking': (
+                    listened is not None
+                    or bool((previous or {}).get('has_listened_tracking') and not started)
+                ),
+                'activity_id': 0 if started else int((previous or {}).get('activity_id') or 0),
                 'seen': now,
                 'started_at': (
                     _now().isoformat() if started else previous['started_at']

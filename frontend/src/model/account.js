@@ -11,6 +11,7 @@ import { ref, watch } from 'vue'
 import API from '/src/model/api'
 import { currentLocale, setLocale } from '/src/i18n'
 import { playbackReport } from '/src/lib/auth'
+import { addPlayed } from '/src/lib/discover'
 import { useAuth } from '/src/model/auth'
 import { usePlayer } from '/src/model/player'
 import { usePlayerPrefs } from '/src/model/playerPrefs'
@@ -117,8 +118,14 @@ async function start() {
 }
 
 // ── Playback reports ──────────────────────────────────────────────────
-const HEARTBEAT_MS = 30000
+const HEARTBEAT_MS = 15000
+const MIN_COUNTED_SECONDS = 15
 let reporting = false
+
+function minRequiredSeconds(duration) {
+  const dur = Number(duration) || 0
+  return dur > 0 ? Math.min(MIN_COUNTED_SECONDS, Math.max(5, dur * 0.5)) : MIN_COUNTED_SECONDS
+}
 
 function startPlaybackReports() {
   if (reporting) return
@@ -127,41 +134,86 @@ function startPlaybackReports() {
   let lastSent = 0
   let lastState = ''
   let lastFile = ''
+  let lastTrack = null
+  let lastPosition = 0
   let maxPosition = 0
+  let playedSeconds = 0
+  let thresholdReported = false
 
-  function send(state) {
-    const track = player.currentTrack.value
+  function send(state, { trackOverride = null, listenedOverride = null, skipped = false, posOverride = null } = {}) {
+    const track = trackOverride || player.currentTrack.value
     const enrichedTrack = track
       ? {
           ...track,
           duration: Number(track.duration || player.duration.value) || 0,
         }
       : track
+    const listenedVal = listenedOverride !== null ? listenedOverride : playedSeconds
+    const posVal = posOverride !== null ? posOverride : player.currentTime.value
     const report = playbackReport(enrichedTrack, {
       player: API.clientId,
       state,
-      position: player.currentTime.value,
+      position: posVal,
+      listened: listenedVal,
+      skipped,
     })
     if (!report) return
     lastSent = Date.now()
-    lastState = state
-    lastFile = track?.file || ''
+    if (!trackOverride) {
+      lastState = state
+      lastFile = track?.file || ''
+      lastTrack = enrichedTrack
+    }
     API.reportPlayback(report).catch(() => {
       // Best effort: feeds Activity & Listening Stats.
     })
+  }
+
+  function flushPreviousTrack() {
+    if (!lastFile || !lastTrack) return
+    const reqSec = minRequiredSeconds(lastTrack.duration)
+    const wasSkipped = playedSeconds < reqSec
+    if (wasSkipped) {
+      send('stopped', {
+        trackOverride: lastTrack,
+        listenedOverride: playedSeconds,
+        skipped: true,
+        posOverride: lastPosition,
+      })
+    } else {
+      send('paused', {
+        trackOverride: lastTrack,
+        listenedOverride: playedSeconds,
+        skipped: false,
+        posOverride: lastPosition,
+      })
+    }
   }
 
   watch(
     () => [player.currentTrack.value?.file, player.isPlaying.value],
     ([file, playing]) => {
       if (!file) {
-        if (lastFile) send('stopped')
+        if (lastFile) {
+          flushPreviousTrack()
+          send('stopped', { listenedOverride: playedSeconds })
+        }
         lastFile = ''
+        lastTrack = null
+        lastPosition = 0
         maxPosition = 0
+        playedSeconds = 0
+        thresholdReported = false
         return
       }
       if (file !== lastFile) {
-        maxPosition = 0
+        if (lastFile) {
+          flushPreviousTrack()
+        }
+        lastPosition = Number(player.currentTime.value) || 0
+        maxPosition = lastPosition
+        playedSeconds = 0
+        thresholdReported = false
       }
       const state = playing ? 'playing' : 'paused'
       if (file !== lastFile || state !== lastState) send(state)
@@ -169,17 +221,36 @@ function startPlaybackReports() {
   )
   watch(player.currentTime, (now) => {
     const pos = Number(now) || 0
-    if (player.isPlaying.value && maxPosition >= 30 && pos < 2) {
+    if (player.isPlaying.value && maxPosition >= 30 && pos < 2 && lastPosition > pos) {
+      // Track looped / restarted from beginning: flush completed play and start fresh
+      flushPreviousTrack()
+      lastPosition = pos
       maxPosition = pos
-      send('playing')
+      playedSeconds = 0
+      thresholdReported = false
+      send('playing', { posOverride: 0, listenedOverride: 0 })
       return
     }
+    playedSeconds = addPlayed(playedSeconds, lastPosition, pos)
+    lastPosition = pos
     if (pos > maxPosition) maxPosition = pos
-    if (player.isPlaying.value && Date.now() - lastSent > HEARTBEAT_MS)
+
+    const curDur = Number(player.currentTrack.value?.duration || player.duration.value) || 0
+    const reqSec = minRequiredSeconds(curDur)
+    if (!thresholdReported && playedSeconds >= reqSec) {
+      thresholdReported = true
+      send(player.isPlaying.value ? 'playing' : 'paused')
+      return
+    }
+    if (player.isPlaying.value && Date.now() - lastSent >= HEARTBEAT_MS) {
       send('playing')
+    }
   })
   window.addEventListener('pagehide', () => {
-    if (lastFile) send('stopped')
+    if (lastFile) {
+      flushPreviousTrack()
+      send('stopped')
+    }
   })
 }
 

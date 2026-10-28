@@ -572,6 +572,10 @@ function getMyStats(days = 30) {
   return API.get('/api/me/stats', { params: { days } })
 }
 
+function clearMyStats() {
+  return API.delete('/api/me/stats')
+}
+
 function getActivityStats(days = 30, userId = null) {
   return API.get('/api/activity/stats', {
     params: { days, ...(userId ? { user_id: userId } : {}) },
@@ -967,6 +971,7 @@ export default {
   updateMe,
   changeMyPassword,
   getMyStats,
+  clearMyStats,
   getActivityStats,
   getSuggestedMix,
   setPreferences,
