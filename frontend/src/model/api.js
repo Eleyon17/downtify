@@ -568,11 +568,11 @@ function setGoogleOAuthConfig(data) {
   return API.put('/api/auth/google/config', data)
 }
 
-function getMyStats(days = 90) {
+function getMyStats(days = 30) {
   return API.get('/api/me/stats', { params: { days } })
 }
 
-function getActivityStats(days = 90, userId = null) {
+function getActivityStats(days = 30, userId = null) {
   return API.get('/api/activity/stats', {
     params: { days, ...(userId ? { user_id: userId } : {}) },
   })

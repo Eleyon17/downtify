@@ -127,10 +127,17 @@ function startPlaybackReports() {
   let lastSent = 0
   let lastState = ''
   let lastFile = ''
+  let maxPosition = 0
 
   function send(state) {
     const track = player.currentTrack.value
-    const report = playbackReport(track, {
+    const enrichedTrack = track
+      ? {
+          ...track,
+          duration: Number(track.duration || player.duration.value) || 0,
+        }
+      : track
+    const report = playbackReport(enrichedTrack, {
       player: API.clientId,
       state,
       position: player.currentTime.value,
@@ -140,7 +147,7 @@ function startPlaybackReports() {
     lastState = state
     lastFile = track?.file || ''
     API.reportPlayback(report).catch(() => {
-      // Best effort: it only feeds the admins' Activity page.
+      // Best effort: feeds Activity & Listening Stats.
     })
   }
 
@@ -150,13 +157,24 @@ function startPlaybackReports() {
       if (!file) {
         if (lastFile) send('stopped')
         lastFile = ''
+        maxPosition = 0
         return
+      }
+      if (file !== lastFile) {
+        maxPosition = 0
       }
       const state = playing ? 'playing' : 'paused'
       if (file !== lastFile || state !== lastState) send(state)
     }
   )
-  watch(player.currentTime, () => {
+  watch(player.currentTime, (now) => {
+    const pos = Number(now) || 0
+    if (player.isPlaying.value && maxPosition >= 30 && pos < 2) {
+      maxPosition = pos
+      send('playing')
+      return
+    }
+    if (pos > maxPosition) maxPosition = pos
     if (player.isPlaying.value && Date.now() - lastSent > HEARTBEAT_MS)
       send('playing')
   })

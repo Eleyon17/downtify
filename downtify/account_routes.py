@@ -506,22 +506,74 @@ async def report_playback(request: Request) -> dict[str, Any]:
     return {'ok': True}
 
 
-def _build_genre_maps() -> tuple[dict[str, str], dict[str, str]]:
+def _build_stats_context() -> dict[str, Any]:
     genre_map: dict[str, str] = {}
     artist_genre_map: dict[str, str] = {}
+    track_meta_map: dict[str, dict[str, Any]] = {}
+    artist_meta_map: dict[str, dict[str, Any]] = {}
+    artist_dur_sums: dict[str, list[float]] = {}
+    unique_lib_artists: set[str] = set()
+    unique_lib_albums: set[str] = set()
     entries: list[dict[str, Any]] = []
     try:
         entries = listing_for_request(api.library_context())
         for e in entries:
             f = str(e.get('file') or '').strip()
-            art = str(e.get('artist') or '').strip().lower()
+            norm_f = f.replace('\\', '/')
+            stem_f = norm_f.rsplit('.', 1)[0].lower() if '.' in norm_f else norm_f.lower()
+            base_f = norm_f.rsplit('/', 1)[-1]
+            base_stem = base_f.rsplit('.', 1)[0].lower() if '.' in base_f else base_f.lower()
+            art_raw = str(e.get('artist') or '').strip()
+            art = art_raw.lower()
+            title_raw = str(e.get('title') or '').strip()
+            album_raw = str(e.get('album') or '').strip()
             g = str(e.get('genre') or '').strip()
+            dur = float(e.get('duration') or 0.0)
+
+            if art:
+                unique_lib_artists.add(art)
+                if art not in artist_meta_map:
+                    artist_meta_map[art] = {
+                        'display_name': art_raw,
+                        'avg_duration': 210.0,
+                        'sample_file': norm_f,
+                    }
+                if dur > 0:
+                    artist_dur_sums.setdefault(art, []).append(dur)
+            if album_raw and album_raw.lower() not in {'unknown', 'unknown album'}:
+                unique_lib_albums.add(f'{art}|{album_raw.lower()}')
+
+            t_meta = {
+                'file': norm_f,
+                'title': title_raw,
+                'artist': art_raw,
+                'album': album_raw,
+                'genre': g if g.lower() != 'unknown' else '',
+                'duration': dur,
+            }
+            if f:
+                track_meta_map[f] = t_meta
+                track_meta_map[norm_f] = t_meta
+                if stem_f:
+                    track_meta_map.setdefault(f'stem:{stem_f}', t_meta)
+                if base_stem:
+                    track_meta_map.setdefault(f'base:{base_stem}', t_meta)
+            if art and title_raw:
+                track_meta_map.setdefault(f'song:{art}|{title_raw.lower()}', t_meta)
+
             if g and g.lower() != 'unknown':
                 if f:
                     genre_map[f] = g
-                    genre_map[f.replace('\\', '/')] = g
+                    genre_map[norm_f] = g
+                    if stem_f:
+                        genre_map.setdefault(f'stem:{stem_f}', g)
+                    if base_stem:
+                        genre_map.setdefault(f'base:{base_stem}', g)
                 if art and art not in artist_genre_map:
                     artist_genre_map[art] = g
+        for art_key, durs in artist_dur_sums.items():
+            if durs and art_key in artist_meta_map:
+                artist_meta_map[art_key]['avg_duration'] = round(sum(durs) / len(durs), 1)
     except Exception:
         pass
 
@@ -529,38 +581,94 @@ def _build_genre_maps() -> tuple[dict[str, str], dict[str, str]]:
         from . import artist_profile  # noqa: PLC0415
 
         download_dir = api._artist_profile_download_dir()
+        seen_artists: set[str] = set()
         for e in entries:
             art = str(e.get('artist') or '').strip()
-            if art and art.lower() not in artist_genre_map:
+            art_l = art.lower()
+            if art and art_l not in seen_artists and art_l not in artist_genre_map:
+                seen_artists.add(art_l)
                 try:
                     prof = artist_profile.load_profile(download_dir, art)
                     pg = str(prof.get('genre') or '').strip()
                     if pg and pg.lower() != 'unknown':
-                        artist_genre_map[art.lower()] = pg
+                        artist_genre_map[art_l] = pg
                 except Exception:
                     pass
     except Exception:
         pass
 
-    return genre_map, artist_genre_map
+    return {
+        'genre_map': genre_map,
+        'artist_genre_map': artist_genre_map,
+        'track_meta_map': track_meta_map,
+        'artist_meta_map': artist_meta_map,
+        'library_totals': {
+            'total_tracks': len(entries),
+            'total_artists': len(unique_lib_artists),
+            'total_albums': len(unique_lib_albums),
+        },
+    }
+
+
+def _compute_full_stats(
+    log: Any,
+    *,
+    user_id: int,
+    days: int,
+    include_legacy_unowned: bool = False,
+) -> dict[str, Any]:
+    ctx = _build_stats_context()
+    discover_rows: list[dict[str, Any]] = []
+    if api.state.discover is not None:
+        try:
+            discover_rows = api.state.discover.listens(user_id if user_id else None)
+            if include_legacy_unowned and user_id:
+                seen_names = {str(r.get('name') or '').lower() for r in discover_rows}
+                for r0 in api.state.discover.listens(0):
+                    if str(r0.get('name') or '').lower() not in seen_names:
+                        discover_rows.append(r0)
+        except Exception:
+            discover_rows = []
+
+    common_kwargs = {
+        'user_id': user_id,
+        'genre_map': ctx['genre_map'],
+        'artist_genre_map': ctx['artist_genre_map'],
+        'track_meta_map': ctx['track_meta_map'],
+        'artist_meta_map': ctx['artist_meta_map'],
+        'discover_listens': discover_rows,
+        'library_totals': ctx['library_totals'],
+        'include_legacy_unowned': include_legacy_unowned,
+    }
+    rolling_stats = log.stats(days=30, **common_kwargs)
+    lifetime_stats = log.stats(days=0, **common_kwargs)
+    if days == 30:
+        primary = dict(rolling_stats)
+    elif days == 0:
+        primary = dict(lifetime_stats)
+    else:
+        primary = log.stats(days=days, **common_kwargs)
+    primary['rolling'] = rolling_stats
+    primary['lifetime'] = lifetime_stats
+    return primary
 
 
 @router.get('/api/me/stats')
 async def my_listening_stats(
-    request: Request, days: int = Query(90, ge=1, le=365)
+    request: Request, days: int = Query(30, ge=0, le=36500)
 ) -> dict[str, Any]:
-    """Listening statistics for the signed-in user by genre, artist, day, etc."""
+    """Listening statistics for the signed-in user (both Rolling 30-day and Lifetime)."""
     me = _me(request)
     log = api.state.activity
     if log is None:
-        return {'total_plays': 0, 'days': days}
-    genre_map, artist_genre_map = _build_genre_maps()
+        return {'total_plays': 0, 'days': days, 'rolling': {'total_plays': 0, 'days': 30}, 'lifetime': {'total_plays': 0, 'days': 0}}
+    include_legacy = bool(me.role == 'admin' or me.user_id in (0, 1))
     return await asyncio.to_thread(
-        log.stats,
+        _compute_full_stats,
+        log,
         user_id=me.user_id,
         days=days,
-        genre_map=genre_map,
-        artist_genre_map=artist_genre_map,
+        include_legacy_unowned=include_legacy,
     )
 
 
@@ -568,19 +676,18 @@ async def my_listening_stats(
 async def activity_listening_stats(
     request: Request,
     user_id: Optional[int] = Query(None),
-    days: int = Query(90, ge=1, le=365),
-    ) -> dict[str, Any]:
+    days: int = Query(30, ge=0, le=36500),
+) -> dict[str, Any]:
     """Listening statistics for admins (across everyone or filtered by user_id)."""
     _me(request)
     log = api.state.activity
     if log is None:
-        return {'total_plays': 0, 'days': days}
-    genre_map, artist_genre_map = _build_genre_maps()
+        return {'total_plays': 0, 'days': days, 'rolling': {'total_plays': 0, 'days': 30}, 'lifetime': {'total_plays': 0, 'days': 0}}
     uid = user_id or 0
     return await asyncio.to_thread(
-        log.stats,
+        _compute_full_stats,
+        log,
         user_id=uid,
         days=days,
-        genre_map=genre_map,
-        artist_genre_map=artist_genre_map,
+        include_legacy_unowned=uid in (0, 1),
     )
