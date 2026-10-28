@@ -157,11 +157,12 @@ def _scan_library_playlists(
             tracks.extend(recovered)
             try:
                 m3u_entries = [{'filename': t} for t in tracks]
-                pl_sub = (
-                    None
-                    if m3u_path.parent == base / 'Playlists'
-                    else safe_name
-                )
+                if m3u_path.parent == base / 'Playlists':
+                    pl_sub = None
+                elif m3u_path.parent != base:
+                    pl_sub = m3u_path.parent.name
+                else:
+                    pl_sub = safe_name
                 m3u.write_m3u(
                     base,
                     m3u_path.stem,
@@ -191,6 +192,72 @@ def _scan_library_playlists(
             # The playlist of hearted songs, not a downloaded one.
             'liked': is_liked_playlist(m3u_path.stem),
             'manual': manual,
+            '_m3u_path': m3u_path,
         })
-    playlists.sort(key=lambda p: (not p['liked'], p['name'].casefold()))
-    return playlists
+
+    # Deduplicate playlists with the same casefolded name (e.g. if both
+    # Playlists/<name>.m3u and <name>/<name>.m3u were written), merging tracks.
+    by_key: dict[str, dict[str, Any]] = {}
+    for pl in playlists:
+        m3u_file: Optional[Path] = pl.pop('_m3u_path', None)
+        key = str(pl['name']).strip().casefold()
+        if key not in by_key:
+            pl['_m3u_path'] = m3u_file
+            by_key[key] = pl
+            continue
+        existing_pl = by_key[key]
+        existing_m3u: Optional[Path] = existing_pl.get('_m3u_path')
+        merged_files: list[str] = list(existing_pl['files'])
+        seen_stems = {
+            os.path.splitext(os.path.basename(f.replace('\\', '/')))[0].casefold()
+            for f in merged_files
+        }
+        seen_paths = {f.replace('\\', '/') for f in merged_files}
+        for f in pl['files']:
+            fn = f.replace('\\', '/')
+            st = os.path.splitext(os.path.basename(fn))[0].casefold()
+            if fn not in seen_paths and st not in seen_stems:
+                merged_files.append(fn)
+                seen_paths.add(fn)
+                seen_stems.add(st)
+        existing_pl['files'] = merged_files
+        existing_pl['count'] = len(merged_files)
+        existing_pl['added'] = max(existing_pl['added'], pl['added'])
+        if not existing_pl['cover'] and pl['cover']:
+            existing_pl['cover'] = pl['cover']
+        existing_pl['manual'] = existing_pl['manual'] or pl['manual']
+        # Keep the M3U that originally had more tracks and remove the duplicate
+        if m3u_file is not None and existing_m3u is not None and m3u_file != existing_m3u:
+            try:
+                m3u_file.unlink(missing_ok=True)
+            except OSError:
+                pass
+            try:
+                pl_sub = (
+                    None
+                    if existing_m3u.parent == base / 'Playlists'
+                    else (
+                        existing_m3u.parent.name
+                        if existing_m3u.parent != base
+                        else m3u.sanitize_playlist_name(existing_pl['name'])
+                    )
+                )
+                m3u.write_m3u(
+                    base,
+                    existing_pl['name'],
+                    [{'filename': f} for f in merged_files],
+                    playlist_subdir=pl_sub,
+                    slskd_dir=slskd_dir,
+                    extra_dirs=extra_dirs,
+                    manual=existing_pl['manual'],
+                    allow_empty=True,
+                )
+            except Exception:
+                pass
+
+    deduped = []
+    for pl in by_key.values():
+        pl.pop('_m3u_path', None)
+        deduped.append(pl)
+    deduped.sort(key=lambda p: (not p['liked'], p['name'].casefold()))
+    return deduped

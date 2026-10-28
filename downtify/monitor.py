@@ -22,7 +22,11 @@ from .downloader import (
 )
 from .library_cache_keys import file_content_key
 from .library_metadata_cache import LibraryMetadataCache
-from .library_paths import locate_library_file, slskd_dir_from_downloader
+from .library_paths import (
+    library_stored_path,
+    locate_library_file,
+    slskd_dir_from_downloader,
+)
 from .library_paths_cache import invalidate_library_paths_cache
 from .navidrome import (
     _effective_navidrome_settings,
@@ -1226,16 +1230,65 @@ def _sync_library_playlist(
 
     download_dir = Path(downloader.download_dir)
     slskd_dir = slskd_dir_from_downloader(downloader)
+    pl_subdir = m3u.sanitize_playlist_name(playlist.name)
     rows: list[tuple[dict[str, Any], str, Path]] = []
+    seen_files: set[str] = set()
+    seen_stems: set[str] = set()
     for song in tracks:
-        filename = known_tracks.get(song.get('song_id') or '')
+        sid = str(song.get('song_id') or '').strip()
+        filename = known_tracks.get(sid) if sid else None
         full = (
             locate_library_file(filename, download_dir, slskd_dir)
             if filename
             else None
         )
+        if full is None:
+            filename = downloader.existing_filename_for(
+                song, subdir=pl_subdir
+            ) or downloader.find_existing_download(
+                song, subdir=pl_subdir
+            )
+            full = (
+                locate_library_file(filename, download_dir, slskd_dir)
+                if filename
+                else None
+            )
         if full is not None:
-            rows.append((song, filename, full))
+            actual = library_stored_path(full, download_dir, slskd_dir) or (filename or '')
+            if actual:
+                rows.append((song, actual, full))
+                seen_files.add(actual.replace('\\', '/'))
+                seen_stems.add(full.stem.casefold())
+
+    # Preserve any existing tracks in the playlist's M3U or folder on disk
+    existing_m3u = m3u.find_m3u_for_name(download_dir, playlist.name)
+    disk_extra: list[str] = []
+    if existing_m3u is not None and existing_m3u.is_file():
+        try:
+            disk_extra.extend(m3u.read_m3u_tracks(existing_m3u, download_dir, slskd_dir))
+        except Exception:
+            pass
+    for pdir in (download_dir / pl_subdir, download_dir / playlist.name):
+        if pdir.is_dir():
+            try:
+                for f in sorted(pdir.iterdir()):
+                    if f.is_file() and f.suffix.lower() in ('.flac', '.mp3', '.m4a', '.opus', '.ogg', '.wav', '.aac'):
+                        st = library_stored_path(f, download_dir, slskd_dir)
+                        if st and st not in disk_extra:
+                            disk_extra.append(st)
+            except OSError:
+                pass
+    for cand in disk_extra:
+        cand_norm = cand.replace('\\', '/')
+        cand_stem = Path(cand_norm).stem.casefold()
+        if cand_norm in seen_files or cand_stem in seen_stems:
+            continue
+        full_cand = locate_library_file(cand_norm, download_dir, slskd_dir)
+        if full_cand is not None:
+            actual_cand = library_stored_path(full_cand, download_dir, slskd_dir) or cand_norm
+            rows.append(({'song_id': f'file:{full_cand.name}'}, actual_cand, full_cand))
+            seen_files.add(actual_cand)
+            seen_stems.add(full_cand.stem.casefold())
 
     if library.playlist_catalog is not None and rows:
         try:
@@ -1499,17 +1552,21 @@ def _regenerate_m3u(
     download_dir = Path(downloader.download_dir)
     slskd_dir = slskd_dir_from_downloader(downloader)
     entries: list[dict[str, Any]] = []
+    seen_files: set[str] = set()
+    seen_stems: set[str] = set()
     for song in tracks:
         sid = str(song.get('song_id') or '').strip()
         filename = None
         if resolved is not None and sid in resolved:
             cand = resolved.get(sid)
-            if cand and locate_library_file(cand, download_dir, slskd_dir):
-                filename = cand
+            full_cand = locate_library_file(cand, download_dir, slskd_dir) if cand else None
+            if full_cand is not None:
+                filename = library_stored_path(full_cand, download_dir, slskd_dir) or cand
         if not filename and known_tracks is not None:
             cand = known_tracks.get(sid)
-            if cand and locate_library_file(cand, download_dir, slskd_dir):
-                filename = cand
+            full_cand = locate_library_file(cand, download_dir, slskd_dir) if cand else None
+            if full_cand is not None:
+                filename = library_stored_path(full_cand, download_dir, slskd_dir) or cand
         if not filename:
             filename = downloader.existing_filename_for(
                 song, subdir=pl_subdir
@@ -1525,12 +1582,46 @@ def _regenerate_m3u(
                 db.mark_track_downloaded(playlist.id, sid, filename)
             except Exception:
                 pass
+        fn_norm = filename.replace('\\', '/')
+        seen_files.add(fn_norm)
+        seen_stems.add(Path(fn_norm).stem.casefold())
         entries.append({
             'filename': filename,
             'title': song.get('name', ''),
             'artist': ', '.join(song.get('artists') or []),
             'duration': song.get('duration', 0),
         })
+
+    # Also preserve any existing tracks in the playlist's M3U or folder on disk
+    existing_m3u = m3u.find_m3u_for_name(download_dir, playlist.name)
+    disk_extra: list[str] = []
+    if existing_m3u is not None and existing_m3u.is_file():
+        try:
+            disk_extra.extend(m3u.read_m3u_tracks(existing_m3u, download_dir, slskd_dir))
+        except Exception:
+            pass
+    for pdir in (download_dir / pl_subdir, download_dir / playlist.name):
+        if pdir.is_dir():
+            try:
+                for f in sorted(pdir.iterdir()):
+                    if f.is_file() and f.suffix.lower() in ('.flac', '.mp3', '.m4a', '.opus', '.ogg', '.wav', '.aac'):
+                        st = library_stored_path(f, download_dir, slskd_dir)
+                        if st and st not in disk_extra:
+                            disk_extra.append(st)
+            except OSError:
+                pass
+    for cand in disk_extra:
+        cand_norm = cand.replace('\\', '/')
+        cand_stem = Path(cand_norm).stem.casefold()
+        if cand_norm in seen_files or cand_stem in seen_stems:
+            continue
+        full_cand = locate_library_file(cand_norm, download_dir, slskd_dir)
+        if full_cand is not None:
+            actual_cand = library_stored_path(full_cand, download_dir, slskd_dir) or cand_norm
+            seen_files.add(actual_cand)
+            seen_stems.add(full_cand.stem.casefold())
+            entries.append({'filename': actual_cand})
+
     if not entries:
         logger.warning(
             'M3U skip for monitored playlist "{}": no tracks on disk',
@@ -1541,11 +1632,17 @@ def _regenerate_m3u(
     # rather than the per-playlist subfolder, so the M3U goes to the legacy
     # Playlists/ directory where its relative paths still resolve.
     organize = downloader.organize_by_artist or downloader.organize_by_album
+    if existing_m3u is not None and existing_m3u.parent == download_dir / 'Playlists':
+        target_sub = None
+    elif existing_m3u is not None and existing_m3u.parent != download_dir:
+        target_sub = existing_m3u.parent.name
+    else:
+        target_sub = None if organize else pl_subdir
     path, _kept = m3u.write_m3u(
         downloader.download_dir,
         playlist.name,
         entries,
-        playlist_subdir=None if organize else pl_subdir,
+        playlist_subdir=target_sub,
         slskd_dir=slskd_dir,
     )
     return path

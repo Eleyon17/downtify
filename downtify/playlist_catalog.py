@@ -349,24 +349,57 @@ class PlaylistCatalog:
         return [str(row['playlist_name']) for row in rows]
 
     def update_filename(
-        self, old_filename: str, new_filename: str
+        self,
+        old_filename: str,
+        new_filename: str,
+        *,
+        content_key: Optional[str] = None,
     ) -> list[str]:
         """Update rows from old_filename to new_filename; return affected playlist names."""
         old = _norm_path(old_filename)
         new = _norm_path(new_filename)
-        if not old or not new or old == new:
+        if not old or not new:
             return []
+        ck = str(content_key or '').strip() or None
+        old_stem = Path(old).stem
         with self._connect() as conn:
-            conn.execute(
-                """UPDATE playlist_tracks SET filename = ?
-                   WHERE filename = ?""",
-                (new, old),
-            )
+            if ck:
+                conn.execute(
+                    """UPDATE playlist_tracks
+                       SET filename = ?, content_key = ?
+                       WHERE filename = ? OR filename = ?""",
+                    (new, ck, old, old.replace('/', '\\')),
+                )
+            elif old != new:
+                conn.execute(
+                    """UPDATE playlist_tracks SET filename = ?
+                       WHERE filename = ? OR filename = ?""",
+                    (new, old, old.replace('/', '\\')),
+                )
             rows = conn.execute(
                 """SELECT DISTINCT playlist_name FROM playlist_tracks
                    WHERE filename = ?""",
                 (new,),
             ).fetchall()
+            if not rows and old_stem and old != new:
+                if ck:
+                    conn.execute(
+                        """UPDATE playlist_tracks
+                           SET filename = ?, content_key = ?
+                           WHERE filename LIKE ?""",
+                        (new, ck, f'%{old_stem}.%'),
+                    )
+                else:
+                    conn.execute(
+                        """UPDATE playlist_tracks SET filename = ?
+                           WHERE filename LIKE ?""",
+                        (new, f'%{old_stem}.%'),
+                    )
+                rows = conn.execute(
+                    """SELECT DISTINCT playlist_name FROM playlist_tracks
+                       WHERE filename = ?""",
+                    (new,),
+                ).fetchall()
         return [str(row['playlist_name']) for row in rows]
 
     def playlists_by_content_keys(

@@ -93,6 +93,11 @@ let pending = null
 let pendingTracks = null
 let pendingAlbums = null
 let pendingArtists = null
+let activePlaylistName = ''
+
+function stripExt(path) {
+  return String(path || '').replace(/\\/g, '/').replace(/\.[^./\\]+$/, '')
+}
 
 function albumFromSummary(row) {
   const albumTracks = (row.tracks || []).map(normalizeTrack)
@@ -156,11 +161,24 @@ function applySummary(data) {
 
 function mergeTrackRows(rows) {
   const incoming = (rows || []).map(normalizeTrack)
+  if (!incoming.length) return
   if (!tracks.value.length) {
     tracks.value = incoming
     return
   }
-  const map = new Map(tracks.value.map((track) => [track.file, track]))
+  const incomingStems = new Map()
+  for (const track of incoming) {
+    incomingStems.set(stripExt(track.file), track.file)
+  }
+  const map = new Map()
+  for (const track of tracks.value) {
+    const stem = stripExt(track.file)
+    const replacementFile = incomingStems.get(stem)
+    if (replacementFile && replacementFile !== track.file) {
+      continue
+    }
+    map.set(track.file, track)
+  }
   for (const track of incoming) map.set(track.file, track)
   tracks.value = [...map.values()]
 }
@@ -182,6 +200,7 @@ async function load({ force = false } = {}) {
       batches.value = batchesRes.data?.playlists || []
       loaded.value = true
       if (tracksComplete.value) await ensureTracks({ force: true })
+      else if (activePlaylistName) await loadPlaylistTracks(activePlaylistName)
       if (albumsComplete.value) await ensureAlbums({ force: true })
       if (artistsComplete.value) await ensureArtists({ force: true })
     } catch (err) {
@@ -259,6 +278,7 @@ async function ensureArtists({ force = false } = {}) {
 
 async function loadPlaylistTracks(name) {
   const text = String(name || '').trim()
+  activePlaylistName = text
   if (!text) return
   const res = await API.listTracks({ playlist: text })
   mergeTrackRows(res.data)
@@ -268,16 +288,26 @@ async function loadPlaylistTracks(name) {
     rawPlaylists.value = rawPlaylists.value.map((pl) => {
       if (pl.name === text || (pl.name && pl.name.toLowerCase() === textLower)) {
         const existing = new Set(pl.files || [])
-        let added = false
+        const existingStems = new Map()
+        ;(pl.files || []).forEach((f, idx) => {
+          existingStems.set(stripExt(f), idx)
+        })
+        let changed = false
         const updated = [...(pl.files || [])]
         for (const f of incomingFiles) {
-          if (!existing.has(f)) {
+          if (existing.has(f)) continue
+          const stemIdx = existingStems.get(stripExt(f))
+          if (stemIdx !== undefined) {
+            updated[stemIdx] = f
+            existing.add(f)
+            changed = true
+          } else {
             updated.push(f)
             existing.add(f)
-            added = true
+            changed = true
           }
         }
-        return added ? { ...pl, files: updated, count: updated.length } : pl
+        return changed ? { ...pl, files: updated, count: updated.length } : pl
       }
       return pl
     })
@@ -331,9 +361,10 @@ API.onMessage((data) => {
   if (data?.type === 'track_path_changed' && data.old_file && data.new_file) {
     const oldFile = data.old_file
     const newFile = data.new_file
+    const oldStem = stripExt(oldFile)
     let replacedTrack = null
     tracks.value = tracks.value.map((track) => {
-      if (track.file !== oldFile) return track
+      if (track.file !== oldFile && stripExt(track.file) !== oldStem) return track
       replacedTrack = normalizeTrack({
         ...track,
         file: newFile,
@@ -342,7 +373,9 @@ API.onMessage((data) => {
     })
     rawPlaylists.value = rawPlaylists.value.map((playlist) => ({
       ...playlist,
-      files: (playlist.files || []).map((f) => (f === oldFile ? newFile : f)),
+      files: (playlist.files || []).map((f) =>
+        f === oldFile || stripExt(f) === oldStem ? newFile : f
+      ),
     }))
     if (replacedTrack) {
       usePlayer().updateTrackFile(oldFile, replacedTrack)

@@ -197,7 +197,7 @@ def prune_stale_and_backfill(
             )
             if full is None:
                 # Before removing, check if track_index or library stem knows this track
-                alt_stored = track_index.filename_for(tid) if track_index is not None else None
+                alt_stored = track_index.lookup(tid) if track_index is not None else None
                 if alt_stored:
                     alt_full = locate_library_file(
                         alt_stored, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs
@@ -298,7 +298,7 @@ def refresh_playlists_after_moves(  # noqa: PLR0914
     playlist_spotify_cache: Optional[PlaylistSpotifyCache] = None,
     cover_cache: Optional[Any] = None,
     metadata_cache: Optional[Any] = None,
-    delete_tag_mismatches: bool = True,
+    delete_tag_mismatches: bool = False,
 ) -> None:
     """Regenerate local M3U and optionally Navidrome for *playlist_names*.
 
@@ -353,7 +353,17 @@ def refresh_playlists_after_moves(  # noqa: PLR0914
 
     for name in sorted(playlist_names):
         catalog_rows = playlist_catalog.list_tracks(name)
-        if not catalog_rows:
+        existing_m3u = m3u.find_m3u_for_name(download_dir, name)
+        m3u_tracks: list[str] = []
+        if existing_m3u is not None and existing_m3u.is_file():
+            try:
+                m3u_tracks = m3u.read_m3u_tracks(
+                    existing_m3u, download_dir, slskd_dir
+                )
+            except Exception:
+                m3u_tracks = []
+
+        if not catalog_rows and not m3u_tracks:
             if sync_navidrome:
                 try:
                     remove_navidrome_playlist_by_name(name, settings)
@@ -399,7 +409,7 @@ def refresh_playlists_after_moves(  # noqa: PLR0914
         for tid, meta in by_id.items():
             if tid in catalog_tids:
                 continue
-            stored_file = track_index.filename_for(tid) if track_index is not None else None
+            stored_file = track_index.lookup(tid) if track_index is not None else None
             if stored_file:
                 found_full = locate_library_file(stored_file, download_dir, slskd_dir)
                 if found_full is not None:
@@ -433,6 +443,61 @@ def refresh_playlists_after_moves(  # noqa: PLR0914
                                 })
                                 catalog_tids.add(dt_tid)
 
+        # Preserve any tracks currently in the playlist's M3U or playlist folder on disk
+        # that are not yet in catalog_rows so refreshing never drops tracks down to 1-2 songs.
+        catalog_files = {
+            str(r.get('filename') or '').replace('\\', '/') for r in catalog_rows
+        }
+        catalog_stems = {
+            Path(str(r.get('filename') or '').replace('\\', '/')).stem.casefold()
+            for r in catalog_rows
+            if r.get('filename')
+        }
+        disk_candidates: list[str] = list(m3u_tracks)
+        safe_pl_name = m3u.sanitize_playlist_name(name)
+        for pdir in (download_dir / safe_pl_name, download_dir / name):
+            if pdir.is_dir():
+                try:
+                    for f in sorted(pdir.iterdir()):
+                        if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS:
+                            st = library_stored_path(f, download_dir, slskd_dir)
+                            if st and st not in disk_candidates:
+                                disk_candidates.append(st)
+                except OSError:
+                    pass
+
+        for cand_stored in disk_candidates:
+            cand_norm = cand_stored.replace('\\', '/')
+            cand_stem = Path(cand_norm).stem.casefold()
+            if cand_norm in catalog_files or cand_stem in catalog_stems:
+                continue
+            full_cand = locate_library_file(cand_norm, download_dir, slskd_dir)
+            if full_cand is None:
+                continue
+            actual_cand = (
+                library_stored_path(full_cand, download_dir, slskd_dir) or cand_norm
+            )
+            tid_cand = (
+                track_index.spotify_id_for_filename(actual_cand)
+                if track_index is not None
+                else None
+            ) or f'file:{Path(actual_cand).name}'
+            if tid_cand in catalog_tids:
+                continue
+            meta = by_id.get(tid_cand) or {'song_id': tid_cand}
+            playlist_catalog.upsert_track(
+                name, meta, actual_cand, full_cand, track_order=len(catalog_rows)
+            )
+            catalog_rows.append({
+                'playlist_name': name,
+                'track_spotify_id': tid_cand,
+                'filename': actual_cand,
+                'track_order': len(catalog_rows),
+            })
+            catalog_tids.add(tid_cand)
+            catalog_files.add(actual_cand)
+            catalog_stems.add(Path(actual_cand).stem.casefold())
+
         entries: list[dict[str, Any]] = []
         songs_for_nav: list[dict[str, Any]] = []
         for row in catalog_rows:
@@ -450,7 +515,7 @@ def refresh_playlists_after_moves(  # noqa: PLR0914
             song = dict(meta)
             song['filename'] = filename
             song = enrich_song_from_library_file(song, download_dir, slskd_dir)
-            if not spotify_aligns_with_file_tags(song):
+            if tid in by_id and not spotify_aligns_with_file_tags(song):
                 if (
                     mismatch_delete is not None
                     and delete_if_spotify_tag_mismatch(
@@ -469,7 +534,12 @@ def refresh_playlists_after_moves(  # noqa: PLR0914
             songs_for_nav.append(song)
 
         if generate_m3u and entries:
-            pl_subdir = None if organize else m3u.sanitize_playlist_name(name)
+            if existing_m3u is not None and existing_m3u.parent == download_dir / 'Playlists':
+                pl_subdir = None
+            elif existing_m3u is not None and existing_m3u.parent != download_dir:
+                pl_subdir = existing_m3u.parent.name
+            else:
+                pl_subdir = None if organize else m3u.sanitize_playlist_name(name)
             try:
                 m3u.write_m3u(
                     download_dir,

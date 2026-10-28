@@ -409,7 +409,11 @@ from .library_delete import (
 )
 from .library_metadata import read_audio_metadata
 from .library_metadata_cache import LibraryMetadataCache
-from .library_paths import locate_library_file, slskd_dir_from_downloader
+from .library_paths import (
+    library_stored_path,
+    locate_library_file,
+    slskd_dir_from_downloader,
+)
 from .library_paths_cache import (
     add_invalidation_listener,
     invalidate_library_paths_cache,
@@ -1516,29 +1520,30 @@ def playlist_entry_for_request(
                 break
     if entry is not None:
         ctx = library_context()
+        pl_title = str(entry.get('name') or wanted).strip()
         existing_files = list(entry.get('files') or [])
         existing_set = {f.replace('\\', '/') for f in existing_files}
         existing_stems = {
-            os.path.splitext(f.replace('\\', '/'))[0].casefold()
+            os.path.splitext(os.path.basename(f.replace('\\', '/')))[0].casefold()
             for f in existing_files
         }
         added = False
 
         if state.playlist_catalog is not None:
             try:
-                cat_rows = state.playlist_catalog.list_tracks(str(entry.get('name') or wanted))
+                cat_rows = state.playlist_catalog.list_tracks(pl_title)
                 for r in cat_rows:
                     cf = str(r.get('filename') or '').strip()
                     if cf:
                         cf_norm = cf.replace('\\', '/')
-                        cf_stem = os.path.splitext(cf_norm)[0].casefold()
+                        cf_stem = os.path.splitext(os.path.basename(cf_norm))[0].casefold()
                         if cf_norm not in existing_set and cf_stem not in existing_stems:
                             full = locate_library_file(cf_norm, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs)
                             if full is not None:
                                 act = library_stored_path(full, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs) or cf_norm
                                 existing_files.append(act)
                                 existing_set.add(act)
-                                existing_stems.add(os.path.splitext(act.replace('\\', '/'))[0].casefold())
+                                existing_stems.add(os.path.splitext(os.path.basename(act.replace('\\', '/')))[0].casefold())
                                 added = True
             except Exception:
                 pass
@@ -1546,41 +1551,75 @@ def playlist_entry_for_request(
         if state.monitor_db is not None:
             try:
                 for mon_pl in state.monitor_db.list_playlists():
-                    if mon_pl.name.strip().casefold() in {wanted.casefold(), str(entry.get('name') or '').strip().casefold()}:
+                    if mon_pl.name.strip().casefold() in {wanted.casefold(), pl_title.casefold()}:
                         for dt in state.monitor_db.list_downloaded_tracks(mon_pl.id):
                             dtf = str(dt.get('filename') or '').strip()
                             if dtf:
                                 dtf_norm = dtf.replace('\\', '/')
-                                dtf_stem = os.path.splitext(dtf_norm)[0].casefold()
+                                dtf_stem = os.path.splitext(os.path.basename(dtf_norm))[0].casefold()
                                 if dtf_norm not in existing_set and dtf_stem not in existing_stems:
                                     full = locate_library_file(dtf_norm, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs)
                                     if full is not None:
                                         act = library_stored_path(full, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs) or dtf_norm
                                         existing_files.append(act)
                                         existing_set.add(act)
-                                        existing_stems.add(os.path.splitext(act.replace('\\', '/'))[0].casefold())
+                                        existing_stems.add(os.path.splitext(os.path.basename(act.replace('\\', '/')))[0].casefold())
                                         added = True
             except Exception:
                 pass
 
         try:
             from .m3u import sanitize_playlist_name
-            clean_name = sanitize_playlist_name(str(entry.get('name') or wanted))
-            p_dir = ctx.download_dir / clean_name
-            if p_dir.is_dir():
-                audio_extensions = ('.flac', '.mp3', '.m4a', '.opus', '.ogg', '.wav', '.aac')
-                for f in sorted(p_dir.iterdir()):
-                    if f.is_file() and f.suffix.lower() in audio_extensions:
-                        f_stem = f.stem.casefold()
-                        if f_stem not in existing_stems:
-                            act = library_stored_path(f, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs)
-                            if act and act not in existing_set:
-                                existing_files.append(act)
-                                existing_set.add(act)
-                                existing_stems.add(f_stem)
-                                added = True
+            clean_name = sanitize_playlist_name(pl_title)
+            for p_dir in (ctx.download_dir / clean_name, ctx.download_dir / pl_title):
+                if p_dir.is_dir():
+                    audio_extensions = ('.flac', '.mp3', '.m4a', '.opus', '.ogg', '.wav', '.aac')
+                    for f in sorted(p_dir.iterdir()):
+                        if f.is_file() and f.suffix.lower() in audio_extensions:
+                            f_stem = f.stem.casefold()
+                            if f_stem not in existing_stems:
+                                act = library_stored_path(f, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs)
+                                if act and act not in existing_set:
+                                    existing_files.append(act)
+                                    existing_set.add(act)
+                                    existing_stems.add(f_stem)
+                                    added = True
         except Exception:
             pass
+
+        # Ensure playlist_catalog is kept in sync with all tracks in the playlist
+        if state.playlist_catalog is not None and not entry.get('manual') and not entry.get('liked'):
+            try:
+                cat_rows = state.playlist_catalog.list_tracks(pl_title)
+                if cat_rows or state.playlist_catalog.spotify_id_for_playlist(pl_title):
+                    cat_files = {str(r.get('filename') or '').replace('\\', '/') for r in cat_rows}
+                    cat_stems = {
+                        os.path.splitext(os.path.basename(str(r.get('filename') or '').replace('\\', '/')))[0].casefold()
+                        for r in cat_rows
+                        if r.get('filename')
+                    }
+                    for idx, f_stored in enumerate(existing_files):
+                        f_norm = f_stored.replace('\\', '/')
+                        f_stem = os.path.splitext(os.path.basename(f_norm))[0].casefold()
+                        if f_norm not in cat_files and f_stem not in cat_stems:
+                            full_f = locate_library_file(f_norm, ctx.download_dir, ctx.slskd_dir, ctx.extra_dirs)
+                            if full_f is not None:
+                                tid_f = (
+                                    state.track_index.spotify_id_for_filename(f_norm)
+                                    if state.track_index is not None
+                                    else None
+                                ) or f'file:{Path(f_norm).name}'
+                                state.playlist_catalog.upsert_track(
+                                    pl_title,
+                                    {'song_id': tid_f},
+                                    f_norm,
+                                    full_f,
+                                    track_order=len(cat_rows) + idx,
+                                )
+                                cat_files.add(f_norm)
+                                cat_stems.add(f_stem)
+            except Exception:
+                pass
 
         if added:
             entry = dict(entry)
@@ -1589,13 +1628,20 @@ def playlist_entry_for_request(
             try:
                 from . import m3u
                 from .m3u import sanitize_playlist_name
-                clean_name = sanitize_playlist_name(str(entry.get('name') or wanted))
+                clean_name = sanitize_playlist_name(pl_title)
+                existing_m3u = m3u.find_m3u_for_name(ctx.download_dir, pl_title)
+                if existing_m3u is not None and existing_m3u.parent == ctx.download_dir / 'Playlists':
+                    pl_sub = None
+                elif existing_m3u is not None and existing_m3u.parent != ctx.download_dir:
+                    pl_sub = existing_m3u.parent.name
+                else:
+                    pl_sub = None if _organize_enabled() else clean_name
                 m3u_entries = [{'filename': f} for f in existing_files]
                 m3u.write_m3u(
                     ctx.download_dir,
-                    str(entry.get('name') or wanted),
+                    pl_title,
                     m3u_entries,
-                    playlist_subdir=clean_name,
+                    playlist_subdir=pl_sub,
                     slskd_dir=ctx.slskd_dir,
                     extra_dirs=ctx.extra_dirs,
                     manual=bool(entry.get('manual')),
@@ -6196,7 +6242,10 @@ def on_track_path_changed(
 
     if state.playlist_catalog is not None:
         try:
-            state.playlist_catalog.update_filename(old_file, new_file)
+            new_ck = content_key_for(full_path) if full_path.is_file() else None
+            state.playlist_catalog.update_filename(
+                old_file, new_file, content_key=new_ck
+            )
         except Exception:
             logger.opt(exception=True).debug(
                 'Failed updating playlist_catalog on path change'

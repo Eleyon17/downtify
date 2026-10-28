@@ -1051,7 +1051,10 @@ def upgrade_track(
 
                 if ctx.playlist_catalog is not None:
                     try:
-                        ctx.playlist_catalog.update_filename(old_stored, new_stored)
+                        new_ck = file_content_key(final_path) or ''
+                        ctx.playlist_catalog.update_filename(
+                            old_stored, new_stored, content_key=new_ck or None
+                        )
                     except Exception:
                         pass
 
@@ -1149,16 +1152,32 @@ def upgrade_track(
     )
     if error:
         return UpgradeOutcome(JOB_FAILED, error)
-    if old_key and deps.rekey_owners is not None:
+    try:
+        new_key = file_content_key(full) or ''
+    except Exception:
+        new_key = ''
+    if old_key and new_key and deps.rekey_owners is not None:
         try:
-            new_key = file_content_key(full) or ''
-            if new_key:
-                deps.rekey_owners(old_key, new_key, stored_path)
+            deps.rekey_owners(old_key, new_key, stored_path)
         except Exception:
             logger.opt(exception=True).debug(
                 'Library upgrade: could not rekey owners for {}',
                 stored_path,
             )
+    if new_key and ctx.playlist_catalog is not None:
+        try:
+            ctx.playlist_catalog.update_filename(
+                stored_path, stored_path, content_key=new_key
+            )
+        except Exception:
+            pass
+    if new_key and ctx.track_index is not None:
+        try:
+            tid = ctx.track_index.spotify_id_for_filename(stored_path)
+            if tid:
+                ctx.track_index.register(tid, stored_path, full_path=full)
+        except Exception:
+            pass
 
     if new_lyrics is not None:
         changed.append(CATEGORY_LYRICS)
@@ -1167,6 +1186,16 @@ def upgrade_track(
             ctx.metadata_cache.refresh(stored_path, full)
         except Exception:
             logger.debug('Library upgrade: metadata cache refresh failed')
+    try:
+        from .library_catalog import (
+            drop_library_listing_files,
+            merge_library_listing_file,
+        )
+
+        drop_library_listing_files(ctx, [stored_path])
+        merge_library_listing_file(ctx, stored_path)
+    except Exception:
+        pass
 
     return UpgradeOutcome(
         JOB_DONE,
@@ -1506,11 +1535,19 @@ class LibraryUpgradeRunner:
             self.db.requeue_running(run_id)
             self.db.set_state(run_id, state)
         try:
+            from .library_catalog import list_library_entries
             from .library_paths_cache import invalidate_library_paths_cache
 
-            invalidate_library_paths_cache(drop_entries=True, notify=True)
+            invalidate_library_paths_cache(drop_entries=True, notify=False)
+            list_library_entries(self.deps.context())
+            invalidate_library_paths_cache(drop_entries=False, notify=True)
         except Exception:
-            pass
+            try:
+                from .library_paths_cache import invalidate_library_paths_cache
+
+                invalidate_library_paths_cache(drop_entries=False, notify=True)
+            except Exception:
+                pass
         self._publish()
 
     def _process(

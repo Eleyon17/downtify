@@ -319,8 +319,8 @@ async function loadMissing() {
 }
 
 watch(
-  () => String(route.query.name || ''),
-  (name) => {
+  [() => String(route.query.name || ''), () => library.loaded.value],
+  ([name]) => {
     missing.value = []
     library.loadPlaylistTracks(name)
   },

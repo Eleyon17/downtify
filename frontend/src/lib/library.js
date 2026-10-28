@@ -219,6 +219,7 @@ export function buildPlaylists(playlists, tracksByFile, batches = []) {
   const fromM3u = playlists.map((playlist) => {
     const files = playlist.files || []
     const tracks = files
+      .filter(Boolean)
       .map((file) => {
         const norm = String(file || '').replace(/\\/g, '/')
         const stem = stripExt(norm)
@@ -227,7 +228,8 @@ export function buildPlaylists(playlists, tracksByFile, batches = []) {
           tracksByFile.get(file) ||
           tracksByFile.get(norm) ||
           tracksByStem.get(stem) ||
-          tracksByBaseName.get(base)
+          tracksByBaseName.get(base) ||
+          normalizeTrack(norm)
         )
       })
       .filter(Boolean)
