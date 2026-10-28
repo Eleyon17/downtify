@@ -559,6 +559,12 @@ def _pick_artwork(
         except Exception:
             meta_cache = None
     if meta_cache is not None:
+        file_path = str(
+            entry.get('file') or entry.get('filename') or ''
+        ).strip()
+        ck = str(entry.get('content_key') or '').strip()
+        if meta_cache.is_track_artwork_locked(file_path, ck):
+            return _Artwork(px=have)
         art = str(
             entry.get('album_artist') or entry.get('artist') or ''
         ).strip()

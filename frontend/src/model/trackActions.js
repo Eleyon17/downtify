@@ -7,6 +7,7 @@ import { useHistory } from '/src/model/history'
 import { useUi } from '/src/model/ui'
 import { useAuth } from '/src/model/auth'
 import { useReplaceAudio } from '/src/model/replaceAudio'
+import { useTrackArt } from '/src/model/trackArt'
 import { canReplace } from '/src/lib/replaceAudio'
 import { coverURL, saveName } from '/src/lib/paths'
 import { useI18n } from '/src/i18n'
@@ -19,6 +20,7 @@ export function useTrackActions() {
   const ui = useUi()
   const auth = useAuth()
   const replaceAudio = useReplaceAudio()
+  const trackArt = useTrackArt()
   const shares = useShares()
   const router = useRouter()
   const { t } = useI18n()
@@ -188,6 +190,13 @@ export function useTrackActions() {
         label: t('actions.share'),
         icon: 'share',
         action: () => shares.shareTrack(track),
+      },
+      {
+        // Change track artwork (admins).
+        label: t('trackArt.changeArt') || 'Change Track Art',
+        icon: 'image',
+        hidden: !auth.isAdmin.value || !track.file,
+        action: () => trackArt.open(track),
       },
       {
         // Wrong song or version: pick the right one by hand (admins).

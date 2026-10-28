@@ -496,10 +496,14 @@ import { useNowPlaying } from '/src/model/ui'
 import { formatBytes, formatDuration, hueFor } from '/src/lib/format'
 import { availablePanels, defaultPanel, requestedPanel } from '/src/lib/panels'
 import { useCoverPalette } from '/src/model/coverPalette'
+import { useAuth } from '/src/model/auth'
+import { useTrackArt } from '/src/model/trackArt'
 import { saveName } from '/src/lib/paths'
 import { useI18n } from '/src/i18n'
 
 const player = usePlayer()
+const auth = useAuth()
+const trackArt = useTrackArt()
 const cast = useCast()
 const library = useLibrary()
 const dm = useDownloadManager()
@@ -677,6 +681,15 @@ const trackMenu = computed(() => {
       hidden: !!tr.stream,
       action: () => saveFile(tr),
     },
+    ...(auth.isAdmin.value && tr.file
+      ? [
+          {
+            label: t('trackArt.changeArt') || 'Change Track Art',
+            icon: 'image',
+            action: () => trackArt.open(tr),
+          },
+        ]
+      : []),
     { divider: true },
     {
       label: t('player.details'),

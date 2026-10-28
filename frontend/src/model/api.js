@@ -265,6 +265,33 @@ function unlockAlbumCover(artist, title) {
   })
 }
 
+function getTrackCoverCandidates(file, artist = '', title = '', query = '') {
+  return API.get('/api/library/album/covers', {
+    params: {
+      file: file || undefined,
+      artist: artist || undefined,
+      title: title || undefined,
+      query: query || undefined,
+    },
+  })
+}
+
+function setTrackCover(file, coverUrl, lock = true) {
+  return API.post('/api/library/track/cover', {
+    file,
+    cover_url: coverUrl,
+    lock,
+    track_only: true,
+  })
+}
+
+function unlockTrackCover(file) {
+  return API.post('/api/library/track/cover/unlock', {
+    file,
+    track_only: true,
+  })
+}
+
 // ── Artist profile: bio, social links, related artists, platform ids ──
 function getArtistProfile(name) {
   return API.get('/api/artists/profile', { params: { name } })
@@ -926,6 +953,9 @@ export default {
   getAlbumCoverCandidates,
   setAlbumCover,
   unlockAlbumCover,
+  getTrackCoverCandidates,
+  setTrackCover,
+  unlockTrackCover,
   getArtistProfile,
   getArtistOverview,
   ensureArtistProfile,

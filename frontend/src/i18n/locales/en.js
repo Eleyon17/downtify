@@ -498,6 +498,23 @@ export default {
     noResultsHint:
       'Try searching for artist and album name above, or paste an image URL directly.',
   },
+  trackArt: {
+    title: 'Choose Track Artwork',
+    changeArt: 'Change Track Art',
+    replaceArt: 'Replace Track Art',
+    searchPlaceholder: 'Search song or paste image URL...',
+    lockLabel: 'Lock Artwork Against Upgrades',
+    lockHint: 'Library Upgrade will never overwrite or change this track artwork.',
+    unlock: 'Unlock',
+    unlocked: 'Track artwork unlocked. Future Library Upgrades may replace it.',
+    appliedAndLocked: 'Track artwork updated and locked against upgrades.',
+    applied: 'Track artwork updated.',
+    lockedBadge: 'Art Locked',
+    apply: 'Set Track Art & Lock',
+    noResults: 'No track cover options found',
+    noResultsHint:
+      'Try searching for artist and title above, or paste an image URL directly.',
+  },
   artistBio: {
     title: 'Bio',
     fetchAppleMusic: 'Fetch from Apple Music',

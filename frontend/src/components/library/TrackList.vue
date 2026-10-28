@@ -151,6 +151,13 @@
               :class="isCurrent(row.track) ? 'text-accent' : 'text-fg'"
             >
               <span class="truncate">{{ row.track.title }}</span>
+              <span
+                v-if="row.track.artwork_locked"
+                class="shrink-0 text-[11px]"
+                :title="t('trackArt.lockedBadge') || 'Art Locked'"
+              >
+                🔒
+              </span>
               <AppIcon
                 name="cloud"
                 :size="14"

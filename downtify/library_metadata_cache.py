@@ -115,6 +115,12 @@ class LibraryMetadataCache:
                     locked_at TEXT NOT NULL
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS locked_track_artworks (
+                    track_path TEXT PRIMARY KEY,
+                    locked_at TEXT NOT NULL
+                )
+            """)
             row = conn.execute(
                 "SELECT sql FROM sqlite_master WHERE name='library_metadata'"
             ).fetchone()
@@ -216,14 +222,108 @@ class LibraryMetadataCache:
             except sqlite3.OperationalError:
                 return False
 
-    def set_track_artwork(self, content_key: str, cover_px: int, locked: bool = True) -> None:
+    def set_track_artwork(
+        self,
+        content_key: str,
+        cover_px: int,
+        locked: bool = True,
+        track_path: str = '',
+    ) -> None:
+        key = str(track_path or '').strip().replace('\\', '/').casefold()
         with self._connect() as conn:
             conn.execute(
                 """UPDATE library_metadata
                    SET has_cover = 1, cover_px = ?, artwork_locked = ?
-                   WHERE content_key = ?""",
-                (cover_px, 1 if locked else 0, content_key),
+                   WHERE content_key = ? OR (LOWER(filename) = ? AND ? != '')""",
+                (cover_px, 1 if locked else 0, content_key, key, key),
             )
+        if track_path:
+            if locked:
+                self.lock_track_artwork(track_path, content_key)
+            else:
+                self.unlock_track_artwork(track_path, content_key)
+
+    def lock_track_artwork(
+        self, track_path: str, content_key: str = ''
+    ) -> None:
+        key = str(track_path or '').strip().replace('\\', '/').casefold()
+        with self._connect() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS locked_track_artworks (
+                    track_path TEXT PRIMARY KEY,
+                    locked_at TEXT NOT NULL
+                )
+            """)
+            if key:
+                conn.execute(
+                    """INSERT OR REPLACE INTO locked_track_artworks (track_path, locked_at)
+                       VALUES (?, datetime('now'))""",
+                    (key,),
+                )
+            if content_key or key:
+                try:
+                    conn.execute(
+                        """UPDATE library_metadata SET artwork_locked = 1
+                           WHERE content_key = ? OR LOWER(filename) = ?""",
+                        (content_key, key),
+                    )
+                except Exception:
+                    pass
+
+    def unlock_track_artwork(
+        self, track_path: str, content_key: str = ''
+    ) -> None:
+        key = str(track_path or '').strip().replace('\\', '/').casefold()
+        with self._connect() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS locked_track_artworks (
+                    track_path TEXT PRIMARY KEY,
+                    locked_at TEXT NOT NULL
+                )
+            """)
+            if key:
+                conn.execute(
+                    'DELETE FROM locked_track_artworks WHERE track_path = ?',
+                    (key,),
+                )
+            if content_key or key:
+                try:
+                    conn.execute(
+                        """UPDATE library_metadata SET artwork_locked = 0
+                           WHERE content_key = ? OR LOWER(filename) = ?""",
+                        (content_key, key),
+                    )
+                except Exception:
+                    pass
+
+    def is_track_artwork_locked(
+        self, track_path: str = '', content_key: str = ''
+    ) -> bool:
+        key = str(track_path or '').strip().replace('\\', '/').casefold()
+        with self._connect() as conn:
+            try:
+                if key:
+                    row = conn.execute(
+                        'SELECT 1 FROM locked_track_artworks WHERE track_path = ?',
+                        (key,),
+                    ).fetchone()
+                    if row:
+                        return True
+            except sqlite3.OperationalError:
+                pass
+            try:
+                if content_key or key:
+                    row = conn.execute(
+                        """SELECT 1 FROM library_metadata
+                           WHERE (content_key = ? OR LOWER(filename) = ?)
+                             AND artwork_locked = 1""",
+                        (content_key, key),
+                    ).fetchone()
+                    if row:
+                        return True
+            except sqlite3.OperationalError:
+                pass
+            return False
 
     @staticmethod
     def _ensure_columns(conn: sqlite3.Connection) -> None:

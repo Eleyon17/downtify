@@ -6447,39 +6447,66 @@ def library_albums(request: Request) -> list[dict[str, Any]]:
 async def library_album_covers(
     artist: str = Query(''),
     title: str = Query(''),
+    track: Optional[str] = Query(None),
     query: Optional[str] = Query(None),
     file: Optional[str] = Query(None),
 ) -> dict[str, Any]:
-    """Search for scraped album cover options from iTunes, Deezer, Spotify, YouTube Music."""
+    """Search for scraped album or track cover options from iTunes, Deezer, Spotify, YouTube Music."""
+    ctx = library_context()
+    resolved_track = track or ''
+    cur_px = 0
+    cur_path = None
+    if file:
+        cur_path = resolve_library_file(file, ctx)
+        if cur_path and cur_path.is_file():
+            if not resolved_track:
+                try:
+                    meta = extract_metadata(cur_path)
+                    if meta:
+                        resolved_track = str(meta.get('title') or '')
+                        if not artist:
+                            artist = str(meta.get('artist') or '')
+                        if not title:
+                            title = str(meta.get('album') or '')
+                except Exception:
+                    pass
+
     candidates = await asyncio.to_thread(
         cover_sources.search_cover_options,
         artist,
         title,
+        track_title=resolved_track or None,
         query_override=query,
     )
-    ctx = library_context()
-    if file:
-        cur_path = resolve_library_file(file, ctx)
-        if cur_path and cur_path.is_file():
-            cur_data, _ = extract_cover_art(cur_path)
-            if cur_data:
-                px = image_short_side(cur_data) or 0
-                candidates.insert(
-                    0,
-                    {
-                        'source': 'current',
-                        'source_label': 'Current Embedded Art',
-                        'url': f'/api/cover?file={quote_plus(file)}',
-                        'width': px,
-                        'height': px,
-                        'title': title or 'Current Cover',
-                        'artist': artist,
-                    },
-                )
+
+    if cur_path and cur_path.is_file():
+        cur_data, _ = extract_cover_art(cur_path)
+        if cur_data:
+            cur_px = image_short_side(cur_data) or 0
+            candidates.insert(
+                0,
+                {
+                    'source': 'current',
+                    'source_label': 'Current Artwork',
+                    'url': f'/api/cover?file={quote_plus(file)}',
+                    'width': cur_px,
+                    'height': cur_px,
+                    'title': resolved_track or title or 'Current Artwork',
+                    'artist': artist,
+                },
+            )
 
     is_locked = False
-    if ctx.metadata_cache is not None and (artist or title):
-        is_locked = ctx.metadata_cache.is_artwork_locked(artist, title)
+    if ctx.metadata_cache is not None:
+        if file:
+            ck = (
+                content_key_for(cur_path)
+                if (cur_path and cur_path.is_file())
+                else ''
+            )
+            is_locked = ctx.metadata_cache.is_track_artwork_locked(file, ck)
+        if not is_locked and (artist or title):
+            is_locked = ctx.metadata_cache.is_artwork_locked(artist, title)
 
     return {
         'candidates': candidates,
@@ -6488,8 +6515,9 @@ async def library_album_covers(
 
 
 @router.post('/api/library/album/cover')
+@router.post('/api/library/track/cover')
 async def library_set_album_cover(request: Request) -> dict[str, Any]:
-    """Apply chosen cover art to all tracks of an album and lock it against upgrades."""
+    """Apply chosen cover art to all tracks of an album or a single track, and lock against upgrades."""
     if not request_is_admin(request):
         raise HTTPException(status_code=403, detail='Admin role required')
     payload = await _json_object(request)
@@ -6498,6 +6526,9 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
     cover_url = str(payload.get('cover_url') or '').strip()
     file_target = str(payload.get('file') or '').strip()
     lock = bool(payload.get('lock', True))
+    track_only = bool(payload.get('track_only', False)) or (
+        bool(file_target) and not (artist and title)
+    )
 
     if not cover_url:
         raise HTTPException(status_code=400, detail='Cover URL is required')
@@ -6544,6 +6575,35 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
             status_code=400, detail='Invalid or unreadable image file'
         )
 
+    # Individual Track Mode
+    if track_only and file_target:
+        full = resolve_library_file(file_target, ctx)
+        if not (full and full.is_file()):
+            raise HTTPException(status_code=404, detail='Track file not found')
+
+        success = embed_cover_art(full, cover_bytes, mime=mime)
+        if not success:
+            raise HTTPException(
+                status_code=500, detail='Failed to embed cover art into track'
+            )
+
+        if ctx.metadata_cache is not None:
+            ctx.metadata_cache.refresh(file_target, full)
+            new_ck = content_key_for(full) or ''
+            ctx.metadata_cache.set_track_artwork(
+                new_ck, cover_px=width, locked=lock, track_path=file_target
+            )
+
+        invalidate_library_paths_cache()
+        return {
+            'status': 'ok',
+            'tracks_updated': 1,
+            'cover_px': width,
+            'locked': lock,
+            'track_only': True,
+        }
+
+    # Album Mode
     files = list_library_paths(ctx)
     tracks = list_entries_for_stored_paths(ctx, files)
     matched_files: list[tuple[str, Path, str]] = []
@@ -6551,7 +6611,7 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
     if file_target:
         full = resolve_library_file(file_target, ctx)
         if full and full.is_file():
-            ck = entry_content_key(full)
+            ck = content_key_for(full) or ''
             matched_files.append((file_target, full, ck))
     elif artist or title:
         wanted_art = artist.casefold()
@@ -6567,13 +6627,13 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
                 stored = str(t.get('file') or '')
                 full = resolve_library_file(stored, ctx)
                 if full and full.is_file():
-                    ck = str(t.get('content_key') or entry_content_key(full))
+                    ck = str(t.get('content_key') or content_key_for(full) or '')
                     matched_files.append((stored, full, ck))
 
     if not matched_files and file_target:
         full = resolve_library_file(file_target, ctx)
         if full and full.is_file():
-            matched_files.append((file_target, full, entry_content_key(full)))
+            matched_files.append((file_target, full, content_key_for(full) or ''))
 
     if not matched_files:
         raise HTTPException(
@@ -6587,8 +6647,10 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
         if success:
             updated_count += 1
             if ctx.metadata_cache is not None:
+                ctx.metadata_cache.refresh(stored, full)
+                new_ck = content_key_for(full) or ck
                 ctx.metadata_cache.set_track_artwork(
-                    ck, cover_px=width, locked=lock
+                    new_ck, cover_px=width, locked=lock, track_path=stored
                 )
             folder = full.parent
             if folder not in folders_written:
@@ -6615,16 +6677,27 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
 
 
 @router.post('/api/library/album/cover/unlock')
+@router.post('/api/library/track/cover/unlock')
 async def library_unlock_album_cover(request: Request) -> dict[str, Any]:
-    """Unlock album artwork so Library Upgrade can update it again."""
+    """Unlock album or track artwork so Library Upgrade can update it again."""
     if not request_is_admin(request):
         raise HTTPException(status_code=403, detail='Admin role required')
     payload = await _json_object(request)
     artist = str(payload.get('artist') or '').strip()
     title = str(payload.get('title') or '').strip()
+    file_target = str(payload.get('file') or '').strip()
     ctx = library_context()
-    if ctx.metadata_cache is not None and artist and title:
-        ctx.metadata_cache.unlock_album_artwork(artist, title)
+    if ctx.metadata_cache is not None:
+        if file_target:
+            full = resolve_library_file(file_target, ctx)
+            ck = (
+                content_key_for(full)
+                if (full and full.is_file())
+                else ''
+            )
+            ctx.metadata_cache.unlock_track_artwork(file_target, ck)
+        if artist and title and not payload.get('track_only'):
+            ctx.metadata_cache.unlock_album_artwork(artist, title)
     invalidate_library_paths_cache()
     return {'status': 'ok', 'locked': False}
 

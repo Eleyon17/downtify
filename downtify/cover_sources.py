@@ -216,17 +216,24 @@ def search_cover_options(
     artist: str,
     album: str,
     *,
+    track_title: Optional[str] = None,
     file_path: Optional[Path] = None,
     query_override: Optional[str] = None,
 ) -> list[dict[str, Any]]:
-    """Gather high-resolution album cover options from iTunes, Deezer, Spotify, and YouTube Music."""
+    """Gather high-resolution cover options from iTunes, Deezer, Spotify, and YouTube Music."""
 
     candidates: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
 
     clean_artist = str(artist or '').strip()
     clean_album = str(album or '').strip()
-    search_query = (query_override or f'{clean_artist} {clean_album}').strip()
+    clean_track = str(track_title or '').strip()
+    if query_override:
+        search_query = str(query_override).strip()
+    elif clean_track:
+        search_query = f'{clean_artist} {clean_track}'.strip()
+    else:
+        search_query = f'{clean_artist} {clean_album}'.strip()
 
     def add_candidate(
         source: str, url: str, width: int, title: str = '', subtitle: str = ''
@@ -239,7 +246,7 @@ def search_cover_options(
             'deezer': 'Deezer',
             'spotify': 'Spotify',
             'youtube-music': 'YouTube Music',
-            'current': 'Current Track Art',
+            'current': 'Current Artwork',
         }
         candidates.append({
             'source': source,
@@ -247,7 +254,7 @@ def search_cover_options(
             'url': url,
             'width': width,
             'height': width,
-            'title': title or clean_album,
+            'title': title or clean_track or clean_album,
             'artist': subtitle or clean_artist,
         })
 
