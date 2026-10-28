@@ -6490,6 +6490,8 @@ async def library_album_covers(
 @router.post('/api/library/album/cover')
 async def library_set_album_cover(request: Request) -> dict[str, Any]:
     """Apply chosen cover art to all tracks of an album and lock it against upgrades."""
+    if not request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
     payload = await _json_object(request)
     artist = str(payload.get('artist') or '').strip()
     title = str(payload.get('title') or '').strip()
@@ -6615,6 +6617,8 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
 @router.post('/api/library/album/cover/unlock')
 async def library_unlock_album_cover(request: Request) -> dict[str, Any]:
     """Unlock album artwork so Library Upgrade can update it again."""
+    if not request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
     payload = await _json_object(request)
     artist = str(payload.get('artist') or '').strip()
     title = str(payload.get('title') or '').strip()

@@ -502,6 +502,13 @@ class UpgradeDeps:
     downloader: Optional[Callable[[], Any]] = None
     on_track_path_changed: Optional[Callable[[str, str, Path], None]] = None
 
+    @property
+    def metadata_cache(self) -> Any:
+        try:
+            return self.context().metadata_cache
+        except Exception:
+            return None
+
 
 def resolve_track(stored_path: str, ctx: LibraryContext) -> Optional[Path]:
     return locate_library_file(
@@ -543,10 +550,20 @@ def _pick_artwork(
         return _Artwork(px=have)
     if bool(entry.get('artwork_locked')):
         return _Artwork(px=have)
-    if deps is not None and deps.metadata_cache is not None:
-        art = str(entry.get('album_artist') or entry.get('artist') or '').strip()
+    meta_cache = None
+    if deps is not None:
+        try:
+            meta_cache = getattr(deps, 'metadata_cache', None)
+            if meta_cache is None and hasattr(deps, 'context'):
+                meta_cache = deps.context().metadata_cache
+        except Exception:
+            meta_cache = None
+    if meta_cache is not None:
+        art = str(
+            entry.get('album_artist') or entry.get('artist') or ''
+        ).strip()
         alb = str(entry.get('album') or '').strip()
-        if deps.metadata_cache.is_artwork_locked(art, alb):
+        if meta_cache.is_artwork_locked(art, alb):
             return _Artwork(px=have)
     if have >= options.artwork_min_px:
         return _Artwork(px=have)

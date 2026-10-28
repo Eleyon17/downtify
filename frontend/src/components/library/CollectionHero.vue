@@ -53,14 +53,27 @@
         <button
           v-if="photoEditable"
           type="button"
-          class="absolute inset-0 flex items-center justify-center rounded-[16px] bg-black/0 text-white opacity-0 transition-all group-hover/cover:bg-black/45 group-hover/cover:opacity-100"
+          :title="photoEditLabel || t('artistArt.editPhoto')"
+          :aria-label="photoEditLabel || t('artistArt.editPhoto')"
+          class="absolute inset-0 flex items-center justify-center rounded-[16px] bg-black/0 text-white opacity-0 transition-all group-hover/cover:bg-black/50 group-hover/cover:opacity-100"
           :class="round ? 'rounded-full' : ''"
           @click="$emit('edit-photo')"
         >
-          <span class="flex items-center gap-2 text-base font-semibold">
-            <AppIcon name="pencil" :size="17" />{{ t('artistArt.editPhoto') }}
+          <span
+            class="flex items-center gap-2 rounded-full bg-black/75 px-3.5 py-1.5 text-sm font-semibold shadow-lg backdrop-blur"
+          >
+            <AppIcon :name="photoEditIcon || 'pencil'" :size="16" />{{
+              photoEditLabel || t('artistArt.editPhoto')
+            }}
           </span>
         </button>
+        <div
+          v-if="photoEditable"
+          class="pointer-events-none absolute right-3 bottom-3 flex size-8 items-center justify-center rounded-full bg-black/65 text-white shadow-md backdrop-blur transition-opacity group-hover/cover:opacity-0"
+          :class="round ? 'right-2 bottom-2' : ''"
+        >
+          <AppIcon :name="photoEditIcon || 'pencil'" :size="15" />
+        </div>
       </div>
       <div
         class="flex min-w-0 flex-col gap-3 max-md:items-center max-md:text-center"
@@ -116,6 +129,8 @@ const props = defineProps({
   // is still reachable from the banner's edit button.
   banner: { type: String, default: '' },
   photoEditable: { type: Boolean, default: false },
+  photoEditLabel: { type: String, default: '' },
+  photoEditIcon: { type: String, default: 'pencil' },
   bannerEditable: { type: Boolean, default: false },
 })
 defineEmits(['edit-photo', 'edit-banner'])

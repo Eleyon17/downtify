@@ -198,6 +198,17 @@
             }}
           </span>
         </template>
+        <template v-if="tab === 'albums' && auth.isAdmin.value" #overlay>
+          <button
+            type="button"
+            class="flex size-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition-all hover:scale-110 hover:bg-black/85"
+            :title="t('albumArt.changeArt')"
+            :aria-label="t('albumArt.changeArt')"
+            @click.stop.prevent="openAlbumArt(item)"
+          >
+            <AppIcon name="image" :size="15" />
+          </button>
+        </template>
       </MediaTile>
     </div>
 
@@ -221,8 +232,23 @@
             size="sm"
           />
         </template>
+        <template v-if="tab === 'albums' && auth.isAdmin.value" #actions>
+          <UiIconButton
+            icon="image"
+            :label="t('albumArt.changeArt')"
+            size="sm"
+            @click.stop.prevent="openAlbumArt(item)"
+          />
+        </template>
       </MediaRow>
     </div>
+
+    <AlbumArtModal
+      :open="artModalOpen"
+      :album="artTargetAlbum"
+      @close="artModalOpen = false"
+      @saved="onArtSaved"
+    />
   </div>
 </template>
 
@@ -245,6 +271,7 @@ import PageHeader from '/src/components/library/PageHeader.vue'
 import PlaylistStatus from '/src/components/library/PlaylistStatus.vue'
 import SelectionBar from '/src/components/library/SelectionBar.vue'
 import TrackList from '/src/components/library/TrackList.vue'
+import AlbumArtModal from '/src/components/library/AlbumArtModal.vue'
 import API from '/src/model/api'
 import { useAuth } from '/src/model/auth'
 import { useLibrary } from '/src/model/library'
@@ -661,5 +688,21 @@ async function deleteSelected() {
       [...selected.value].filter((file) => !gone.has(file))
     )
   }
+}
+
+const artModalOpen = ref(false)
+const artTargetAlbum = ref(null)
+
+async function openAlbumArt(item) {
+  if (item?.artist) {
+    await library.loadArtistTracks(item.artist)
+  }
+  const full = library.findAlbum(item.artist, item.title)
+  artTargetAlbum.value = full || item
+  artModalOpen.value = true
+}
+
+function onArtSaved() {
+  library.load({ force: true })
 }
 </script>

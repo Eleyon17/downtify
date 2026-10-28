@@ -481,6 +481,23 @@ export default {
     removed: 'Image removed',
     removeFailed: 'Could not remove that image',
   },
+  albumArt: {
+    title: 'Choose Album Artwork',
+    changeArt: 'Change Album Art',
+    replaceArt: 'Replace Album Art',
+    searchPlaceholder: 'Search album title or paste image URL...',
+    lockLabel: 'Lock Artwork Against Upgrades',
+    lockHint: 'Library Upgrade will never overwrite or change this album art.',
+    unlock: 'Unlock',
+    unlocked: 'Artwork unlocked. Future Library Upgrades may replace it.',
+    appliedAndLocked: 'Album artwork updated and locked against upgrades.',
+    applied: 'Album artwork updated.',
+    lockedBadge: 'Art Locked',
+    apply: 'Set Artwork & Lock',
+    noResults: 'No album cover options found',
+    noResultsHint:
+      'Try searching for artist and album name above, or paste an image URL directly.',
+  },
   artistBio: {
     title: 'Bio',
     fetchAppleMusic: 'Fetch from Apple Music',

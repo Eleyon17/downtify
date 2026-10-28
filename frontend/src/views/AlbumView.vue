@@ -11,7 +11,9 @@
         :kicker="[t('album.kicker'), album.year].filter(Boolean).join(' · ')"
         :cover="album.cover"
         :name="album.title"
-        photo-editable
+        :photo-editable="auth.isAdmin.value"
+        :photo-edit-label="t('albumArt.changeArt')"
+        photo-edit-icon="image"
         @edit-photo="artModalOpen = true"
       >
         <template #subtitle>
@@ -44,12 +46,12 @@
             {{ t('actions.addToQueue') }}
           </UiButton>
           <UiButton
-            variant="ghost"
-            icon="wand"
-            class="max-sm:hidden"
+            v-if="auth.isAdmin.value"
+            variant="secondary"
+            icon="image"
             @click="artModalOpen = true"
           >
-            {{ t('albumArt.changeArt') || 'Album Art' }}
+            {{ t('albumArt.changeArt') }}
           </UiButton>
           <UiButton
             variant="ghost"
@@ -131,6 +133,7 @@ import MediaTile from '/src/components/library/MediaTile.vue'
 import PlayButton from '/src/components/library/PlayButton.vue'
 import TrackList from '/src/components/library/TrackList.vue'
 import AlbumArtModal from '/src/components/library/AlbumArtModal.vue'
+import { useAuth } from '/src/model/auth'
 import { useLibrary } from '/src/model/library'
 import { usePlayer } from '/src/model/player'
 import { usePlaylistActions } from '/src/model/playlistActions'
@@ -140,6 +143,7 @@ import { formatBytes, splitLength } from '/src/lib/format'
 import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
+const auth = useAuth()
 const route = useRoute()
 const router = useRouter()
 const library = useLibrary()
@@ -243,13 +247,17 @@ const menu = computed(() => [
     icon: 'zip',
     action: () => actions.downloadZip(album.value.tracks),
   },
-  {
-    label: t('albumArt.changeArt') || 'Change Album Art',
-    icon: 'wand',
-    action: () => {
-      artModalOpen.value = true
-    },
-  },
+  ...(auth.isAdmin.value
+    ? [
+        {
+          label: t('albumArt.changeArt'),
+          icon: 'image',
+          action: () => {
+            artModalOpen.value = true
+          },
+        },
+      ]
+    : []),
   {
     label: t('album.searchMore'),
     icon: 'search',
