@@ -259,10 +259,16 @@ def search_cover_options(
             'youtube-music': 'YouTube Music',
             'current': 'Current Artwork',
         }
+        preview_url = (
+            f'/api/cover/proxy?url={quote_plus(url)}'
+            if url.startswith(('http://', 'https://'))
+            else url
+        )
         candidates.append({
             'source': source,
             'source_label': source_labels.get(source, source.capitalize()),
             'url': url,
+            'preview_url': preview_url,
             'width': width,
             'height': width,
             'title': title or clean_track or clean_album,

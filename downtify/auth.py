@@ -922,6 +922,7 @@ RULES: list[tuple[frozenset[str], re.Pattern[str], str]] = [
             r'^/(tracks|list|playlists|lyrics|cover|playlist-cover)$',
             CLIENT,
         ),
+        (_READ, r'^/api/cover(/proxy)?$', CLIENT),
         (_READ, r'^/(downloads|media)/', CLIENT),
         (_READ, r'^/api/(songs|albums|artists)/search$', CLIENT),
         (_READ, r'^/api/discover/chart$', CLIENT),

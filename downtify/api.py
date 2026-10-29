@@ -6474,6 +6474,72 @@ def library_cover_art_route(file: str) -> Response:
     )
 
 
+@router.get('/api/cover/proxy')
+async def cover_proxy_endpoint(url: str = Query('')) -> Response:
+    """Proxy cover art images to bypass client-side CORS, referrer restrictions, or adblockers."""
+    clean_url = str(url or '').strip()
+    if not clean_url:
+        raise HTTPException(status_code=400, detail='URL parameter is required')
+
+    ctx = library_context()
+
+    # Local cover route
+    if clean_url.startswith(('/cover', '/api/cover')):
+        from urllib.parse import parse_qs, urlparse
+
+        parsed = urlparse(clean_url)
+        params = parse_qs(parsed.query)
+        ref_file = (params.get('file') or [''])[0]
+        ref_path = resolve_library_file(ref_file, ctx) if ref_file else None
+        if ref_path and ref_path.is_file():
+            data, mime = extract_cover_art(ref_path)
+            if data:
+                return Response(
+                    content=data,
+                    media_type=mime or 'image/jpeg',
+                    headers={
+                        'Cache-Control': 'public, max-age=86400',
+                        'ETag': f'"{int(ref_path.stat().st_mtime)}"',
+                    },
+                )
+        raise HTTPException(status_code=404, detail='Embedded cover not found')
+
+    if not clean_url.startswith(('http://', 'https://')):
+        raise HTTPException(status_code=400, detail='Invalid image URL scheme')
+
+    try:
+        resp = await asyncio.to_thread(
+            httpx.get,
+            clean_url,
+            timeout=15,
+            follow_redirects=True,
+            headers={
+                'User-Agent': (
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                    'AppleWebKit/537.36 (KHTML, like Gecko) '
+                    'Chrome/120.0.0.0 Safari/537.36'
+                )
+            },
+        )
+        resp.raise_for_status()
+        content_type = resp.headers.get('content-type', 'image/jpeg')
+        return Response(
+            content=resp.content,
+            media_type=content_type,
+            headers={
+                'Cache-Control': 'public, max-age=86400',
+                'ETag': f'"{hash(clean_url)}"',
+            },
+        )
+    except Exception as exc:
+        logger.debug(
+            'Cover proxy fetch failed for {}: {}', clean_url[:120], exc
+        )
+        raise HTTPException(
+            status_code=502, detail=f'Failed to proxy image: {exc}'
+        )
+
+
 @router.get('/api/library/album/covers')
 async def library_album_covers(
     artist: str = Query(''),
@@ -6520,6 +6586,7 @@ async def library_album_covers(
                     'source': 'current',
                     'source_label': 'Current Artwork',
                     'url': f'/cover?file={quote(file)}',
+                    'preview_url': f'/cover?file={quote(file)}',
                     'width': cur_px,
                     'height': cur_px,
                     'title': resolved_track or title or 'Current Artwork',

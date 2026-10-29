@@ -497,6 +497,10 @@ export default {
     noResults: 'No album cover options found',
     noResultsHint:
       'Try searching for artist and album name above, or paste an image URL directly.',
+    zoomTitle: 'Artwork Preview',
+    viewFullSize: 'Click to view full size',
+    currentArt: 'Current',
+    newArt: 'New Selection',
   },
   trackArt: {
     title: 'Choose Track Artwork',
@@ -514,6 +518,10 @@ export default {
     noResults: 'No track cover options found',
     noResultsHint:
       'Try searching for artist and title above, or paste an image URL directly.',
+    zoomTitle: 'Artwork Preview',
+    viewFullSize: 'Click to view full size',
+    currentArt: 'Current',
+    newArt: 'New Selection',
   },
   artistBio: {
     title: 'Bio',

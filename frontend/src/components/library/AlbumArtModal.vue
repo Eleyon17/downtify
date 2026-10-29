@@ -4,9 +4,9 @@
     :title="t('albumArt.title') || 'Choose Album Artwork'"
     :description="album ? `${album.artist} — ${album.title}` : ''"
     width="sm:max-w-3xl"
-    @close="$emit('close')"
+    @close="handleClose"
   >
-    <div class="flex flex-col gap-5">
+    <div class="flex flex-col gap-4">
       <!-- Search and Custom Input -->
       <form class="flex gap-2" @submit.prevent="search">
         <label
@@ -37,7 +37,7 @@
 
       <!-- Lock Setting & Status Banner -->
       <div
-        class="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line-2 bg-surface-2 p-3.5 text-sm"
+        class="flex flex-wrap items-center justify-between gap-3 rounded-control border border-line-2 bg-surface-2 p-3 text-sm"
       >
         <div class="flex items-center gap-2.5">
           <AppIcon
@@ -108,59 +108,195 @@
         </p>
       </div>
 
-      <!-- Candidate cover grid -->
-      <div
-        v-else
-        class="grid max-h-[55vh] grid-cols-2 gap-3.5 overflow-y-auto p-0.5 sm:grid-cols-3 md:grid-cols-4"
-      >
-        <button
-          v-for="(cand, idx) in candidates"
-          :key="`${cand.source}-${cand.url}-${idx}`"
-          type="button"
-          class="group relative flex flex-col overflow-hidden rounded-cover border-2 p-1.5 text-left transition-all"
-          :class="
-            selectedUrl === cand.url
-              ? 'border-accent bg-accent/10 shadow-md ring-2 ring-accent/30'
-              : 'border-line-2 bg-surface hover:border-line-3'
-          "
-          @click="selectedUrl = cand.url"
+      <div v-else class="flex flex-col gap-4">
+        <!-- Selected Artwork Large Preview & Inspection Card -->
+        <div
+          v-if="selectedCandidate"
+          class="flex flex-col sm:flex-row items-center gap-4 rounded-control border border-accent/40 bg-accent/5 p-3.5 shadow-sm"
         >
-          <div class="relative aspect-square w-full overflow-hidden rounded-[10px] bg-black/20">
+          <!-- Large Image with Click-to-Zoom -->
+          <div
+            class="group relative aspect-square w-36 sm:w-44 shrink-0 cursor-pointer overflow-hidden rounded-cover border-2 border-accent/40 bg-black/40 shadow-md"
+            :title="t('albumArt.viewFullSize') || 'Click to view full size'"
+            @click="showZoomModal = true"
+          >
             <img
-              :src="cand.url"
-              :alt="cand.title || 'Cover candidate'"
-              loading="lazy"
+              :src="selectedPreviewSrc"
+              :alt="selectedCandidate.title || 'Selected artwork'"
+              referrerpolicy="no-referrer"
+              decoding="async"
               class="size-full object-cover transition-transform duration-200 group-hover:scale-105"
+              @error="onPreviewImgError"
             />
             <div
-              v-if="selectedUrl === cand.url"
-              class="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-accent text-white shadow-md"
+              class="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
             >
-              <AppIcon name="check" :size="14" />
+              <div
+                class="flex items-center gap-1.5 rounded-full bg-black/75 px-2.5 py-1 text-xs font-medium text-white shadow backdrop-blur-xs"
+              >
+                <AppIcon name="search" :size="13" />
+                <span>{{ t('albumArt.viewFullSize') || 'Zoom' }}</span>
+              </div>
+            </div>
+            <div
+              class="absolute top-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white uppercase backdrop-blur-xs shadow"
+            >
+              {{ selectedCandidate.source_label || selectedCandidate.source }}
             </div>
           </div>
 
-          <div class="mt-2 flex flex-col gap-0.5 px-0.5">
-            <div class="flex items-center justify-between gap-1 text-[11px]">
-              <span
-                class="rounded px-1.5 py-0.5 font-semibold uppercase tracking-wider text-[10px]"
-                :class="sourceBadgeClass(cand.source)"
-              >
-                {{ cand.source_label || cand.source }}
-              </span>
-              <span class="font-mono text-muted">
-                {{ cand.width ? `${cand.width}×${cand.height || cand.width}` : '' }}
-              </span>
+          <!-- Selection details & Comparison -->
+          <div class="flex min-w-0 flex-1 flex-col justify-between gap-3 self-stretch">
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span
+                  class="rounded px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider"
+                  :class="sourceBadgeClass(selectedCandidate.source)"
+                >
+                  {{ selectedCandidate.source_label || selectedCandidate.source }}
+                </span>
+                <span
+                  v-if="selectedCandidate.width"
+                  class="rounded bg-surface-3 px-2 py-0.5 font-mono text-xs font-medium text-fg"
+                >
+                  {{ selectedCandidate.width }} × {{ selectedCandidate.height || selectedCandidate.width }} px
+                </span>
+                <span
+                  v-if="resolutionDiff > 0"
+                  class="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent"
+                >
+                  +{{ resolutionDiff }} px Upgrade
+                </span>
+              </div>
+              <h4 class="mt-2 truncate text-base font-semibold text-fg">
+                {{ selectedCandidate.title || album?.title }}
+              </h4>
+              <p class="truncate text-xs text-muted">
+                {{ selectedCandidate.artist || album?.artist }}
+              </p>
             </div>
-            <p
-              v-if="cand.title"
-              class="truncate text-xs font-medium text-fg"
-              :title="cand.title"
+
+            <!-- Side-by-side comparison with current album artwork -->
+            <div
+              v-if="currentCandidate && currentCandidate.url !== selectedCandidate.url"
+              class="flex flex-wrap items-center gap-3 rounded-control border border-line-2 bg-surface-2 p-2.5 text-xs"
             >
-              {{ cand.title }}
-            </p>
+              <div class="flex items-center gap-2">
+                <div
+                  class="size-11 shrink-0 overflow-hidden rounded-md border border-line-3 bg-black/30"
+                >
+                  <img
+                    :src="currentCandidate.preview_url || currentCandidate.url"
+                    referrerpolicy="no-referrer"
+                    decoding="async"
+                    class="size-full object-cover"
+                    alt="Current"
+                  />
+                </div>
+                <div class="flex flex-col">
+                  <span class="text-[10px] uppercase font-semibold text-muted">
+                    {{ t('albumArt.currentArt') || 'Current' }}
+                  </span>
+                  <span class="font-mono text-xs text-fg">
+                    {{ currentCandidate.width ? `${currentCandidate.width}×${currentCandidate.height || currentCandidate.width}` : 'Existing' }}
+                  </span>
+                </div>
+              </div>
+
+              <AppIcon name="chevron-right" :size="16" class="text-muted" />
+
+              <div class="flex flex-col">
+                <span class="text-[10px] uppercase font-semibold text-accent">
+                  {{ t('albumArt.newArt') || 'New Selection' }}
+                </span>
+                <span class="font-mono text-xs font-semibold text-fg">
+                  {{ selectedCandidate.width ? `${selectedCandidate.width}×${selectedCandidate.height || selectedCandidate.width} px` : '' }}
+                </span>
+              </div>
+
+              <UiButton
+                size="xs"
+                variant="ghost"
+                class="ml-auto"
+                @click="selectedUrl = currentCandidate.url"
+              >
+                Keep Current
+              </UiButton>
+            </div>
           </div>
-        </button>
+        </div>
+
+        <!-- Candidate cover grid -->
+        <div class="flex flex-col gap-2">
+          <div class="flex items-center justify-between text-xs text-muted">
+            <span class="font-medium uppercase tracking-wider text-[11px]">
+              Available Artwork Options ({{ candidates.length }})
+            </span>
+            <span class="text-[11px]">Select to preview & compare</span>
+          </div>
+
+          <div
+            class="grid max-h-[38vh] grid-cols-2 gap-3 overflow-y-auto p-0.5 sm:grid-cols-3 md:grid-cols-4"
+          >
+            <button
+              v-for="(cand, idx) in candidates"
+              :key="`${cand.source}-${cand.url}-${idx}`"
+              type="button"
+              class="group relative flex flex-col overflow-hidden rounded-cover border-2 p-1.5 text-left transition-all"
+              :class="
+                selectedUrl === cand.url
+                  ? 'border-accent bg-accent/10 shadow-md ring-2 ring-accent/30'
+                  : 'border-line-2 bg-surface hover:border-line-3'
+              "
+              @click="selectedUrl = cand.url"
+            >
+              <div
+                class="relative aspect-square w-full overflow-hidden rounded-[10px] bg-black/30"
+              >
+                <img
+                  :src="cand.preview_url || cand.url"
+                  :alt="cand.title || 'Cover candidate'"
+                  referrerpolicy="no-referrer"
+                  decoding="async"
+                  class="size-full object-cover transition-transform duration-200 group-hover:scale-105"
+                  @error="onThumbError($event, cand)"
+                />
+                <div
+                  v-if="selectedUrl === cand.url"
+                  class="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-accent text-white shadow-md ring-1 ring-white/30"
+                >
+                  <AppIcon name="check" :size="14" />
+                </div>
+                <div
+                  class="absolute bottom-1.5 left-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-semibold text-white uppercase backdrop-blur-xs"
+                >
+                  {{ cand.width ? `${cand.width}px` : cand.source_label }}
+                </div>
+              </div>
+
+              <div class="mt-2 flex flex-col gap-0.5 px-0.5">
+                <div class="flex items-center justify-between gap-1 text-[11px]">
+                  <span
+                    class="rounded px-1.5 py-0.5 font-semibold uppercase tracking-wider text-[10px]"
+                    :class="sourceBadgeClass(cand.source)"
+                  >
+                    {{ cand.source_label || cand.source }}
+                  </span>
+                  <span class="font-mono text-muted">
+                    {{ cand.width ? `${cand.width}×${cand.height || cand.width}` : '' }}
+                  </span>
+                </div>
+                <p
+                  v-if="cand.title"
+                  class="truncate text-xs font-medium text-fg"
+                  :title="cand.title"
+                >
+                  {{ cand.title }}
+                </p>
+              </div>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -172,7 +308,7 @@
           </span>
         </p>
         <div class="flex items-center gap-2">
-          <UiButton variant="ghost" type="button" @click="$emit('close')">
+          <UiButton variant="ghost" type="button" @click="handleClose">
             {{ t('common.cancel') || 'Cancel' }}
           </UiButton>
           <UiButton
@@ -185,6 +321,42 @@
             {{ t('albumArt.apply') || 'Set Artwork & Lock' }}
           </UiButton>
         </div>
+      </div>
+    </template>
+  </UiModal>
+
+  <!-- Full-size Zoom Modal -->
+  <UiModal
+    :open="showZoomModal"
+    :title="selectedCandidate?.title || t('albumArt.zoomTitle') || 'Artwork Preview'"
+    :description="`${selectedCandidate?.source_label || ''} • ${selectedCandidate?.width || ''} × ${selectedCandidate?.height || selectedCandidate?.width || ''} px`"
+    width="sm:max-w-2xl"
+    @close="showZoomModal = false"
+  >
+    <div class="flex flex-col items-center justify-center p-2">
+      <div
+        class="relative max-h-[65vh] max-w-full overflow-hidden rounded-cover border border-line-2 bg-black/40 shadow-xl"
+      >
+        <img
+          :src="selectedPreviewSrc"
+          :alt="selectedCandidate?.title || 'Full artwork'"
+          referrerpolicy="no-referrer"
+          decoding="async"
+          class="max-h-[65vh] w-auto max-w-full object-contain"
+        />
+      </div>
+      <div class="mt-4 flex w-full items-center justify-between text-xs text-muted">
+        <span>{{ selectedCandidate?.artist }} — {{ selectedCandidate?.title }}</span>
+        <span class="font-mono font-medium text-fg">
+          {{ selectedCandidate?.width }} × {{ selectedCandidate?.height || selectedCandidate?.width }} px
+        </span>
+      </div>
+    </div>
+    <template #footer>
+      <div class="flex w-full justify-end">
+        <UiButton variant="primary" @click="showZoomModal = false">
+          {{ t('common.close') || 'Close' }}
+        </UiButton>
       </div>
     </template>
   </UiModal>
@@ -221,15 +393,49 @@ const unlocking = ref(false)
 const isLocked = ref(false)
 const shouldLock = ref(true)
 const error = ref('')
+const showZoomModal = ref(false)
 
 const isUrlQuery = computed(() => {
   const q = query.value.trim()
   return q.startsWith('http://') || q.startsWith('https://')
 })
 
-const selectedCandidate = computed(() =>
-  candidates.value.find((c) => c.url === selectedUrl.value)
+const currentCandidate = computed(() =>
+  candidates.value.find((c) => c.source === 'current')
 )
+
+const selectedCandidate = computed(() =>
+  candidates.value.find((c) => c.url === selectedUrl.value) ||
+  candidates.value[0] ||
+  null
+)
+
+const selectedPreviewSrc = computed(() => {
+  if (!selectedCandidate.value) return ''
+  return selectedCandidate.value.preview_url || selectedCandidate.value.url
+})
+
+const resolutionDiff = computed(() => {
+  if (!selectedCandidate.value || !currentCandidate.value) return 0
+  const selW = Number(selectedCandidate.value.width) || 0
+  const curW = Number(currentCandidate.value.width) || 0
+  return selW > curW ? selW - curW : 0
+})
+
+function onThumbError(e, cand) {
+  if (cand.preview_url && e.target.src !== cand.url && cand.url) {
+    e.target.src = cand.url
+  }
+}
+
+function onPreviewImgError(e) {
+  if (
+    selectedCandidate.value?.url &&
+    e.target.src !== selectedCandidate.value.url
+  ) {
+    e.target.src = selectedCandidate.value.url
+  }
+}
 
 function sourceBadgeClass(source) {
   switch (source) {
@@ -241,6 +447,8 @@ function sourceBadgeClass(source) {
       return 'bg-green-500/15 text-green-400 border border-green-500/20'
     case 'youtube-music':
       return 'bg-red-500/15 text-red-400 border border-red-500/20'
+    case 'current':
+      return 'bg-blue-500/15 text-blue-400 border border-blue-500/20'
     default:
       return 'bg-surface-3 text-muted'
   }
@@ -292,22 +500,28 @@ watch(
       candidates.value = []
       selectedUrl.value = ''
       error.value = ''
+      showZoomModal.value = false
     }
   },
   { immediate: true }
 )
 
+function handleClose() {
+  showZoomModal.value = false
+  emit('close')
+}
+
 async function search() {
   const q = query.value.trim()
   if (!q) return
   if (isUrlQuery.value) {
-    // Treat as direct image candidate
     const existing = candidates.value.find((c) => c.url === q)
     if (!existing) {
       candidates.value.unshift({
         source: 'custom',
         source_label: 'Custom URL',
         url: q,
+        preview_url: `/api/cover/proxy?url=${encodeURIComponent(q)}`,
         width: 0,
         height: 0,
         title: props.album?.title || '',
@@ -341,7 +555,7 @@ async function applyCover() {
     )
     await library.load({ force: true })
     emit('saved', res.data)
-    emit('close')
+    handleClose()
   } catch (err) {
     console.error('Failed to apply album artwork:', err)
     error.value = extractErrorMessage(err, t('toast.actionFailed') || 'Failed to apply album artwork')
