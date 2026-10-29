@@ -261,6 +261,16 @@ function sourceBadgeClass(source) {
   }
 }
 
+function extractErrorMessage(err, fallback = 'Something went wrong') {
+  const d = err?.response?.data?.detail
+  if (typeof d === 'string' && d.trim()) return d
+  if (Array.isArray(d) && d.length > 0) {
+    return d.map((e) => e.msg || e.detail || JSON.stringify(e)).join('; ')
+  }
+  if (typeof err?.message === 'string' && err.message.trim()) return err.message
+  return fallback
+}
+
 async function loadCovers(overrideQuery = '') {
   const tr = track.value
   if (!tr) return
@@ -271,7 +281,8 @@ async function loadCovers(overrideQuery = '') {
       tr.file,
       tr.artist,
       tr.album || tr.title,
-      overrideQuery
+      overrideQuery,
+      tr.title
     )
     candidates.value = res.data?.candidates || []
     isLocked.value = Boolean(res.data?.locked)
@@ -280,10 +291,11 @@ async function loadCovers(overrideQuery = '') {
       selectedUrl.value = candidates.value[0].url
     }
   } catch (err) {
-    error.value =
-      err?.response?.data?.detail ||
-      t('toast.actionFailed') ||
-      'Failed to search track artwork'
+    console.error('Failed to search track artwork:', err)
+    error.value = extractErrorMessage(
+      err,
+      t('toast.actionFailed') || 'Failed to search track artwork'
+    )
   } finally {
     loading.value = false
   }
@@ -353,10 +365,11 @@ async function applyCover() {
     await library.load({ force: true })
     handleClose()
   } catch (err) {
-    error.value =
-      err?.response?.data?.detail ||
-      t('toast.actionFailed') ||
-      'Failed to apply track artwork'
+    console.error('Failed to apply track cover:', err)
+    error.value = extractErrorMessage(
+      err,
+      t('toast.actionFailed') || 'Failed to apply track artwork'
+    )
   } finally {
     saving.value = false
   }
@@ -376,10 +389,11 @@ async function unlock() {
     )
     await library.load({ force: true })
   } catch (err) {
-    error.value =
-      err?.response?.data?.detail ||
-      t('toast.actionFailed') ||
-      'Failed to unlock track artwork'
+    console.error('Failed to unlock track cover:', err)
+    error.value = extractErrorMessage(
+      err,
+      t('toast.actionFailed') || 'Failed to unlock track artwork'
+    )
   } finally {
     unlocking.value = false
   }

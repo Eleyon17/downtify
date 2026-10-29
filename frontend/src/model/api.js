@@ -265,13 +265,20 @@ function unlockAlbumCover(artist, title) {
   })
 }
 
-function getTrackCoverCandidates(file, artist = '', title = '', query = '') {
+function getTrackCoverCandidates(
+  file,
+  artist = '',
+  title = '',
+  query = '',
+  track = ''
+) {
   return API.get('/api/library/album/covers', {
     params: {
       file: file || undefined,
       artist: artist || undefined,
       title: title || undefined,
       query: query || undefined,
+      track: track || undefined,
     },
   })
 }

@@ -7,6 +7,7 @@ import mimetypes
 import os
 from pathlib import Path
 
+from loguru import logger
 from mutagen import File as MutagenFile
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import ID3, APIC, ID3NoHeaderError
@@ -184,7 +185,7 @@ def embed_cover_art(
         if suffix == '.mp3':
             try:
                 tag = ID3(str(path))
-            except ID3NoHeaderError:
+            except Exception:
                 tag = ID3()
             tag.delall('APIC')
             tag.add(
@@ -251,6 +252,9 @@ def embed_cover_art(
                 f.add_picture(pic)
                 f.save()
                 return True
-    except Exception:
+    except Exception as exc:
+        logger.opt(exception=True).warning(
+            'Failed to embed cover art into {}: {}', path, exc
+        )
         return False
     return False

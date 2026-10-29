@@ -246,6 +246,16 @@ function sourceBadgeClass(source) {
   }
 }
 
+function extractErrorMessage(err, fallback = 'Something went wrong') {
+  const d = err?.response?.data?.detail
+  if (typeof d === 'string' && d.trim()) return d
+  if (Array.isArray(d) && d.length > 0) {
+    return d.map((e) => e.msg || e.detail || JSON.stringify(e)).join('; ')
+  }
+  if (typeof err?.message === 'string' && err.message.trim()) return err.message
+  return fallback
+}
+
 async function loadCovers(overrideQuery = '') {
   if (!props.album) return
   loading.value = true
@@ -264,7 +274,8 @@ async function loadCovers(overrideQuery = '') {
       selectedUrl.value = candidates.value[0].url
     }
   } catch (err) {
-    error.value = err?.response?.data?.detail || t('toast.actionFailed') || 'Failed to search cover art'
+    console.error('Failed to search album cover art:', err)
+    error.value = extractErrorMessage(err, t('toast.actionFailed') || 'Failed to search cover art')
   } finally {
     loading.value = false
   }
@@ -332,7 +343,8 @@ async function applyCover() {
     emit('saved', res.data)
     emit('close')
   } catch (err) {
-    error.value = err?.response?.data?.detail || t('toast.actionFailed') || 'Failed to apply album artwork'
+    console.error('Failed to apply album artwork:', err)
+    error.value = extractErrorMessage(err, t('toast.actionFailed') || 'Failed to apply album artwork')
   } finally {
     saving.value = false
   }
@@ -349,7 +361,8 @@ async function unlock() {
     })
     await library.load({ force: true })
   } catch (err) {
-    error.value = err?.response?.data?.detail || t('toast.actionFailed') || 'Failed to unlock artwork'
+    console.error('Failed to unlock album artwork:', err)
+    error.value = extractErrorMessage(err, t('toast.actionFailed') || 'Failed to unlock artwork')
   } finally {
     unlocking.value = false
   }

@@ -312,7 +312,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Collection, Optional
-from urllib.parse import quote
+from urllib.parse import quote, quote_plus
 
 from fastapi import (
     APIRouter,
@@ -6443,6 +6443,37 @@ def library_albums(request: Request) -> list[dict[str, Any]]:
     )
 
 
+@router.get('/api/cover')
+def library_cover_art_route(file: str) -> Response:
+    """Serve embedded cover art for an audio track (alias for /cover)."""
+    ctx = library_context()
+    full = resolve_library_file(file, ctx)
+    if full is None or not full.is_file():
+        raise HTTPException(status_code=404, detail='File not found')
+
+    data: Optional[bytes] = None
+    mime: Optional[str] = None
+    cache = state.cover_cache
+    if cache is not None:
+        hit = cache.lookup(file, full)
+        if hit is not None:
+            data, mime = hit
+    if data is None:
+        data, mime = extract_cover_art(full)
+        if data is None:
+            raise HTTPException(status_code=404, detail='No embedded cover')
+        if state.settings.get('cache_cover_art') and cache is not None:
+            cache.store(file, full, data, mime or 'image/jpeg')
+    return Response(
+        content=data,
+        media_type=mime or 'image/jpeg',
+        headers={
+            'Cache-Control': 'public, max-age=86400',
+            'ETag': f'"{int(full.stat().st_mtime)}"',
+        },
+    )
+
+
 @router.get('/api/library/album/covers')
 async def library_album_covers(
     artist: str = Query(''),
@@ -6461,7 +6492,7 @@ async def library_album_covers(
         if cur_path and cur_path.is_file():
             if not resolved_track:
                 try:
-                    meta = extract_metadata(cur_path)
+                    meta = read_audio_metadata(cur_path)
                     if meta:
                         resolved_track = str(meta.get('title') or '')
                         if not artist:
@@ -6488,7 +6519,7 @@ async def library_album_covers(
                 {
                     'source': 'current',
                     'source_label': 'Current Artwork',
-                    'url': f'/api/cover?file={quote_plus(file)}',
+                    'url': f'/cover?file={quote(file)}',
                     'width': cur_px,
                     'height': cur_px,
                     'title': resolved_track or title or 'Current Artwork',
@@ -6537,7 +6568,7 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
 
     cover_bytes: Optional[bytes] = None
     mime = 'image/jpeg'
-    if '/api/cover' in cover_url:
+    if '/cover' in cover_url:
         from urllib.parse import parse_qs, urlparse
 
         parsed = urlparse(cover_url)
@@ -6550,7 +6581,18 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
                 mime = detected_mime
     elif cover_url.startswith(('http://', 'https://')):
         try:
-            resp = httpx.get(cover_url, timeout=20, follow_redirects=True)
+            resp = httpx.get(
+                cover_url,
+                timeout=20,
+                follow_redirects=True,
+                headers={
+                    'User-Agent': (
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                        'AppleWebKit/537.36 (KHTML, like Gecko) '
+                        'Chrome/120.0.0.0 Safari/537.36'
+                    )
+                },
+            )
             resp.raise_for_status()
             cover_bytes = resp.content
             content_type = resp.headers.get('content-type', '')
@@ -6571,9 +6613,18 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
 
     width = image_short_side(cover_bytes)
     if not width:
-        raise HTTPException(
-            status_code=400, detail='Invalid or unreadable image file'
-        )
+        # Fallback if image has valid headers (JPEG/PNG/WebP/GIF) but short side wasn't parsed
+        if len(cover_bytes) >= 128 and (
+            cover_bytes.startswith(b'\xff\xd8\xff')
+            or cover_bytes.startswith(b'\x89PNG')
+            or b'WEBP' in cover_bytes[:20]
+            or cover_bytes.startswith((b'GIF87a', b'GIF89a'))
+        ):
+            width = 600
+        else:
+            raise HTTPException(
+                status_code=400, detail='Invalid or unreadable image file'
+            )
 
     # Individual Track Mode
     if track_only and file_target:

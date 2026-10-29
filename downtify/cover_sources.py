@@ -79,11 +79,22 @@ def spotify_upgrade_url(url: str) -> str:
     return url
 
 
+_USER_AGENT = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+)
+
+
 def _fetch(url: str) -> Optional[bytes]:
     if not url:
         return None
     try:
-        resp = httpx.get(url, timeout=_TIMEOUT, follow_redirects=True)
+        resp = httpx.get(
+            url,
+            timeout=_TIMEOUT,
+            follow_redirects=True,
+            headers={'User-Agent': _USER_AGENT},
+        )
         resp.raise_for_status()
     except Exception:
         logger.debug('Cover fetch failed: {}', url[:120])
@@ -266,7 +277,9 @@ def search_cover_options(
                 params = f'term={quote_plus(search_query)}&entity={entity}&limit=5'
                 url = f'https://itunes.apple.com/search?{params}'
                 try:
-                    resp = httpx.get(url, timeout=10)
+                    resp = httpx.get(
+                        url, timeout=10, headers={'User-Agent': _USER_AGENT}
+                    )
                     if resp.status_code == 200:
                         itunes_albums.extend(
                             (resp.json() or {}).get('results') or []
