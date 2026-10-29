@@ -6581,13 +6581,14 @@ async def library_album_covers(
         cur_data, _ = extract_cover_art(cur_path)
         if cur_data:
             cur_px = image_short_side(cur_data) or 0
+            cur_mtime = int(cur_path.stat().st_mtime)
             candidates.insert(
                 0,
                 {
                     'source': 'current',
                     'source_label': 'Current Artwork',
-                    'url': f'/cover?file={quote(file)}',
-                    'preview_url': f'/cover?file={quote(file)}',
+                    'url': f'/cover?file={quote(file)}&v={cur_mtime}',
+                    'preview_url': f'/cover?file={quote(file)}&v={cur_mtime}',
                     'width': cur_px,
                     'height': cur_px,
                     'title': resolved_track or title or 'Current Artwork',
@@ -6636,18 +6637,18 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
 
     cover_bytes: Optional[bytes] = None
     mime = 'image/jpeg'
-    if '/cover' in cover_url:
+
+    # If a proxy URL was provided, extract the target URL
+    if '/cover/proxy' in cover_url:
         from urllib.parse import parse_qs, urlparse
 
         parsed = urlparse(cover_url)
         params = parse_qs(parsed.query)
-        ref_file = (params.get('file') or [''])[0]
-        ref_path = resolve_library_file(ref_file, ctx) if ref_file else None
-        if ref_path and ref_path.is_file():
-            cover_bytes, detected_mime = extract_cover_art(ref_path)
-            if detected_mime:
-                mime = detected_mime
-    elif cover_url.startswith(('http://', 'https://')):
+        inner_url = (params.get('url') or [''])[0]
+        if inner_url:
+            cover_url = inner_url
+
+    if cover_url.startswith(('http://', 'https://')):
         try:
             resp = httpx.get(
                 cover_url,
@@ -6663,11 +6664,13 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
             )
             resp.raise_for_status()
             cover_bytes = resp.content
-            content_type = resp.headers.get('content-type', '')
-            if 'png' in content_type:
+            content_type = resp.headers.get('content-type', '').lower()
+            if 'png' in content_type or cover_bytes.startswith(b'\x89PNG'):
                 mime = 'image/png'
-            elif 'webp' in content_type:
+            elif 'webp' in content_type or (cover_bytes.startswith(b'RIFF') and b'WEBP' in cover_bytes[:16]):
                 mime = 'image/webp'
+            elif cover_bytes.startswith(b'\xff\xd8\xff'):
+                mime = 'image/jpeg'
         except Exception as exc:
             logger.opt(exception=True).warning(
                 'Failed to fetch cover from {}', cover_url
@@ -6675,6 +6678,17 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
             raise HTTPException(
                 status_code=400, detail=f'Failed to fetch cover image: {exc}'
             )
+    elif '/cover' in cover_url:
+        from urllib.parse import parse_qs, urlparse
+
+        parsed = urlparse(cover_url)
+        params = parse_qs(parsed.query)
+        ref_file = (params.get('file') or [''])[0]
+        ref_path = resolve_library_file(ref_file, ctx) if ref_file else None
+        if ref_path and ref_path.is_file():
+            cover_bytes, detected_mime = extract_cover_art(ref_path)
+            if detected_mime:
+                mime = detected_mime
 
     if not cover_bytes:
         raise HTTPException(status_code=400, detail='Could not obtain image data')
@@ -6713,13 +6727,25 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
                 new_ck, cover_px=width, locked=lock, track_path=file_target
             )
 
-        invalidate_library_paths_cache()
+        if state.cover_cache is not None:
+            try:
+                state.cover_cache.forget(file_target, full_path=full)
+                state.cover_cache.forget_by_stored_path(file_target)
+                if state.settings.get('cache_cover_art'):
+                    state.cover_cache.store(file_target, full, cover_bytes, mime or 'image/jpeg')
+            except Exception:
+                pass
+
+        invalidate_library_paths_cache(drop_entries=True)
+        mtime = int(full.stat().st_mtime)
         return {
             'status': 'ok',
             'tracks_updated': 1,
             'cover_px': width,
             'locked': lock,
             'track_only': True,
+            'mtime': mtime,
+            'cover': f'/cover?file={quote(file_target)}&v={mtime}',
         }
 
     # Album Mode
@@ -6761,6 +6787,7 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
 
     updated_count = 0
     folders_written: set[Path] = set()
+    latest_mtime = int(time.time())
     for stored, full, ck in matched_files:
         success = embed_cover_art(full, cover_bytes, mime=mime)
         if success:
@@ -6771,6 +6798,14 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
                 ctx.metadata_cache.set_track_artwork(
                     new_ck, cover_px=width, locked=lock, track_path=stored
                 )
+            if state.cover_cache is not None:
+                try:
+                    state.cover_cache.forget(stored, full_path=full)
+                    state.cover_cache.forget_by_stored_path(stored)
+                    if state.settings.get('cache_cover_art'):
+                        state.cover_cache.store(stored, full, cover_bytes, mime or 'image/jpeg')
+                except Exception:
+                    pass
             folder = full.parent
             if folder not in folders_written:
                 folders_written.add(folder)
@@ -6778,6 +6813,10 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
                     (folder / 'cover.jpg').write_bytes(cover_bytes)
                 except Exception:
                     pass
+            try:
+                latest_mtime = max(latest_mtime, int(full.stat().st_mtime))
+            except Exception:
+                pass
 
     if ctx.metadata_cache is not None and artist and title:
         if lock:
@@ -6785,13 +6824,14 @@ async def library_set_album_cover(request: Request) -> dict[str, Any]:
         else:
             ctx.metadata_cache.unlock_album_artwork(artist, title)
 
-    invalidate_library_paths_cache()
+    invalidate_library_paths_cache(drop_entries=True)
 
     return {
         'status': 'ok',
         'tracks_updated': updated_count,
         'cover_px': width,
         'locked': lock,
+        'mtime': latest_mtime,
     }
 
 

@@ -381,6 +381,8 @@ import API from '/src/model/api'
 import { useUi } from '/src/model/ui'
 import { useLibrary } from '/src/model/library'
 import { useTrackArt } from '/src/model/trackArt'
+import { usePlayer } from '/src/model/player'
+import { coverURL } from '/src/lib/paths'
 import { useI18n } from '/src/i18n'
 
 const { t } = useI18n()
@@ -564,6 +566,18 @@ async function applyCover() {
       shouldLock.value
     )
     isLocked.value = Boolean(res.data?.locked)
+    const newVersion = res.data?.mtime || Date.now()
+    const newCover = coverURL(tr.file, newVersion)
+
+    // Instantly update target track in-place
+    tr.cover = newCover
+    tr.hasCover = true
+    tr.artwork_locked = shouldLock.value
+
+    // Invalidate across reactive store, collections, and active player
+    library.bustTrackCover(tr.file, newVersion)
+    usePlayer().updateTrackCover(tr.file, newCover)
+
     ui.toast(
       shouldLock.value
         ? t('trackArt.appliedAndLocked') ||

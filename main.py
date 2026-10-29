@@ -987,12 +987,24 @@ def build_app() -> FastAPI:
         return read_track_lyrics(full, target_lang=target_lang)
 
     @app.get('/cover')
-    def get_cover(file: str):
+    def get_cover(file: str, request: Request):
         # Resolved and confined to the downloads or slskd folder, which
         # prevents path traversal.
         full = resolve_library_file(file, api.library_context())
         if full is None:
             raise HTTPException(status_code=404, detail='File not found')
+
+        mtime = int(full.stat().st_mtime)
+        etag = f'"{mtime}"'
+        if_none_match = request.headers.get('if-none-match')
+        if if_none_match and if_none_match.strip() == etag:
+            return Response(
+                status_code=304,
+                headers={
+                    'Cache-Control': 'public, max-age=86400, must-revalidate',
+                    'ETag': etag,
+                },
+            )
 
         data: bytes | None = None
         mime: str | None = None
@@ -1014,8 +1026,8 @@ def build_app() -> FastAPI:
             media_type=mime or 'image/jpeg',
             headers={
                 # Cache by mtime — clients fetch once per file revision.
-                'Cache-Control': 'public, max-age=86400',
-                'ETag': f'"{int(full.stat().st_mtime)}"',
+                'Cache-Control': 'public, max-age=86400, must-revalidate',
+                'ETag': etag,
             },
         )
 

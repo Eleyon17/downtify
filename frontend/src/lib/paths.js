@@ -28,8 +28,23 @@ export function fileURL(fileName) {
   return `/downloads/${encodePath(path)}`
 }
 
-export function coverURL(fileName) {
-  return `/cover?file=${encodeURIComponent(fileName)}`
+const coverVersions = new Map()
+
+export function setCoverVersion(fileName, version = Date.now()) {
+  if (!fileName) return
+  coverVersions.set(String(fileName).trim(), version)
+}
+
+export function getCoverVersion(fileName) {
+  return coverVersions.get(String(fileName).trim()) || null
+}
+
+export function coverURL(fileName, version) {
+  if (!fileName) return ''
+  const clean = String(fileName).trim()
+  const v = version || coverVersions.get(clean)
+  const base = `/cover?file=${encodeURIComponent(clean)}`
+  return v ? `${base}&v=${v}` : base
 }
 
 /**

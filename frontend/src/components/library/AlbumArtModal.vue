@@ -372,6 +372,8 @@ import UiSwitch from '../ui/UiSwitch.vue'
 import API from '/src/model/api'
 import { useUi } from '/src/model/ui'
 import { useLibrary } from '/src/model/library'
+import { usePlayer } from '/src/model/player'
+import { coverURL } from '/src/lib/paths'
 import { useI18n } from '/src/i18n'
 
 const props = defineProps({
@@ -547,6 +549,21 @@ async function applyCover() {
       props.album.tracks?.[0]?.file || ''
     )
     isLocked.value = Boolean(res.data?.locked)
+    const newVersion = res.data?.mtime || Date.now()
+
+    if (props.album.tracks?.length) {
+      const firstFile = props.album.tracks[0].file
+      props.album.cover = coverURL(firstFile, newVersion)
+      for (const t of props.album.tracks) {
+        t.cover = coverURL(t.file, newVersion)
+        t.hasCover = true
+        t.artwork_locked = shouldLock.value
+        usePlayer().updateTrackCover(t.file, t.cover)
+      }
+    }
+
+    library.bustAlbumCover(props.album.artist, props.album.title, newVersion)
+
     ui.toast(
       shouldLock.value
         ? t('albumArt.appliedAndLocked') || 'Album artwork updated and locked against upgrades.'

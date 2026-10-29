@@ -92,7 +92,7 @@ export function normalizeTrack(row) {
     playlists: Array.isArray(raw.playlists) ? raw.playlists : [],
     format: fileFormat(file),
     url: fileURL(file),
-    cover: coverURL(file),
+    cover: coverURL(file, Number(raw.added) || 0),
   }
 }
 

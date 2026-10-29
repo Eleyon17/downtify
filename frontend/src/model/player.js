@@ -390,6 +390,25 @@ function updateTrackFile(oldFile, newTrack) {
   }
 }
 
+/** Update a queued track's cover art in place and refresh MediaSession. */
+function updateTrackCover(file, newCover) {
+  let changed = false
+  const list = playlist.value.map((track) => {
+    if (track.file === file) {
+      changed = true
+      return { ...track, cover: newCover, hasCover: true }
+    }
+    return track
+  })
+  if (changed) {
+    playlist.value = list
+    const cur = currentTrack.value
+    if (cur?.file === file) {
+      updateMediaSession(cur)
+    }
+  }
+}
+
 function stop() {
   pause()
   if (audio) audio.removeAttribute('src')
@@ -910,6 +929,7 @@ export function usePlayer() {
     forgetFiles,
     refreshTracks,
     updateTrackFile,
+    updateTrackCover,
     stop,
     playAt,
     play,

@@ -14,7 +14,7 @@ import {
   indexTracksBySong,
   songKey,
 } from '/src/lib/library'
-import { coverURL } from '/src/lib/paths'
+import { coverURL, setCoverVersion } from '/src/lib/paths'
 import { usePlayer } from '/src/model/player'
 import { useI18n } from '/src/i18n'
 
@@ -199,7 +199,7 @@ async function load({ force = false } = {}) {
       rawPlaylists.value = playlistsRes.data || []
       batches.value = batchesRes.data?.playlists || []
       loaded.value = true
-      if (tracksComplete.value) await ensureTracks({ force: true })
+      if (tracksComplete.value || tracks.value.length) await ensureTracks({ force: true })
       else if (activePlaylistName) await loadPlaylistTracks(activePlaylistName)
       if (albumsComplete.value) await ensureAlbums({ force: true })
       if (artistsComplete.value) await ensureArtists({ force: true })
@@ -479,6 +479,57 @@ function findTrack(artist, title) {
   return tracksBySong.value.get(songKey(artist, title)) || null
 }
 
+/** Invalidate cache and update track cover art in-place across store and player. */
+function bustTrackCover(file, version = Date.now()) {
+  if (!file) return
+  setCoverVersion(file, version)
+  const newCover = coverURL(file, version)
+  let changed = false
+  tracks.value = tracks.value.map((t) => {
+    if (t.file === file) {
+      changed = true
+      return {
+        ...t,
+        cover: newCover,
+        hasCover: true,
+      }
+    }
+    return t
+  })
+  if (changed) {
+    usePlayer().updateTrackCover(file, newCover)
+    usePlayer().refreshTracks(tracksByFile.value)
+    rawPlaylists.value = rawPlaylists.value.map((pl) => ({ ...pl }))
+  }
+}
+
+/** Invalidate cache and update album cover art in-place across store and player. */
+function bustAlbumCover(artist, title, version = Date.now()) {
+  const normArtist = String(artist || '').toLowerCase()
+  const normTitle = String(title || '').toLowerCase()
+  let changed = false
+  tracks.value = tracks.value.map((t) => {
+    const tArt = String(t.albumArtist || t.artist || '').toLowerCase()
+    const tAlb = String(t.album || '').toLowerCase()
+    if (tAlb === normTitle && (!normArtist || tArt === normArtist)) {
+      changed = true
+      setCoverVersion(t.file, version)
+      const newCover = coverURL(t.file, version)
+      usePlayer().updateTrackCover(t.file, newCover)
+      return {
+        ...t,
+        cover: newCover,
+        hasCover: true,
+      }
+    }
+    return t
+  })
+  if (changed) {
+    usePlayer().refreshTracks(tracksByFile.value)
+    rawPlaylists.value = rawPlaylists.value.map((pl) => ({ ...pl }))
+  }
+}
+
 export function useLibrary() {
   return {
     tracks,
@@ -516,5 +567,7 @@ export function useLibrary() {
     findPlaylist,
     hasSong,
     findTrack,
+    bustTrackCover,
+    bustAlbumCover,
   }
 }
