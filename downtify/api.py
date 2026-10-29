@@ -314,6 +314,7 @@ from pathlib import Path
 from typing import Any, Collection, Optional
 from urllib.parse import quote, quote_plus
 
+import httpx
 from fastapi import (
     APIRouter,
     Body,
