@@ -6216,9 +6216,10 @@ def _upgrade_options(
 
     saved = state.settings.get('library_upgrade') or {}
     merged = {**saved, **(payload or {})}
-    merged['check_format'] = bool(
-        state.settings.get('redownload_improper_format', False)
-    )
+    if 'check_format' not in (payload or {}):
+        merged['check_format'] = bool(
+            state.settings.get('redownload_improper_format', False)
+        )
     merged['target_format'] = str(state.settings.get('format') or 'mp3')
     try:
         merged['target_bitrate'] = int(state.settings.get('bitrate') or 320)
@@ -6244,6 +6245,86 @@ def broadcast_upgrade_progress(status: dict[str, Any]) -> None:
     )
 
 
+def on_track_upgraded(
+    stored: str, full_path: Path, changed: list[str]
+) -> None:
+    """Invoked when an upgraded track is modified in place on disk."""
+
+    file = str(stored or '').strip().replace('\\', '/')
+    if not file:
+        return
+
+    new_ck = content_key_for(full_path) if full_path.is_file() else None
+    if state.likes is not None and new_ck:
+        try:
+            state.likes.update_track_metadata(file, content_key=new_ck)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Failed updating likes on track upgrade'
+            )
+
+    if state.navidrome_index is not None:
+        try:
+            state.navidrome_index.forget_filename(file, full_path=full_path)
+        except Exception:
+            pass
+
+    if state.cover_cache is not None and (
+        library_upgrade.CATEGORY_ARTWORK in changed
+        or library_upgrade.CATEGORY_FORMAT in changed
+    ):
+        try:
+            state.cover_cache.forget_by_stored_path(file)
+            if full_path.is_file():
+                state.cover_cache.refresh(file, full_path)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Failed refreshing cover_cache on track upgrade'
+            )
+
+    loop = state.loop
+    if loop is not None and state.connections is not None:
+        if library_upgrade.CATEGORY_ARTWORK in changed:
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    state.connections.broadcast({
+                        'type': 'track_artwork_updated',
+                        'file': file,
+                    }),
+                    loop,
+                )
+            except Exception:
+                pass
+        if library_upgrade.CATEGORY_FORMAT in changed:
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    state.connections.broadcast({
+                        'type': 'track_audio_replaced',
+                        'file': file,
+                    }),
+                    loop,
+                )
+            except Exception:
+                pass
+
+
+def on_upgrade_run_finished() -> None:
+    """Refresh library sync and notify connected clients when an upgrade run ends."""
+
+    try:
+        if state.library_sync is not None:
+            state.library_sync.refresh(list_library_entries(library_context()))
+    except Exception:
+        logger.opt(exception=True).debug(
+            'Failed refreshing library_sync after upgrade run'
+        )
+    try:
+        _sync_liked_playlist()
+    except Exception:
+        pass
+    announce_library_changed()
+
+
 def on_track_path_changed(
     old_stored: str, new_stored: str, full_path: Path
 ) -> None:
@@ -6253,6 +6334,8 @@ def on_track_path_changed(
     new_file = str(new_stored or '').strip().replace('\\', '/')
     if not old_file or not new_file or old_file == new_file:
         return
+
+    new_ck = content_key_for(full_path) if full_path.is_file() else None
 
     spotify_id = None
     if state.track_index is not None:
@@ -6282,15 +6365,24 @@ def on_track_path_changed(
     if state.likes is not None:
         try:
             state.likes.update_path(old_file, new_file)
+            if new_ck:
+                state.likes.update_track_metadata(new_file, content_key=new_ck)
+            _sync_liked_playlist()
             _announce_likes()
         except Exception:
             logger.opt(exception=True).debug(
                 'Failed updating likes on path change'
             )
 
+    if state.navidrome_index is not None:
+        try:
+            state.navidrome_index.forget_filename(old_file)
+            state.navidrome_index.forget_filename(new_file, full_path=full_path)
+        except Exception:
+            pass
+
     if state.playlist_catalog is not None:
         try:
-            new_ck = content_key_for(full_path) if full_path.is_file() else None
             state.playlist_catalog.update_filename(
                 old_file, new_file, content_key=new_ck
             )
@@ -6302,10 +6394,18 @@ def on_track_path_changed(
     if state.cover_cache is not None:
         try:
             state.cover_cache.forget_by_stored_path(old_file)
+            if full_path.is_file():
+                state.cover_cache.refresh(new_file, full_path)
         except Exception:
             logger.opt(exception=True).debug(
                 'Failed clearing cover_cache on path change'
             )
+
+    if state.library_sync is not None:
+        try:
+            state.library_sync.refresh(list_library_entries(library_context()))
+        except Exception:
+            pass
 
     loop = state.loop
     if loop is not None and state.connections is not None:

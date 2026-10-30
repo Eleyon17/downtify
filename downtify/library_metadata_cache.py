@@ -671,9 +671,9 @@ class LibraryMetadataCache:
                (content_key, filename, title, artist, album, has_cover,
                 cover_px, album_artist, track_number, year, duration,
                 meta_version, codec, bitrate, sample_rate, channels, genre,
-                file_mtime_ns, file_size, cached_at)
+                artwork_locked, file_mtime_ns, file_size, cached_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                       ?, ?)
+                       ?, ?, ?)
                ON CONFLICT(content_key) DO UPDATE SET
                filename=excluded.filename,
                title=excluded.title,
@@ -691,6 +691,7 @@ class LibraryMetadataCache:
                sample_rate=excluded.sample_rate,
                channels=excluded.channels,
                genre=excluded.genre,
+               artwork_locked=MAX(library_metadata.artwork_locked, excluded.artwork_locked),
                file_mtime_ns=excluded.file_mtime_ns,
                file_size=excluded.file_size,
                cached_at=excluded.cached_at""",
@@ -712,6 +713,7 @@ class LibraryMetadataCache:
                 int(entry.get('sample_rate') or 0),
                 int(entry.get('channels') or 0),
                 str(entry.get('genre') or ''),
+                1 if entry.get('artwork_locked') else 0,
                 mtime_ns,
                 file_size,
                 _now_iso(),

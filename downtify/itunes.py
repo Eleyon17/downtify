@@ -299,3 +299,62 @@ def fetch_artwork_url(song: dict[str, Any], size: int = 1200) -> str:
         )
         return ''
     return artwork_url_at(base, size)
+
+
+def fetch_track_metadata(song: dict[str, Any]) -> dict[str, Any]:
+    """Return enriched metadata for *song* from the iTunes Search API.
+
+    Used by library upgrades when a track's Spotify ID is unknown or
+    Spotify returned incomplete fields.
+    """
+
+    artists = song.get('artists') or []
+    artist = artists[0] if artists else (song.get('artist') or '')
+    title = song.get('name', '') or song.get('title', '')
+    album = song.get('album_name', '') or song.get('album', '')
+
+    if not title:
+        return {}
+
+    query = f'{artist} {title}'.strip()
+    match = _pick_best(_search_itunes(query, limit=5), artist, title)
+    if match is None and album:
+        match = _pick_best(
+            _search_itunes(f'{artist} {title} {album}'.strip(), limit=5),
+            artist,
+            title,
+        )
+    if not match:
+        return {}
+
+    out: dict[str, Any] = {}
+    col_name = str(match.get('collectionName') or '').strip()
+    if col_name:
+        out['album_name'] = col_name
+    col_artist = str(
+        match.get('collectionArtistName') or match.get('artistName') or ''
+    ).strip()
+    if col_artist:
+        out['album_artist'] = col_artist
+    rel_date = str(match.get('releaseDate') or '').strip()
+    if rel_date:
+        out['release_date'] = rel_date[:10]
+        if len(rel_date) >= 4 and rel_date[:4].isdigit():
+            out['year'] = rel_date[:4]
+    try:
+        trk_num = int(match.get('trackNumber') or 0)
+        if trk_num > 0:
+            out['track_number'] = trk_num
+    except (TypeError, ValueError):
+        pass
+    try:
+        trk_cnt = int(match.get('trackCount') or 0)
+        if trk_cnt > 0:
+            out['album_track_total'] = trk_cnt
+    except (TypeError, ValueError):
+        pass
+    genre = str(match.get('primaryGenreName') or '').strip()
+    if genre:
+        out['genre'] = genre
+    return out
+

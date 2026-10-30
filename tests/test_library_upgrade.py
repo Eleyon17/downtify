@@ -1345,3 +1345,64 @@ def test_runner_start_auto_upgrade(tmp_path: Path) -> None:
     status = runner.status()
     assert status['state'] in {STATE_DONE, STATE_READY}
 
+
+def test_format_already_satisfied_on_fallback_proceeds_to_artwork(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """When primary provider (slskd FLAC) is unavailable and fallback (ytm MP3 128)
+    is already satisfied by the existing file, upgrade_track must not raise
+    ValueError/UnboundLocalError and must proceed to upgrade artwork."""
+    from downtify.library_upgrade import CATEGORY_FORMAT, JOB_DONE
+
+    ctx = _context(tmp_path)
+    track = _write_track(ctx.download_dir / 'track.mp3', cover_px=300)
+    _stub_cover(monkeypatch, 1200)
+    monkeypatch.setattr(
+        'downtify.library_upgrade.download_from_slskd',
+        lambda song, settings, **kwargs: None,
+    )
+
+    deps = UpgradeDeps(
+        context=lambda: ctx,
+        settings=lambda: {
+            'redownload_improper_format': True,
+            'audio_providers': ['slskd', 'youtube-music'],
+            'slskd': {'enabled': True},
+        },
+    )
+    options = UpgradeOptions(
+        categories=(CATEGORY_ARTWORK, CATEGORY_FORMAT),
+        artwork_min_px=600,
+        check_format=True,
+        source_targets={
+            'slskd': [{'format': 'flac', 'bitrate': 'lossless'}],
+            'youtube-music': [{'format': 'mp3', 'bitrate': '128'}],
+        },
+        audio_providers=['slskd', 'youtube-music'],
+    )
+
+    outcome = upgrade_track('track.mp3', deps=deps, options=options)
+    assert outcome.status == JOB_DONE
+    assert outcome.changed == [CATEGORY_ARTWORK]
+    assert ID3(str(track)).getall('APIC')[0].data == _png(1200)
+
+
+def test_artwork_locked_preserved_after_metadata_cache_refresh(
+    tmp_path: Path,
+) -> None:
+    ctx = _context(tmp_path)
+    track = _write_track(ctx.download_dir / 'locked.mp3', cover_px=300)
+    entry = _entry(ctx, 'locked.mp3')
+    ctx.metadata_cache.set_track_artwork(
+        entry.get('content_key') or '',
+        cover_px=300,
+        locked=True,
+        track_path='locked.mp3',
+    )
+    refreshed = ctx.metadata_cache.refresh('locked.mp3', track)
+    assert refreshed is not None
+    assert refreshed.get('artwork_locked') is True
+    found = track_findings(refreshed, track, artwork_min_px=600)
+    assert CATEGORY_ARTWORK not in found
+
+

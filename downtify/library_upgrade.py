@@ -366,6 +366,29 @@ def _merge_remote(
     return merged
 
 
+def _metadata_gaps_for_song(song: dict[str, Any]) -> list[str]:
+    """Tag fields a song dict is still missing."""
+
+    gaps: list[str] = []
+    if not str(song.get('album_name') or '').strip():
+        gaps.append('album')
+    artists = song.get('artists') or []
+    if not str(song.get('album_artist') or '').strip() and not artists:
+        gaps.append('album_artist')
+    if (
+        not str(song.get('year') or '').strip()
+        and not str(song.get('release_date') or '').strip()
+    ):
+        gaps.append('year')
+    try:
+        trk = int(song.get('track_number') or 0)
+    except (TypeError, ValueError):
+        trk = 0
+    if trk <= 0:
+        gaps.append('track_number')
+    return gaps
+
+
 def song_for_track(
     entry: dict[str, Any],
     *,
@@ -382,21 +405,34 @@ def song_for_track(
     song = _song_from_tags(entry)
     if spotify_id:
         song['song_id'] = spotify_id
-    if not (refresh_metadata and spotify_id):
+    if not refresh_metadata:
         return song
-    try:
-        # The album lookup costs two more requests; only a file with no
-        # album tag of its own needs it (single-track downloads before the
-        # fix that made them fetch it).
-        remote = spotify.track_from_id(
-            spotify_id, with_album=not song.get('album_name')
-        )
-    except Exception:
-        logger.opt(exception=True).debug(
-            'Library upgrade: Spotify lookup failed for {}', spotify_id
-        )
-        return song
-    return _merge_remote(song, remote or {})
+    if spotify_id:
+        try:
+            # The album lookup costs two more requests; only a file with no
+            # album tag of its own needs it (single-track downloads before the
+            # fix that made them fetch it).
+            remote = spotify.track_from_id(
+                spotify_id, with_album=not song.get('album_name')
+            )
+            song = _merge_remote(song, remote or {})
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Library upgrade: Spotify lookup failed for {}', spotify_id
+            )
+    if _metadata_gaps_for_song(song):
+        try:
+            from . import itunes
+
+            itunes_meta = itunes.fetch_track_metadata(song)
+            if itunes_meta:
+                song = _merge_remote(song, itunes_meta)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Library upgrade: iTunes metadata lookup failed for {!r}',
+                song.get('name'),
+            )
+    return song
 
 
 # ── Safe file replacement ─────────────────────────────────────────────
@@ -501,6 +537,8 @@ class UpgradeDeps:
     rekey_owners: Optional[Callable[[str, str, str], None]] = None
     downloader: Optional[Callable[[], Any]] = None
     on_track_path_changed: Optional[Callable[[str, str, Path], None]] = None
+    on_track_upgraded: Optional[Callable[[str, Path, list[str]], None]] = None
+    on_run_finished: Optional[Callable[[], None]] = None
 
     @property
     def metadata_cache(self) -> Any:
@@ -722,6 +760,7 @@ def upgrade_track(
         CATEGORY_METADATA in options.categories
         and spotify_id
         and _metadata_gaps(entry)
+        and len(_metadata_gaps_for_song(song)) < len(_metadata_gaps(entry))
     ):
         changed.append(CATEGORY_METADATA)
 
@@ -777,7 +816,6 @@ def upgrade_track(
 
         stage_now('downloading')
         basename = f'{full.stem}{UPGRADE_STAGING_MARKER}'
-        stat = full.stat()
         try:
             old_key = file_content_key(full) or ''
         except Exception:
@@ -1022,9 +1060,7 @@ def upgrade_track(
                             pass
 
                 try:
-                    os.utime(
-                        str(final_path), ns=(stat.st_atime_ns, stat.st_mtime_ns)
-                    )
+                    os.utime(str(final_path), None)
                 except OSError:
                     pass
 
@@ -1032,20 +1068,33 @@ def upgrade_track(
                 if new_lyrics is not None:
                     changed.append(CATEGORY_LYRICS)
 
-            old_stored = stored_path
-            new_stored = str(
-                Path(stored_path).with_suffix(f'.{effective_target_fmt}')
-            )
-            if ctx.metadata_cache is not None:
+                old_stored = stored_path
+                new_stored = (
+                    Path(stored_path)
+                    .with_suffix(f'.{effective_target_fmt}')
+                    .as_posix()
+                )
                 try:
-                    if new_stored != old_stored:
-                        ctx.metadata_cache.forget(old_stored, full_path=full)
-                    ctx.metadata_cache.refresh(new_stored, final_path)
+                    new_key = file_content_key(final_path) or ''
                 except Exception:
-                    logger.debug('Metadata cache refresh failed')
+                    new_key = ''
 
-            if new_stored != old_stored:
-                if ctx.download_dir:
+                if ctx.metadata_cache is not None:
+                    try:
+                        if new_stored != old_stored:
+                            ctx.metadata_cache.forget(old_stored, full_path=full)
+                        ctx.metadata_cache.refresh(new_stored, final_path)
+                    except Exception:
+                        logger.debug('Metadata cache refresh failed')
+
+                if ctx.cover_cache is not None:
+                    try:
+                        ctx.cover_cache.forget_by_stored_path(old_stored)
+                        ctx.cover_cache.refresh(new_stored, final_path)
+                    except Exception:
+                        pass
+
+                if new_stored != old_stored and ctx.download_dir:
                     try:
                         from .m3u import iter_m3u_files
 
@@ -1082,10 +1131,19 @@ def upgrade_track(
 
                 if ctx.playlist_catalog is not None:
                     try:
-                        new_ck = file_content_key(final_path) or ''
                         ctx.playlist_catalog.update_filename(
-                            old_stored, new_stored, content_key=new_ck or None
+                            old_stored, new_stored, content_key=new_key or None
                         )
+                    except Exception:
+                        pass
+
+                if new_key and ctx.track_index is not None:
+                    try:
+                        tid = ctx.track_index.spotify_id_for_filename(old_stored)
+                        if tid:
+                            ctx.track_index.register(
+                                tid, new_stored, full_path=final_path
+                            )
                     except Exception:
                         pass
 
@@ -1115,18 +1173,16 @@ def upgrade_track(
                         'Library paths cache invalidation failed'
                     )
 
-                if old_key and deps.rekey_owners is not None:
+                if old_key and new_key and deps.rekey_owners is not None:
                     try:
-                        new_key = file_content_key(final_path) or ''
-                        if new_key:
-                            deps.rekey_owners(old_key, new_key, new_stored)
+                        deps.rekey_owners(old_key, new_key, new_stored)
                     except Exception:
                         logger.opt(exception=True).debug(
                             'Library upgrade: could not rekey owners for {}',
                             new_stored,
                         )
 
-                if deps.on_track_path_changed is not None:
+                if new_stored != old_stored and deps.on_track_path_changed is not None:
                     try:
                         deps.on_track_path_changed(
                             old_stored, new_stored, final_path
@@ -1134,6 +1190,13 @@ def upgrade_track(
                     except Exception:
                         logger.opt(exception=True).debug(
                             'on_track_path_changed hook failed'
+                        )
+                elif deps.on_track_upgraded is not None:
+                    try:
+                        deps.on_track_upgraded(new_stored, final_path, changed)
+                    except Exception:
+                        logger.opt(exception=True).debug(
+                            'on_track_upgraded hook failed'
                         )
 
                 return UpgradeOutcome(
@@ -1217,6 +1280,12 @@ def upgrade_track(
             ctx.metadata_cache.refresh(stored_path, full)
         except Exception:
             logger.debug('Library upgrade: metadata cache refresh failed')
+    if CATEGORY_ARTWORK in changed and ctx.cover_cache is not None:
+        try:
+            ctx.cover_cache.forget_by_stored_path(stored_path)
+            ctx.cover_cache.refresh(stored_path, full)
+        except Exception:
+            pass
     try:
         from .library_catalog import (
             drop_library_listing_files,
@@ -1227,6 +1296,13 @@ def upgrade_track(
         merge_library_listing_file(ctx, stored_path)
     except Exception:
         pass
+    if deps.on_track_upgraded is not None:
+        try:
+            deps.on_track_upgraded(stored_path, full, changed)
+        except Exception:
+            logger.opt(exception=True).debug(
+                'on_track_upgraded hook failed'
+            )
 
     return UpgradeOutcome(
         JOB_DONE,
@@ -1365,7 +1441,7 @@ class LibraryUpgradeRunner:
             self._scan_total = len(entries)
             checks = self.db.checks_for([str(e['file']) for e in entries])
             jobs: list[dict[str, Any]] = []
-            checked: list[tuple[str, list[str]]] = []
+            checked: list[tuple[str, list[str], int]] = []
             total_bytes = 0
             skipped = 0
             active_cats = [
@@ -1386,6 +1462,8 @@ class LibraryUpgradeRunner:
                     checks.get(stored) or {},
                     options.recheck_days,
                     check_format=options.check_format,
+                    artwork_min_px=options.artwork_min_px,
+                    entry_cover_px=int(entry.get('cover_px') or 0),
                 )
                 if not due:
                     # Every category was looked at recently: don't even
@@ -1412,7 +1490,15 @@ class LibraryUpgradeRunner:
                 # next scan doesn't read this file again for those.
                 clean = sorted(due - behind)
                 if clean:
-                    checked.append((stored, clean))
+                    checked.append(
+                        (
+                            stored,
+                            clean,
+                            int(entry.get('cover_px') or 0)
+                            if CATEGORY_ARTWORK in clean
+                            else 0,
+                        )
+                    )
                 if found:
                     jobs.append({
                         'file': stored,
@@ -1454,6 +1540,8 @@ class LibraryUpgradeRunner:
         track_checks: dict[str, Any],
         recheck_days: int,
         check_format: bool = False,
+        artwork_min_px: int = DEFAULT_ARTWORK_MIN_PX,
+        entry_cover_px: int = 0,
     ) -> set[str]:
         """Categories this track hasn't had looked at recently.
 
@@ -1471,6 +1559,15 @@ class LibraryUpgradeRunner:
                 max_age_days=recheck_days,
             )
         }
+        art_check = track_checks.get(CATEGORY_ARTWORK)
+        if art_check and CATEGORY_ARTWORK not in due:
+            recorded_px = int(art_check.get('artwork_px') or 0)
+            if (
+                recorded_px > 0
+                and entry_cover_px >= recorded_px
+                and entry_cover_px < artwork_min_px
+            ):
+                due.add(CATEGORY_ARTWORK)
         if check_format:
             due.add(CATEGORY_FORMAT)
         return due
@@ -1579,6 +1676,13 @@ class LibraryUpgradeRunner:
                 invalidate_library_paths_cache(drop_entries=False, notify=True)
             except Exception:
                 pass
+        if self.deps.on_run_finished is not None:
+            try:
+                self.deps.on_run_finished()
+            except Exception:
+                logger.opt(exception=True).debug(
+                    'on_run_finished hook failed'
+                )
         self._publish()
 
     def _process(

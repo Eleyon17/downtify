@@ -368,6 +368,8 @@ def _open_library_stores(monitor_db_path: Path) -> None:
             rekey_owners=api.rekey_file_owners,
             downloader=lambda: api.state.downloader,
             on_track_path_changed=api.on_track_path_changed,
+            on_track_upgraded=api.on_track_upgraded,
+            on_run_finished=api.on_upgrade_run_finished,
         ),
     )
     api.state.external_sync = ExternalSyncJob(

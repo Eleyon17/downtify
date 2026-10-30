@@ -429,7 +429,7 @@ class LibraryUpgradeDB:
 
     def record_checks(
         self,
-        entries: Iterable[tuple[str, list[str]]],
+        entries: Iterable[tuple[Any, ...]],
         *,
         app_version: str,
     ) -> int:
@@ -442,21 +442,33 @@ class LibraryUpgradeDB:
         """
 
         now = _now_iso()
-        rows = [
-            (path, category, now, app_version)
-            for path, categories in entries
-            for category in categories
-        ]
+        rows: list[tuple[str, str, str, str, int]] = []
+        for item in entries:
+            path = str(item[0])
+            categories = item[1]
+            artwork_px = int(item[2]) if len(item) > 2 else 0
+            for category in categories:
+                rows.append(
+                    (
+                        path,
+                        str(category),
+                        now,
+                        app_version,
+                        artwork_px if category == 'artwork' else 0,
+                    )
+                )
         if not rows:
             return 0
         with self._connect() as conn:
             conn.executemany(
                 """INSERT INTO library_upgrade_checks
-                   (stored_path, category, checked_at, app_version)
-                   VALUES (?, ?, ?, ?)
+                   (stored_path, category, checked_at, app_version, artwork_px)
+                   VALUES (?, ?, ?, ?, ?)
                    ON CONFLICT(stored_path, category) DO UPDATE SET
                    checked_at = excluded.checked_at,
-                   app_version = excluded.app_version""",
+                   app_version = excluded.app_version,
+                   artwork_px = MAX(excluded.artwork_px,
+                                    library_upgrade_checks.artwork_px)""",
                 rows,
             )
         return len(rows)
