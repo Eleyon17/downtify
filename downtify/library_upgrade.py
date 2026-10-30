@@ -1087,10 +1087,11 @@ def upgrade_track(
                     except Exception:
                         logger.debug('Metadata cache refresh failed')
 
-                if ctx.cover_cache is not None:
+                cover_cache = getattr(ctx, 'cover_cache', None)
+                if cover_cache is not None:
                     try:
-                        ctx.cover_cache.forget_by_stored_path(old_stored)
-                        ctx.cover_cache.refresh(new_stored, final_path)
+                        cover_cache.forget_by_stored_path(old_stored)
+                        cover_cache.refresh(new_stored, final_path)
                     except Exception:
                         pass
 
@@ -1280,10 +1281,11 @@ def upgrade_track(
             ctx.metadata_cache.refresh(stored_path, full)
         except Exception:
             logger.debug('Library upgrade: metadata cache refresh failed')
-    if CATEGORY_ARTWORK in changed and ctx.cover_cache is not None:
+    cover_cache = getattr(ctx, 'cover_cache', None)
+    if CATEGORY_ARTWORK in changed and cover_cache is not None:
         try:
-            ctx.cover_cache.forget_by_stored_path(stored_path)
-            ctx.cover_cache.refresh(stored_path, full)
+            cover_cache.forget_by_stored_path(stored_path)
+            cover_cache.refresh(stored_path, full)
         except Exception:
             pass
     try:

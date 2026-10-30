@@ -49,6 +49,7 @@ class LibraryContext:
     track_index: Optional[TrackIndex] = None
     metadata_cache: Optional[LibraryMetadataCache] = None
     playlist_catalog: Optional[PlaylistCatalog] = None
+    cover_cache: Optional[Any] = None
 
 
 def library_context_from_state(
@@ -57,6 +58,7 @@ def library_context_from_state(
     track_index: Optional[TrackIndex] = None,
     metadata_cache: Optional[LibraryMetadataCache] = None,
     playlist_catalog: Optional[PlaylistCatalog] = None,
+    cover_cache: Optional[Any] = None,
 ) -> LibraryContext:
     slskd_raw = settings.get('slskd')
     slskd_dir: Optional[Path] = None
@@ -76,6 +78,7 @@ def library_context_from_state(
         track_index=track_index,
         metadata_cache=metadata_cache,
         playlist_catalog=playlist_catalog,
+        cover_cache=cover_cache,
     )
 
 

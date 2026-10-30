@@ -1998,6 +1998,7 @@ def library_context() -> LibraryContext:
         state.track_index,
         metadata_cache=state.metadata_cache,
         playlist_catalog=state.playlist_catalog,
+        cover_cache=state.cover_cache,
     )
 
 
