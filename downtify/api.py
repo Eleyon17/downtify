@@ -457,7 +457,12 @@ from .monitor import (
     normalize_release_types,
     parse_playlist_url,
 )
-from .navidrome import _effective_navidrome_settings, cache_navidrome_song_id
+from .navidrome import (
+    NavidromeClient,
+    _effective_navidrome_settings,
+    cache_navidrome_song_id,
+    rename_navidrome_playlist,
+)
 from .navidrome_index import NavidromeIndex
 from .playlist_batches import (
     PlaylistBatchStore,
@@ -6125,30 +6130,69 @@ async def _run_replacement(
         'status': 'done',
         'filename': file,
     })
+    await state.connections.broadcast({
+        'type': 'audio_replaced',
+        'file': file,
+        'timestamp': int(datetime.now(timezone.utc).timestamp()),
+    })
     announce_library_changed()
 
 
 def _after_replacement(file: str, full: Path, old_key: str = '') -> None:
     """The caches that describe the file by its contents catch up."""
 
+    entry = None
     if state.metadata_cache is not None:
         try:
             state.metadata_cache.refresh(file, full)
+            entry = state.metadata_cache.entry_for(file)
         except Exception:
             logger.debug('Metadata cache refresh failed for {}', file)
     if state.track_index is not None:
         spotify_id = state.track_index.spotify_id_for_filename(file)
         if spotify_id:
             state.track_index.register(spotify_id, file, full_path=full)
-    if old_key and state.track_owners is not None:
+    new_key = content_key_for(full) or ''
+    if old_key and state.track_owners is not None and new_key:
         try:
-            new_key = content_key_for(full) or ''
-            if new_key:
-                state.track_owners.rekey(old_key, new_key, file)
+            state.track_owners.rekey(old_key, new_key, file)
         except Exception:
             logger.opt(exception=True).debug(
                 'Could not rekey owners for {}', file
             )
+    if state.likes is not None:
+        try:
+            dur = float((entry or {}).get('duration') or 0.0)
+            state.likes.update_track_metadata(
+                file,
+                content_key=new_key or None,
+                duration=dur if dur > 0 else None,
+            )
+            _sync_liked_playlist()
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Could not update likes for {}', file
+            )
+    if state.navidrome_index is not None:
+        try:
+            state.navidrome_index.forget_filename(file, full_path=full)
+        except Exception:
+            pass
+    if state.library_sync is not None:
+        try:
+            state.library_sync.refresh(list_library_entries(library_context()))
+        except Exception:
+            logger.opt(exception=True).debug(
+                'Could not refresh library sync for {}', file
+            )
+    cfg = _effective_navidrome_settings(state.settings)
+    if cfg.get('enabled') and cfg.get('scan_after_download'):
+        try:
+            client = NavidromeClient(cfg)
+            if client.configured() and client.ping():
+                client.start_scan(full=False)
+        except Exception:
+            pass
     invalidate_library_paths_cache(notify=False)
 
 
@@ -6988,6 +7032,7 @@ async def rename_library_playlist_endpoint(request: Request) -> dict[str, Any]:
         except Exception:
             pass
 
+    actual_new_name = new_name
     if monitored_watch is not None:
         await asyncio.to_thread(
             state.monitor_db.update_playlist, monitored_watch.id, name=new_name
@@ -7027,40 +7072,89 @@ async def rename_library_playlist_endpoint(request: Request) -> dict[str, Any]:
                 )
             except Exception:
                 pass
-        invalidate_library_paths_cache()
-        return {'name': new_name, 'previous': name, 'manual': False}
+        result = {'name': new_name, 'previous': name, 'manual': False}
+    else:
+        try:
+            result = await asyncio.to_thread(
+                rename_manual_playlist, ctx, name, new_name
+            )
+        except ManualPlaylistError as exc:
+            raise HTTPException(
+                status_code=exc.status_code, detail=str(exc)
+            ) from exc
+        actual_new_name = str(result.get('name') or new_name)
+        if state.playlist_catalog is not None:
+            try:
+                await asyncio.to_thread(
+                    state.playlist_catalog.rename_playlist,
+                    name,
+                    actual_new_name,
+                )
+            except Exception:
+                logger.opt(exception=True).debug(
+                    'Could not rename playlist in catalog {!r}', name
+                )
+        if state.manual_playlist_owners is not None:
+            try:
+                await asyncio.to_thread(
+                    state.manual_playlist_owners.rename_owner,
+                    name,
+                    actual_new_name,
+                )
+            except Exception:
+                logger.opt(exception=True).debug(
+                    'Could not move owner for playlist {!r}', name
+                )
 
     try:
-        result = await asyncio.to_thread(
-            rename_manual_playlist, ctx, name, new_name
+        await asyncio.to_thread(
+            rename_navidrome_playlist, name, actual_new_name, state.settings
         )
-    except ManualPlaylistError as exc:
-        raise HTTPException(
-            status_code=exc.status_code, detail=str(exc)
-        ) from exc
-    if state.playlist_catalog is not None:
+    except Exception:
+        logger.opt(exception=True).warning(
+            'Failed to rename playlist in Navidrome from {!r} to {!r}',
+            name,
+            actual_new_name,
+        )
+
+    if state.downloader and state.playlist_catalog:
         try:
             await asyncio.to_thread(
-                state.playlist_catalog.rename_playlist,
-                name,
-                str(result.get('name') or new_name),
+                refresh_playlists_after_moves,
+                {actual_new_name},
+                settings=state.settings,
+                downloader=state.downloader,
+                playlist_catalog=state.playlist_catalog,
+                track_index=state.track_index,
+                monitor_db=state.monitor_db,
+                navidrome_index=state.navidrome_index,
+                playlist_spotify_cache=state.playlist_spotify_cache,
+                cover_cache=state.cover_cache,
+                metadata_cache=state.metadata_cache,
             )
         except Exception:
-            logger.opt(exception=True).debug(
-                'Could not rename playlist in catalog {!r}', name
+            logger.opt(exception=True).warning(
+                'Failed to refresh playlist {!r} after rename', actual_new_name
             )
-    if state.manual_playlist_owners is not None:
+
+    if state.library_sync is not None:
         try:
             await asyncio.to_thread(
-                state.manual_playlist_owners.rename_owner,
-                name,
-                str(result.get('name') or new_name),
+                state.library_sync.refresh,
+                list_library_entries(library_context()),
             )
         except Exception:
-            logger.opt(exception=True).debug(
-                'Could not move owner for playlist {!r}', name
+            logger.opt(exception=True).warning(
+                'Failed to refresh library sync after playlist rename'
             )
-    invalidate_library_paths_cache()
+
+    invalidate_library_paths_cache(notify=False)
+    announce_library_changed()
+    await state.connections.broadcast({
+        'type': 'playlist_renamed',
+        'old_name': name,
+        'new_name': actual_new_name,
+    })
     return result
 
 
@@ -9619,6 +9713,15 @@ async def update_monitor_playlist(
                     current.name,
                     new_name,
                 )
+        if state.manual_playlist_owners is not None:
+            try:
+                await asyncio.to_thread(
+                    state.manual_playlist_owners.rename_owner,
+                    current.name,
+                    new_name,
+                )
+            except Exception:
+                pass
         try:
             ctx = library_context()
             m3u_path = m3u.find_m3u_for_name(ctx.download_dir, current.name)
@@ -9637,7 +9740,51 @@ async def update_monitor_playlist(
                 current.name,
                 new_name,
             )
-        invalidate_library_paths_cache()
+        try:
+            await asyncio.to_thread(
+                rename_navidrome_playlist,
+                current.name,
+                new_name,
+                state.settings,
+            )
+        except Exception:
+            logger.opt(exception=True).warning(
+                'Failed to rename Navidrome playlist from {!r} to {!r}',
+                current.name,
+                new_name,
+            )
+        if state.downloader and state.playlist_catalog:
+            try:
+                await asyncio.to_thread(
+                    refresh_playlists_after_moves,
+                    {new_name},
+                    settings=state.settings,
+                    downloader=state.downloader,
+                    playlist_catalog=state.playlist_catalog,
+                    track_index=state.track_index,
+                    monitor_db=state.monitor_db,
+                    navidrome_index=state.navidrome_index,
+                    playlist_spotify_cache=state.playlist_spotify_cache,
+                    cover_cache=state.cover_cache,
+                    metadata_cache=state.metadata_cache,
+                )
+            except Exception:
+                pass
+        if state.library_sync is not None:
+            try:
+                await asyncio.to_thread(
+                    state.library_sync.refresh,
+                    list_library_entries(library_context()),
+                )
+            except Exception:
+                pass
+        invalidate_library_paths_cache(notify=False)
+        announce_library_changed()
+        await state.connections.broadcast({
+            'type': 'playlist_renamed',
+            'old_name': current.name,
+            'new_name': new_name,
+        })
 
     if 'interval_minutes' in payload:
         kwargs['interval_minutes'] = int(payload['interval_minutes'])

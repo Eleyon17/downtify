@@ -577,8 +577,10 @@ class NavidromeClient:
                 return picked
         return None
 
-    def find_playlist_ids_by_name(self, name: str) -> list[str]:
-        """Return all playlist IDs with an exact *name* match (newest API order)."""
+    def find_playlist_ids_by_name(
+        self, name: str, *, case_insensitive: bool = False
+    ) -> list[str]:
+        """Return all playlist IDs with a matching name."""
 
         body = self._request('getPlaylists')
         playlists = body.get('playlists') if isinstance(body, dict) else None
@@ -588,10 +590,15 @@ class NavidromeClient:
         if isinstance(items, dict):
             items = [items]
         ids: list[str] = []
+        target = name.casefold().strip() if case_insensitive else name
         for pl in items:
             if not isinstance(pl, dict):
                 continue
-            if str(pl.get('name') or '') != name:
+            pl_name = str(pl.get('name') or '')
+            compare = (
+                pl_name.casefold().strip() if case_insensitive else pl_name
+            )
+            if compare != target:
                 continue
             pid = str(pl.get('id') or '').strip()
             if pid:
@@ -691,6 +698,15 @@ class NavidromeClient:
                 'playlistId': playlist_id,
                 'comment': comment,
                 'public': str(public).lower(),
+            },
+        )
+
+    def rename_playlist(self, playlist_id: str, new_name: str) -> None:
+        self._request(
+            'updatePlaylist',
+            {
+                'playlistId': playlist_id,
+                'name': new_name,
             },
         )
 
@@ -930,6 +946,74 @@ def remove_navidrome_playlist_by_name(
                 exc,
             )
     return removed
+
+
+def rename_navidrome_playlist(
+    old_name: str,
+    new_name: str,
+    settings: dict[str, Any],
+) -> int:
+    """Rename Navidrome playlist(s) matching *old_name* to *new_name*. Returns count renamed."""
+
+    old_clean = str(old_name or '').strip()
+    new_clean = str(new_name or '').strip()
+    if not old_clean or not new_clean or old_clean == new_clean:
+        return 0
+    cfg = _effective_navidrome_settings(settings)
+    if not cfg.get('enabled'):
+        return 0
+    client = NavidromeClient(cfg)
+    if not client.configured() or not client.ping():
+        return 0
+    renamed = 0
+    existing = client.find_playlist_ids_by_name(old_clean)
+    if not existing:
+        existing = client.find_playlist_ids_by_name(
+            old_clean, case_insensitive=True
+        )
+    if not existing:
+        logger.info(
+            'navidrome: no playlist found with name {!r} to rename', old_clean
+        )
+        return 0
+    target_id = existing[0]
+    for dup_id in existing[1:]:
+        try:
+            client.delete_playlist(dup_id)
+            logger.info(
+                'navidrome: removed duplicate playlist id={} name={!r}',
+                dup_id,
+                old_clean,
+            )
+        except Exception as exc:
+            logger.info(
+                'navidrome: could not remove duplicate playlist id={} err={}',
+                dup_id,
+                exc,
+            )
+    try:
+        client.rename_playlist(target_id, new_clean)
+        renamed += 1
+        logger.info(
+            'navidrome: renamed playlist id={} from {!r} to {!r}',
+            target_id,
+            old_clean,
+            new_clean,
+        )
+    except Exception as exc:
+        logger.warning(
+            'navidrome: failed to rename playlist id={} from {!r} to {!r}: {}',
+            target_id,
+            old_clean,
+            new_clean,
+            exc,
+        )
+    if cfg.get('scan_after_download'):
+        try:
+            client.start_scan(full=False)
+        except Exception:
+            pass
+    return renamed
 
 
 def sync_playlist_to_navidrome(  # noqa: PLR0914

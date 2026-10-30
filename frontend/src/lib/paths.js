@@ -17,15 +17,30 @@ export function encodePath(fileName) {
     .join('/')
 }
 
-export function fileURL(fileName) {
-  const path = String(fileName || '')
+const audioVersions = new Map()
+
+export function setAudioVersion(fileName, version = Date.now()) {
+  if (!fileName) return
+  audioVersions.set(String(fileName).trim(), version)
+}
+
+export function getAudioVersion(fileName) {
+  return audioVersions.get(String(fileName).trim()) || null
+}
+
+export function fileURL(fileName, version) {
+  const clean = String(fileName || '').trim()
+  let base
   if (
-    path.startsWith(SLSKD_LIBRARY_PREFIX) ||
-    path.startsWith(EXTERNAL_LIBRARY_PREFIX)
+    clean.startsWith(SLSKD_LIBRARY_PREFIX) ||
+    clean.startsWith(EXTERNAL_LIBRARY_PREFIX)
   ) {
-    return `/media/${encodePath(path)}`
+    base = `/media/${encodePath(clean)}`
+  } else {
+    base = `/downloads/${encodePath(clean)}`
   }
-  return `/downloads/${encodePath(path)}`
+  const v = version || audioVersions.get(clean)
+  return v ? `${base}?v=${v}` : base
 }
 
 const coverVersions = new Map()

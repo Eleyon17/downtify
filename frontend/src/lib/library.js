@@ -91,7 +91,7 @@ export function normalizeTrack(row) {
     hasCover: raw.has_cover !== false,
     playlists: Array.isArray(raw.playlists) ? raw.playlists : [],
     format: fileFormat(file),
-    url: fileURL(file),
+    url: fileURL(file, Number(raw.added) || 0),
     cover: coverURL(file, Number(raw.added) || 0),
   }
 }

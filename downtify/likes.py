@@ -315,6 +315,43 @@ class LikedTracks:
             )
             return cur.rowcount > 0
 
+    def update_track_metadata(
+        self,
+        stored_path: str,
+        *,
+        content_key: Optional[str] = None,
+        title: Optional[str] = None,
+        artist: Optional[str] = None,
+        duration: Optional[float] = None,
+    ) -> int:
+        """Update metadata (content_key, title, artist, duration) for *stored_path* across all users."""
+        path = _norm(stored_path)
+        if not path:
+            return 0
+        updates: list[str] = []
+        values: list[Any] = []
+        if content_key is not None:
+            updates.append('content_key = ?')
+            values.append(str(content_key))
+        if title is not None:
+            updates.append('title = ?')
+            values.append(str(title))
+        if artist is not None:
+            updates.append('artist = ?')
+            values.append(str(artist))
+        if duration is not None:
+            updates.append('duration = ?')
+            values.append(float(duration))
+        if not updates:
+            return 0
+        values.append(path)
+        with self._connect() as conn:
+            cur = conn.execute(
+                f"UPDATE liked_tracks SET {', '.join(updates)} WHERE stored_path = ?",
+                tuple(values),
+            )
+            return cur.rowcount
+
 
 def sync_liked_playlist(
     likes: LikedTracks,

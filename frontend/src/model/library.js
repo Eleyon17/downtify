@@ -14,7 +14,7 @@ import {
   indexTracksBySong,
   songKey,
 } from '/src/lib/library'
-import { coverURL, setCoverVersion } from '/src/lib/paths'
+import { coverURL, setCoverVersion, setAudioVersion } from '/src/lib/paths'
 import { usePlayer } from '/src/model/player'
 import { useI18n } from '/src/i18n'
 
@@ -381,6 +381,25 @@ API.onMessage((data) => {
       usePlayer().updateTrackFile(oldFile, replacedTrack)
     }
     usePlayer().refreshTracks(tracksByFile.value)
+  }
+  if (data?.type === 'audio_replaced' && data.file) {
+    const version = data.timestamp ? data.timestamp * 1000 : Date.now()
+    setAudioVersion(data.file, version)
+    tracks.value = tracks.value.map((track) => {
+      if (track.file !== data.file) return track
+      return normalizeTrack({
+        ...track,
+        added: Math.floor(version / 1000),
+      })
+    })
+    usePlayer().refreshTracks(tracksByFile.value)
+    refreshSoon(500)
+  }
+  if (data?.type === 'playlist_renamed' && data.old_name && data.new_name) {
+    rawPlaylists.value = rawPlaylists.value.map((pl) =>
+      pl.name === data.old_name ? { ...pl, name: data.new_name } : pl
+    )
+    refreshSoon(500)
   }
   if (data?.type === 'library_changed') {
     refreshSoon(1000)

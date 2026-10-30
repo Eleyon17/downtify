@@ -274,7 +274,9 @@ def replace_audio(
             if leftover.is_file():
                 leftover.unlink(missing_ok=True)
     try:
-        os.utime(str(target), ns=(stat.st_atime_ns, stat.st_mtime_ns))
+        # Bump the modification time to now so HTTP caches, media players,
+        # and downstream synchronizers detect the replaced audio stream.
+        os.utime(str(target), None)
     except OSError:
         pass
     logger.info(
