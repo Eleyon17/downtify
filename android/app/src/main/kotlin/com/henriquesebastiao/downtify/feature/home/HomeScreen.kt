@@ -543,7 +543,7 @@ private fun SuggestedMixHeroCard(
                         modifier = Modifier.size(18.dp),
                     )
                     Text(
-                        text = stringResource(R.string.action_play),
+                        text = "Play",
                         modifier = Modifier.padding(start = Spacing.xs),
                     )
                 }

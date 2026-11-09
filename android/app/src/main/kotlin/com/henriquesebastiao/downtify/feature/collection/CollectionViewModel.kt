@@ -274,21 +274,22 @@ class CollectionViewModel @Inject constructor(
     fun shareCollection(onShareUrl: (String) -> Unit) {
         val state = uiState.value
         viewModelScope.launch {
-            val url = when (state.kind) {
+            val share = when (state.kind) {
                 CollectionKind.Playlist -> library.createShare(playlist = playlistName, title = state.title)
                 CollectionKind.Album -> state.tracks.firstOrNull()?.let {
                     library.createShare(trackId = it.id, title = state.title)
                 }
                 CollectionKind.Liked -> null
             }
-            if (!url.isNullOrBlank()) onShareUrl(url)
+            val url = share?.url.orEmpty()
+            if (url.isNotBlank()) onShareUrl(url)
         }
     }
 
     fun shareTrack(track: Track, onShareUrl: (String) -> Unit) {
         viewModelScope.launch {
-            val url = library.createShare(trackId = track.id, title = track.displayTitle)
-            if (!url.isNullOrBlank()) onShareUrl(url)
+            val url = library.createShare(trackId = track.id, title = track.displayTitle)?.url.orEmpty()
+            if (url.isNotBlank()) onShareUrl(url)
         }
     }
 

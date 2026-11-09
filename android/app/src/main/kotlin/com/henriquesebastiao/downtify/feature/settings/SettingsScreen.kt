@@ -246,7 +246,7 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, modifier: M
                         GroupedRow(
                             title = "Download latest APK",
                             summary = if (state.updateCheck?.updateAvailable == true) {
-                                "Update ${state.updateCheck.latestVersion} available on server"
+                                "Update ${state.updateCheck.latest} available on server"
                             } else {
                                 "Install or update APK from server (/api/apk)"
                             },
@@ -267,11 +267,11 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, modifier: M
                         summary = "View 30-day & lifetime stats or clear history",
                         icon = DowntifyIcons.Graphic,
                         action = RowAction.Click(
-                            onClick = {
+                            {
                                 actions.onLoadStats()
                                 dialog = SettingsDialog.Stats
                             },
-                            icon = DowntifyIcons.ChevronRight,
+                            DowntifyIcons.ChevronRight,
                         ),
                     ),
                     if (state.username.isNotBlank()) {
@@ -280,8 +280,8 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, modifier: M
                             summary = "Profile, display name, and public playlist defaults",
                             icon = DowntifyIcons.Person,
                             action = RowAction.Click(
-                                onClick = { dialog = SettingsDialog.Account },
-                                icon = DowntifyIcons.ChevronRight,
+                                { dialog = SettingsDialog.Account },
+                                DowntifyIcons.ChevronRight,
                             ),
                         )
                     } else {
@@ -293,11 +293,11 @@ fun SettingsScreen(state: SettingsUiState, actions: SettingsActions, modifier: M
                             summary = "Scan and upgrade low-bitrate tracks to 320 kbps",
                             icon = DowntifyIcons.Storage,
                             action = RowAction.Click(
-                                onClick = {
+                                {
                                     actions.onLoadUpgrade()
                                     dialog = SettingsDialog.Upgrade
                                 },
-                                icon = DowntifyIcons.ChevronRight,
+                                DowntifyIcons.ChevronRight,
                             ),
                         )
                     } else {
@@ -466,11 +466,11 @@ private fun StatsDialog(
                     state.statsLoading -> Text("Loading stats...")
                     stats == null -> Text("No listening stats available yet.")
                     else -> {
-                        val plays = if (allTime) stats.allTimePlays else stats.windowPlays
-                        val seconds = if (allTime) stats.allTimeSeconds else stats.windowSeconds
-                        val hours = (seconds / 360.0).roundToInt() / 10.0
-                        val topArtists = if (allTime) stats.topArtistsAllTime else stats.topArtists
-                        val topGenres = if (allTime) stats.topGenresAllTime else stats.topGenres
+                        val totals = if (allTime) stats.lifetime else stats.totals
+                        val plays = totals.plays
+                        val hours = totals.hours
+                        val topArtists = stats.topArtists
+                        val topGenres = stats.topGenres
                         Text(
                             "$plays plays · $hours hrs listened",
                             style = MaterialTheme.typography.titleMedium,
@@ -488,7 +488,7 @@ private fun StatsDialog(
                             Text("Top Genres", style = MaterialTheme.typography.labelLarge)
                             topGenres.take(5).forEachIndexed { idx, g ->
                                 Text(
-                                    "${idx + 1}. ${g.genre} (${g.count})",
+                                    "${idx + 1}. ${g.genre} (${g.plays})",
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
@@ -592,7 +592,7 @@ private fun UpgradeDialog(
                 } else {
                     Text(
                         if (up.running) {
-                            "Running (${up.phase}): ${up.done}/${up.total} · Upgraded: ${up.upgraded}"
+                            "Running (${up.phase}): ${up.processed}/${up.total} · Upgraded: ${up.upgraded}"
                         } else {
                             "Idle · Candidates (< 280 kbps): ${up.candidatesCount} · Upgraded: ${up.upgraded}"
                         },

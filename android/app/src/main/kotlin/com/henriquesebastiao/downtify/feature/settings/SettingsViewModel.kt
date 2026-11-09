@@ -108,9 +108,9 @@ class SettingsViewModel @Inject constructor(
     fun refreshAccountAndUpdate() {
         viewModelScope.launch {
             library.fetchMe()?.let { me ->
-                mutableRole.value = me.role
-                mutableDisplayName.value = me.displayName
-                mutableEmail.value = me.email
+                mutableRole.value = me.user?.role.orEmpty()
+                mutableDisplayName.value = me.user?.displayName.orEmpty()
+                mutableEmail.value = me.user?.email.orEmpty()
                 mutableHidePublic.value = me.preferences.hidePublicPlaylistsByDefault
             }
             mutableUpdateCheck.value = library.checkUpdate()
@@ -139,9 +139,9 @@ class SettingsViewModel @Inject constructor(
 
     fun updateProfile(newDisplayName: String, newEmail: String, hidePublicByDefault: Boolean) {
         viewModelScope.launch {
-            library.updateMe(displayName = newDisplayName.trim(), email = newEmail.trim())?.let { me ->
-                mutableDisplayName.value = me.displayName
-                mutableEmail.value = me.email
+            if (library.updateMe(displayName = newDisplayName.trim(), email = newEmail.trim())) {
+                mutableDisplayName.value = newDisplayName.trim()
+                mutableEmail.value = newEmail.trim()
             }
             if (library.setMyPreferences(hidePublicByDefault)) {
                 mutableHidePublic.value = hidePublicByDefault

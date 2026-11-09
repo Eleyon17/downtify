@@ -603,7 +603,7 @@ private fun PlaylistSuggestionsSection(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = Spacing.screen),
-        shape = DowntifyShape.Card,
+        shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(

@@ -388,7 +388,7 @@ private fun TrackMenu(track: Track, isLiked: Boolean, actions: TrackActions, col
             actions.onShare?.let { share ->
                 DropdownMenuItem(
                     text = { Text("Share link") },
-                    leadingIcon = { Icon(painterResource(DowntifyIcons.Link), contentDescription = null) },
+                    leadingIcon = { Icon(painterResource(DowntifyIcons.OpenInNew), contentDescription = null) },
                     onClick = {
                         open = false
                         share(track)
