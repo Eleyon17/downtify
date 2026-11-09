@@ -73,6 +73,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -950,14 +951,19 @@ private fun LibrarySearchResults(
                             }
                             items(state.playlists, key = { "pl-${it.playlist?.name ?: "__liked__"}" }) { pl ->
                                 CoverItem(
-                                    title = pl.playlist?.displayTitle ?: liked,
-                                    subtitle = if (pl.isLiked) "${pl.count} songs" else playlistSubtitle(pl.playlist),
-                                    coverUrl = covers.playlist(pl.playlist, pl.coverTrackId, ServerUrls.COVER_SMALL),
-                                    onClick = {
-                                        if (pl.isLiked) navigation.onLiked()
-                                        else pl.playlist?.let { navigation.onPlaylist(it.name) }
+                                    title = pl.playlist?.title ?: liked,
+                                    subtitle = if (pl.playlist == null) songsCount(pl.count) else buildString {
+                                        append(songsCount(pl.count))
+                                        if (pl.playlist.owner.isNotBlank()) append(" · ${pl.playlist.owner}")
+                                        if (pl.playlist.isPublic) append(" · Public")
                                     },
-                                    placeholderIcon = if (pl.isLiked) DowntifyIcons.FavoriteFilled else DowntifyIcons.Playlist,
+                                    coverUrl = pl.playlist?.let { covers.playlist(it, pl.coverTrackId, ServerUrls.COVER_SMALL) }
+                                        ?: covers.track(pl.coverTrackId, ServerUrls.COVER_SMALL),
+                                    onClick = {
+                                        if (pl.playlist != null) navigation.onPlaylist(pl.playlist.name)
+                                        else navigation.onLiked()
+                                    },
+                                    placeholderIcon = if (pl.playlist == null) DowntifyIcons.FavoriteFilled else DowntifyIcons.Playlist,
                                 )
                             }
                         }

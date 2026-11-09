@@ -810,23 +810,25 @@ private fun downloadRows(
             action = RowAction.Toggle(state.settings.downloadWifiOnly, actions.onDownloadWifiOnly),
         ),
     )
-    GroupedRow(
-        title = stringResource(R.string.settings_offline_limit),
-        summary = stringResource(
-            R.string.settings_offline_limit_summary,
-            limitLabel(state.settings.offlineLimitBytes),
-            formatBytes(state.offlineUsedBytes),
+    add(
+        GroupedRow(
+            title = stringResource(R.string.settings_offline_limit),
+            summary = stringResource(
+                R.string.settings_offline_limit_summary,
+                limitLabel(state.settings.offlineLimitBytes),
+                formatBytes(state.offlineUsedBytes),
+            ),
+            summaryValues = listOfNotNull(
+                limitLabel(state.settings.offlineLimitBytes).takeIf {
+                    state.settings.offlineLimitBytes != OfflinePlanner.UNLIMITED
+                },
+                formatBytes(state.offlineUsedBytes),
+            ),
+            icon = DowntifyIcons.Storage,
+            action = RowAction.Click({ open(SettingsDialog.OfflineLimit) }),
         ),
-        summaryValues = listOfNotNull(
-            limitLabel(state.settings.offlineLimitBytes).takeIf {
-                state.settings.offlineLimitBytes != OfflinePlanner.UNLIMITED
-            },
-            formatBytes(state.offlineUsedBytes),
-        ),
-        icon = DowntifyIcons.Storage,
-        action = RowAction.Click({ open(SettingsDialog.OfflineLimit) }),
-    ),
-)
+    )
+}
 
 @Composable
 private fun bufferRows(

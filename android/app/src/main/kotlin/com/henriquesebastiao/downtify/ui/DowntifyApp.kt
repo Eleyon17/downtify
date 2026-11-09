@@ -292,7 +292,6 @@ private fun MainShell() {
             }
         }
     }
-}
 
 @Composable
 private fun AppNavHost(navController: NavHostController, onOpenMenu: () -> Unit = {}) {
@@ -383,7 +382,7 @@ private fun AppNavHost(navController: NavHostController, onOpenMenu: () -> Unit 
                 onBack = navController::popBackStack,
                 onOpenAbout = { navController.navigate(AboutDestination) },
                 onOpenDownloads = { navController.navigate(DownloadsDestination) },
-                onOpenTrash = if (trashOn) ({ navController.navigate(TrashRoute) }) else null,
+                onOpenTrash = if (trashOn) ({ navController.navigate(TrashDestination) }) else null,
             )
         }
         composable<AboutDestination> {
