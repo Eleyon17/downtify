@@ -174,7 +174,7 @@ fun SearchScreen(
         topBar = {
             // A tab, as the library: its title in primary.
             PageHeader(
-                title = stringResource(R.string.nav_search),
+                title = stringResource(R.string.discover_title),
                 titleColor = MaterialTheme.colorScheme.primary,
                 scrollBehavior = scrollBehavior,
             )
@@ -192,7 +192,7 @@ fun SearchScreen(
                         onExpandedChange = {},
                         placeholder = {
                             Text(
-                                stringResource(R.string.search_placeholder),
+                                "Search or paste link to download to server…",
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )

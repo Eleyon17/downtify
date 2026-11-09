@@ -17,11 +17,13 @@ import com.henriquesebastiao.downtify.core.model.ServerJobStatus
 import com.henriquesebastiao.downtify.core.model.Track
 import com.henriquesebastiao.downtify.core.network.CatalogJson
 import com.henriquesebastiao.downtify.core.network.dto.ArtistOverviewDto
+import com.henriquesebastiao.downtify.core.network.dto.ArtistPopularSongDto
 import com.henriquesebastiao.downtify.core.network.dto.CoverSearchResponseDto
 import com.henriquesebastiao.downtify.core.player.PlayerController
 import com.henriquesebastiao.downtify.core.player.PlayerEvent
 import com.henriquesebastiao.downtify.core.player.PlayerState
 import com.henriquesebastiao.downtify.core.player.PlayingStream
+import com.henriquesebastiao.downtify.core.player.StreamEntry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -186,6 +188,42 @@ class PlayerViewModel @Inject constructor(
     fun queueLibraryFile(file: String) {
         val track = library.library.value?.tracks?.firstOrNull { it.file == file } ?: return
         player.addToQueue(track)
+    }
+
+    fun playPopularSong(song: ArtistPopularSongDto) {
+        val file = song.localFile
+        val local = file?.let { f -> library.library.value?.tracks?.firstOrNull { it.file == f } }
+            ?: library.library.value?.tracks?.firstOrNull {
+                it.displayTitle.equals(song.displayTitle, ignoreCase = true)
+            }
+        if (local != null) {
+            player.play(listOf(local), 0, PlaybackContext(PlaybackContextType.Songs, "", local.displayTitle))
+        } else if (song.streamVideoId.isNotBlank()) {
+            val remote = RemoteSong(
+                id = song.streamVideoId,
+                title = song.displayTitle,
+                artist = song.artist,
+                album = song.displayAlbum,
+                duration = song.duration.toLong(),
+                cover = song.displayCover,
+            )
+            player.playStreams(
+                listOf(StreamEntry(remote, song.streamVideoId)),
+                0,
+                PlaybackContext(PlaybackContextType.Songs, "", song.displayTitle),
+            )
+        }
+    }
+
+    fun queuePopularSong(song: ArtistPopularSongDto) {
+        val file = song.localFile
+        val local = file?.let { f -> library.library.value?.tracks?.firstOrNull { it.file == f } }
+            ?: library.library.value?.tracks?.firstOrNull {
+                it.displayTitle.equals(song.displayTitle, ignoreCase = true)
+            }
+        if (local != null) {
+            player.addToQueue(local)
+        }
     }
 
     fun addCurrentTrackToPlaylist(playlistName: String, onDone: (Boolean) -> Unit = {}) {

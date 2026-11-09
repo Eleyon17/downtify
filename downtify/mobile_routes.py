@@ -163,6 +163,7 @@ async def playlists(request: Request) -> list[dict[str, Any]]:
     return [
         {
             'name': p['name'],
+            'display_name': p.get('display_name') or p.get('title') or p['name'],
             'liked': p['liked'],
             'manual': bool(p.get('manual')),
             'public': bool(p.get('public')),
@@ -173,10 +174,15 @@ async def playlists(request: Request) -> list[dict[str, Any]]:
             'can_edit': bool(p.get('can_edit')),
             'can_change_owner': bool(p.get('can_change_owner')),
             'hidden': bool(p.get('hidden')),
-            'count': p['count'],
-            'cover': p['cover'],
+            'favorite': bool(p.get('favorite')),
+            'count': p.get('count', len(p.get('files') or [])),
+            'cover': p.get('cover') or '',
             'files': p.get('files') or [],
-            'track_ids': [ids[f] for f in p['files'] if f in ids],
+            'track_ids': [
+                ids.get(f) or ids.get(f.replace('\\', '/')) or ids.get(f.replace('/', '\\'))
+                for f in p.get('files') or []
+                if (ids.get(f) or ids.get(f.replace('\\', '/')) or ids.get(f.replace('/', '\\')))
+            ],
         }
         for p in found
     ]

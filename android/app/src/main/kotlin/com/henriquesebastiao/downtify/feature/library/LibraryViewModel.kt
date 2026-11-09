@@ -31,7 +31,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-enum class LibraryTab { Songs, Albums, Artists, Playlists }
+enum class LibraryTab { Playlists, Songs, Albums, Artists }
 
 /** A playlist row: [playlist] null is "Liked songs". [tracks] are the ones in the library, in order. */
 data class PlaylistItem(
@@ -44,7 +44,7 @@ data class PlaylistItem(
 
 data class LibraryUiState(
     val loading: Boolean = true,
-    val tab: LibraryTab = LibraryTab.Songs,
+    val tab: LibraryTab = LibraryTab.Playlists,
     val layout: LibraryLayout = LibraryLayout.Grid,
     val sort: LibrarySort = LibrarySort.RecentlyAdded,
     val sortDescending: Boolean = sort.descendingByDefault,
@@ -101,7 +101,7 @@ class LibraryViewModel @Inject constructor(
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
 
-    private val tab = savedState.getStateFlow(KEY_TAB, LibraryTab.Songs.name)
+    private val tab = savedState.getStateFlow(KEY_TAB, LibraryTab.Playlists.name)
     private val showHidden = MutableStateFlow(false)
     private val hiddenList = MutableStateFlow<List<Playlist>>(emptyList())
 
@@ -143,7 +143,7 @@ class LibraryViewModel @Inject constructor(
         player.nowPlaying,
     ) { content, tabName, syncStatus, playing ->
         content.copy(
-            tab = LibraryTab.entries.firstOrNull { it.name == tabName } ?: LibraryTab.Songs,
+            tab = LibraryTab.entries.firstOrNull { it.name == tabName } ?: LibraryTab.Playlists,
             refreshing = syncStatus == SyncStatus.Syncing,
             currentTrackId = playing.trackId,
             isPlaying = playing.isPlaying,
@@ -263,7 +263,8 @@ class LibraryViewModel @Inject constructor(
         // The server lists its liked-songs playlist too; the app shows likes from /api/v1/likes instead.
         val others = playlists.filterNot { it.liked }.map { p ->
             val tracks = snapshot?.tracks(p.trackIds).orEmpty()
-            PlaylistItem(p, p.title, p.trackIds.size, tracks.firstOrNull { it.hasCover }?.id, tracks)
+            val songCount = if (p.trackIds.isNotEmpty()) p.trackIds.size else tracks.size
+            PlaylistItem(p, p.title, songCount, tracks.firstOrNull { it.hasCover }?.id, tracks)
         }
         return (listOf(likedItem) + others).sortedByDescending { it.playlist?.favorite == true }
     }

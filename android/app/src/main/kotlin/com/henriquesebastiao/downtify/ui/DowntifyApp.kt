@@ -365,7 +365,7 @@ private fun AppNavHost(navController: NavHostController, onOpenMenu: () -> Unit)
         composable<LibraryDestination> {
             LibraryRoute(
                 LibraryNavigation(
-                    onSearch = { navController.navigateTopLevel(TopLevelDestination.Search) },
+                    onSearch = { navController.navigateTopLevel(TopLevelDestination.Discover) },
                     onAlbum = toAlbum,
                     onArtist = toArtist,
                     onPlaylist = toPlaylist,
@@ -391,6 +391,7 @@ private fun AppNavHost(navController: NavHostController, onOpenMenu: () -> Unit)
             SettingsRoute(
                 onBack = navController::popBackStack,
                 onOpenAbout = { navController.navigate(AboutDestination) },
+                onOpenDownloads = { navController.navigate(DownloadsRoute) },
             )
         }
         composable<AboutDestination> {
@@ -503,6 +504,7 @@ private fun NowPlayingOverlay(
             onOpenQueue = { queueOpen = true },
             onOpenContext = { routeFor(it)?.let(onNavigate) },
             onGoToArtist = { onNavigate(ArtistDestination(it)) },
+            onGoToAlbum = { onNavigate(AlbumRoute(it)) },
             onSkipBack = player::skipBack,
             onSkipForward = player::skipForward,
             onCycleSpeed = player::cycleSpeed,
@@ -544,6 +546,8 @@ private fun NowPlayingOverlay(
                 onLoadArtistOverview = player::loadArtistOverview,
                 onPlayLibraryFile = player::playLibraryFile,
                 onQueueLibraryFile = player::queueLibraryFile,
+                onPlayPopularSong = player::playPopularSong,
+                onQueuePopularSong = player::queuePopularSong,
                 onAddToPlaylist = { name -> player.addCurrentTrackToPlaylist(name) },
                 onCreatePlaylistAndAdd = { name, pub -> player.createPlaylistAndAddCurrentTrack(name, pub) },
                 onShareTrack = {

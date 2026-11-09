@@ -85,6 +85,7 @@ fun CoverCard(
     placeholderIcon: Int = DowntifyIcons.Album,
     titleColor: Color = Color.Unspecified,
     centered: Boolean = false,
+    fallbackUrl: String? = null,
 ) {
     Column(
         modifier = modifier.clickable(onClickLabel = title, role = Role.Button, onClick = onClick),
@@ -93,6 +94,7 @@ fun CoverCard(
     ) {
         Artwork(
             url = coverUrl,
+            fallbackUrl = fallbackUrl,
             contentDescription = null,
             shape = shape,
             placeholderIcon = placeholderIcon,
@@ -244,6 +246,7 @@ fun CoverItem(
     shape: Shape = ListStyle.Separated.shapeOf(0, 1),
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     trailing: (@Composable RowScope.() -> Unit)? = null,
+    fallbackUrl: String? = null,
 ) {
     MediaListItem(
         title = title,
@@ -258,6 +261,7 @@ fun CoverItem(
         leading = {
             Artwork(
                 url = coverUrl,
+                fallbackUrl = fallbackUrl,
                 contentDescription = null,
                 shape = if (round) CircleShape else DowntifyShape.ArtworkThumb,
                 placeholderIcon = placeholderIcon,
@@ -413,11 +417,19 @@ private fun TrackMenu(track: Track, isLiked: Boolean, actions: TrackActions, col
 
 /** A round artist avatar with the name under it. */
 @Composable
-fun ArtistCard(name: String, coverUrl: String?, onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 88.dp) {
+fun ArtistCard(
+    name: String,
+    coverUrl: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 88.dp,
+    fallbackUrl: String? = null,
+) {
     CoverCard(
         title = name,
         subtitle = null,
         coverUrl = coverUrl,
+        fallbackUrl = fallbackUrl,
         onClick = onClick,
         shape = CircleShape,
         placeholderIcon = DowntifyIcons.Artist,

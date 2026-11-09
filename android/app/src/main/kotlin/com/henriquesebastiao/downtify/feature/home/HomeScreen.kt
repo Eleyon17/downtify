@@ -480,8 +480,8 @@ private fun SuggestedMixHeroCard(
                                 modifier = Modifier.size(orbSize),
                             ) {
                                 Artwork(
-                                    url = covers.artistPhoto(artist.name)
-                                        ?: covers.track(artist.coverTrackId, ServerUrls.COVER_MEDIUM),
+                                    url = covers.artistPhoto(artist.name),
+                                    fallbackUrl = covers.track(artist.coverTrackId, ServerUrls.COVER_MEDIUM),
                                     contentDescription = artist.name,
                                     shape = CircleShape,
                                     placeholderIcon = DowntifyIcons.Artist,

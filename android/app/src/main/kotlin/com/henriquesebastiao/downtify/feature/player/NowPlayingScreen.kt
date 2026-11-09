@@ -1,5 +1,8 @@
 package com.henriquesebastiao.downtify.feature.player
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +31,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material3.LoadingIndicator
@@ -47,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -86,6 +91,7 @@ import com.henriquesebastiao.downtify.core.model.kilobits
 import com.henriquesebastiao.downtify.core.model.kilohertz
 import com.henriquesebastiao.downtify.core.network.ServerUrls
 import com.henriquesebastiao.downtify.core.network.dto.ArtistOverviewDto
+import com.henriquesebastiao.downtify.core.network.dto.ArtistPopularSongDto
 import com.henriquesebastiao.downtify.core.network.dto.CoverSearchResponseDto
 import com.henriquesebastiao.downtify.core.player.PlaybackError
 import com.henriquesebastiao.downtify.core.player.PlayerState
@@ -112,6 +118,7 @@ data class NowPlayingActions(
     val onCycleSpeed: () -> Unit = {},
     val onGoToShow: (Long) -> Unit = {},
     val onGoToArtist: (String) -> Unit = {},
+    val onGoToAlbum: (String) -> Unit = {},
     val onDownloadStream: () -> Unit = {},
     /** Moves the synced lyrics this many ms later (earlier when negative). */
     val onShiftLyrics: (Long) -> Unit = {},
@@ -147,6 +154,8 @@ fun NowPlayingScreen(
     onLoadArtistOverview: (String) -> Unit = {},
     onPlayLibraryFile: (String) -> Unit = {},
     onQueueLibraryFile: (String) -> Unit = {},
+    onPlayPopularSong: (ArtistPopularSongDto) -> Unit = {},
+    onQueuePopularSong: (ArtistPopularSongDto) -> Unit = {},
     onAddToPlaylist: (String) -> Unit = {},
     onCreatePlaylistAndAdd: (String, Boolean) -> Unit = { _, _ -> },
     onShareTrack: () -> Unit = {},
@@ -354,49 +363,67 @@ fun NowPlayingScreen(
                         lyrics = episode == null && (stream == null || hasLibraryCopy),
                         queue = episode == null,
                     )
-                    // The cover takes whatever the rest leaves, square; tap to flip for Artist Overview & Track Actions.
+                    val flipRotation by animateFloatAsState(
+                        targetValue = if (flipped && episode == null) 180f else 0f,
+                        animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                        label = "coverFlipRotation",
+                    )
+                    // The cover takes whatever the rest leaves, square; smooth 3D flip for Artist Overview & Track Actions.
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        if (flipped && episode == null) {
-                            ArtistFlipCard(
-                                artistName = artistName,
-                                overview = artistOverview,
-                                hasLibraryTrack = track != null || hasLibraryCopy,
-                                onFlipBack = { flipped = false },
-                                onPlayFile = onPlayLibraryFile,
-                                onQueueFile = onQueueLibraryFile,
-                                onAddToPlaylist = { showAddToPlaylistDialog = true },
-                                onShareTrack = onShareTrack,
-                                onOpenCoverPicker = {
-                                    showCoverDialog = true
-                                    onSearchCovers(null) {}
+                        Box(
+                            modifier = Modifier
+                                .widthIn(max = MAX_COVER)
+                                .fillMaxWidth()
+                                .aspectRatio(1f, matchHeightConstraintsFirst = true)
+                                .graphicsLayer {
+                                    rotationY = flipRotation
+                                    cameraDistance = 14f * density
                                 },
-                                modifier = Modifier
-                                    .widthIn(max = MAX_COVER)
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f, matchHeightConstraintsFirst = true),
-                            )
-                        } else {
-                            Artwork(
-                                url = coverUrl,
-                                contentDescription = null,
-                                shape = DowntifyShape.Artwork,
-                                placeholderIcon = if (episode != null) DowntifyIcons.Podcasts else DowntifyIcons.Song,
-                                modifier = Modifier
-                                    .widthIn(max = MAX_COVER)
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f, matchHeightConstraintsFirst = true)
-                                    .then(
-                                        if (episode == null) {
-                                            Modifier.clickable {
-                                                flipped = true
-                                                if (artistName.isNotBlank()) onLoadArtistOverview(artistName)
-                                            }
-                                        } else {
-                                            Modifier
+                        ) {
+                            if (flipRotation <= 90f) {
+                                Artwork(
+                                    url = coverUrl,
+                                    contentDescription = null,
+                                    shape = DowntifyShape.Artwork,
+                                    placeholderIcon = if (episode != null) DowntifyIcons.Podcasts else DowntifyIcons.Song,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .then(
+                                            if (episode == null) {
+                                                Modifier.clickable {
+                                                    flipped = true
+                                                    if (artistName.isNotBlank()) onLoadArtistOverview(artistName)
+                                                }
+                                            } else {
+                                                Modifier
+                                            },
+                                        )
+                                        .then(coverModifier),
+                                )
+                            } else {
+                                ArtistFlipCard(
+                                    artistName = artistName,
+                                    overview = artistOverview,
+                                    hasLibraryTrack = track != null || hasLibraryCopy,
+                                    onFlipBack = { flipped = false },
+                                    onPlayFile = onPlayLibraryFile,
+                                    onQueueFile = onQueueLibraryFile,
+                                    onPlayPopularSong = onPlayPopularSong,
+                                    onQueuePopularSong = onQueuePopularSong,
+                                    onGoToAlbum = actions.onGoToAlbum,
+                                    onAddToPlaylist = { showAddToPlaylistDialog = true },
+                                    onShareTrack = onShareTrack,
+                                    onOpenCoverPicker = {
+                                        showCoverDialog = true
+                                        onSearchCovers(null) {}
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .graphicsLayer {
+                                            rotationY = 180f
                                         },
-                                    )
-                                    .then(coverModifier),
-                            )
+                                )
+                            }
                         }
                     }
                     TitleBlock(
@@ -743,13 +770,6 @@ private fun SourceLines(state: PlayerState, track: Track?, serverName: String) {
             textAlign = TextAlign.Center,
             modifier = Modifier.alpha(MUTED_ALPHA),
         )
-        if (state.readAheadTarget > 0) {
-            Text(
-                stringResource(R.string.player_buffer_ready, state.readAheadReady, state.readAheadTarget),
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.alpha(MUTED_ALPHA),
-            )
-        }
         state.error?.let { error ->
             Text(
                 errorText(error),
@@ -830,6 +850,9 @@ private fun ArtistFlipCard(
     onFlipBack: () -> Unit,
     onPlayFile: (String) -> Unit,
     onQueueFile: (String) -> Unit,
+    onPlayPopularSong: (ArtistPopularSongDto) -> Unit = {},
+    onQueuePopularSong: (ArtistPopularSongDto) -> Unit = {},
+    onGoToAlbum: (String) -> Unit = {},
     onAddToPlaylist: () -> Unit,
     onShareTrack: () -> Unit,
     onOpenCoverPicker: () -> Unit,
@@ -837,6 +860,8 @@ private fun ArtistFlipCard(
 ) {
     val covers = LocalCoverUrls.current
     val scheme = MaterialTheme.colorScheme
+    val songs = overview?.allSongs.orEmpty()
+    val albums = overview?.topAlbums.orEmpty()
     Surface(
         color = scheme.surfaceContainerHigh.copy(alpha = 0.94f),
         contentColor = scheme.onSurface,
@@ -853,7 +878,8 @@ private fun ArtistFlipCard(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Artwork(
-                    url = covers.artistPhoto(artistName) ?: overview?.image?.takeIf { it.isNotBlank() },
+                    url = covers.artistPhoto(artistName),
+                    fallbackUrl = overview?.displayImage?.takeIf { it.isNotBlank() },
                     contentDescription = artistName,
                     shape = CircleShape,
                     placeholderIcon = DowntifyIcons.Artist,
@@ -867,7 +893,13 @@ private fun ArtistFlipCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    if ((overview?.fans ?: 0) > 0) {
+                    if (overview != null && overview.bioSource.isNotBlank()) {
+                        Text(
+                            text = if (overview.bioSource == "youtubemusic") "YouTube Music" else "Artist Profile",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = scheme.onSurfaceVariant,
+                        )
+                    } else if ((overview?.fans ?: 0) > 0) {
                         Text(
                             text = "${overview?.fans} fans",
                             style = MaterialTheme.typography.labelSmall,
@@ -918,61 +950,167 @@ private fun ArtistFlipCard(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    if (overview.popularSongs.isNotEmpty()) {
+                    if (songs.isNotEmpty()) {
                         Text(
                             text = "Popular Songs",
                             style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Bold,
+                            color = scheme.primary,
+                            modifier = Modifier.padding(top = Spacing.xs),
                         )
-                        overview.popularSongs.take(6).forEach { song ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        songs.take(8).forEach { song ->
+                            Surface(
+                                onClick = {
+                                    val f = song.localFile
+                                    if (!f.isNullOrBlank()) onPlayFile(f)
+                                    else onPlayPopularSong(song)
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                color = scheme.surfaceContainer,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
                             ) {
-                                Text(
-                                    text = song.title,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                val localFile = song.localFile
-                                if (song.inLibrary && !localFile.isNullOrBlank()) {
-                                    TextButton(onClick = { onPlayFile(localFile) }) {
-                                        Text("Play", style = MaterialTheme.typography.labelSmall)
+                                Row(
+                                    Modifier.padding(horizontal = Spacing.sm, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                                ) {
+                                    Artwork(
+                                        url = song.displayCover.takeIf { it.isNotBlank() },
+                                        contentDescription = song.displayTitle,
+                                        shape = RoundedCornerShape(6.dp),
+                                        placeholderIcon = DowntifyIcons.Song,
+                                        modifier = Modifier.size(38.dp),
+                                    )
+                                    Column(Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text(
+                                                text = song.displayTitle,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f, fill = false),
+                                            )
+                                            if (song.inLibrary) {
+                                                Icon(
+                                                    painter = painterResource(DowntifyIcons.Cloud),
+                                                    contentDescription = "In library",
+                                                    tint = scheme.primary,
+                                                    modifier = Modifier.size(14.dp),
+                                                )
+                                            }
+                                        }
+                                        val details = listOfNotNull(
+                                            song.displayAlbum.takeIf { it.isNotBlank() },
+                                            if (song.duration > 0) formatDuration(song.duration) else null,
+                                        ).joinToString(" · ")
+                                        if (details.isNotBlank()) {
+                                            Text(
+                                                text = details,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = scheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
                                     }
-                                    TextButton(onClick = { onQueueFile(localFile) }) {
-                                        Text("Next", style = MaterialTheme.typography.labelSmall)
+                                    IconButton(
+                                        onClick = {
+                                            val f = song.localFile
+                                            if (!f.isNullOrBlank()) onQueueFile(f)
+                                            else onQueuePopularSong(song)
+                                        },
+                                        modifier = Modifier.size(32.dp),
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(DowntifyIcons.AddToQueue),
+                                            contentDescription = "Play next",
+                                            tint = scheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp),
+                                        )
                                     }
                                 }
                             }
                         }
                     }
-                    if (overview.topAlbums.isNotEmpty()) {
+                    if (albums.isNotEmpty()) {
                         Text(
                             text = "Top Albums",
                             style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Bold,
+                            color = scheme.primary,
+                            modifier = Modifier.padding(top = Spacing.xs),
                         )
-                        overview.topAlbums.take(5).forEach { alb ->
-                            Text(
-                                text = buildString {
-                                    append(alb.title)
-                                    if (alb.year.isNotBlank()) append(" (${alb.year})")
-                                    if (alb.inLibrary) append(" · In library")
+                        albums.take(6).forEach { alb ->
+                            Surface(
+                                onClick = {
+                                    val albKey = alb.localAlbumId ?: "alb-${alb.displayTitle}"
+                                    onGoToAlbum(albKey)
                                 },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = scheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                                shape = RoundedCornerShape(12.dp),
+                                color = scheme.surfaceContainer,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal = Spacing.sm, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                                ) {
+                                    Artwork(
+                                        url = alb.displayCover.takeIf { it.isNotBlank() },
+                                        contentDescription = alb.displayTitle,
+                                        shape = RoundedCornerShape(6.dp),
+                                        placeholderIcon = DowntifyIcons.Album,
+                                        modifier = Modifier.size(38.dp),
+                                    )
+                                    Column(Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text(
+                                                text = alb.displayTitle,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f, fill = false),
+                                            )
+                                            if (alb.inLibrary) {
+                                                Icon(
+                                                    painter = painterResource(DowntifyIcons.Cloud),
+                                                    contentDescription = "In library",
+                                                    tint = scheme.primary,
+                                                    modifier = Modifier.size(14.dp),
+                                                )
+                                            }
+                                        }
+                                        val details = listOfNotNull(
+                                            alb.recordType.replaceFirstChar { it.uppercase() }.takeIf { it.isNotBlank() },
+                                            alb.year.takeIf { it.isNotBlank() },
+                                        ).joinToString(" · ")
+                                        if (details.isNotBlank()) {
+                                            Text(
+                                                text = details,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = scheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                    }
+                                    Icon(
+                                        painter = painterResource(DowntifyIcons.ChevronRight),
+                                        contentDescription = null,
+                                        tint = scheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
 }
 
 private val COMPACT_HEIGHT = 720.dp

@@ -51,13 +51,13 @@ enum class TopLevelDestination(
     @DrawableRes val selectedIcon: Int,
 ) {
     Home(HomeRoute, R.string.nav_home, DowntifyIcons.Home, DowntifyIcons.HomeFilled),
-    Search(SearchRoute, R.string.nav_search, DowntifyIcons.Search, DowntifyIcons.Search),
+    Discover(SearchRoute, R.string.discover_title, DowntifyIcons.Explore, DowntifyIcons.Explore),
     Library(LibraryRoute, R.string.nav_library, DowntifyIcons.Library, DowntifyIcons.LibraryFilled),
 }
 
 /**
- * The side menu's destinations (Home's menu button): what doesn't need a tab of its own. Each
- * opens above Home, with a back button, as Discover does.
+ * The side menu's destinations (Home's menu button): what doesn't need a tab of its own.
+ * Downloads are accessed via Settings cog; Trash is shown to admins when trash is enabled.
  */
 enum class DrawerDestination(
     val route: Any,
@@ -67,6 +67,5 @@ enum class DrawerDestination(
     /** Shown only to an admin's pairing on a server that has the music trash on. */
     val trashOnly: Boolean = false,
 ) {
-    Downloads(DownloadsRoute, R.string.nav_downloads, DowntifyIcons.Downloads, DowntifyIcons.DownloadsFilled),
     Trash(TrashRoute, R.string.nav_trash, DowntifyIcons.Delete, DowntifyIcons.Delete, trashOnly = true),
 }

@@ -557,24 +557,43 @@ data class UpgradeStartRequest(
 @Serializable
 data class ArtistPopularSongDto(
     val title: String = "",
+    val name: String = "",
     val artist: String = "",
     val album: String = "",
-    val duration: Int = 0,
+    @SerialName("album_name") val albumName: String = "",
+    val duration: Double = 0.0,
     val cover: String = "",
+    @SerialName("cover_url") val coverUrl: String = "",
+    @SerialName("song_id") val songId: String = "",
+    @SerialName("video_id") val videoId: String = "",
     @SerialName("in_library") val inLibrary: Boolean = false,
     @SerialName("local_file") val localFile: String? = null,
     @SerialName("local_title") val localTitle: String? = null,
-)
+    @SerialName("local_track_id") val localTrackId: String? = null,
+) {
+    val displayTitle: String get() = title.ifBlank { name }
+    val displayAlbum: String get() = album.ifBlank { albumName }
+    val displayCover: String get() = cover.ifBlank { coverUrl }
+    val streamVideoId: String get() = songId.ifBlank { videoId }
+}
 
 @Serializable
 data class ArtistTopAlbumDto(
     val title: String = "",
+    val name: String = "",
     val year: String = "",
     val cover: String = "",
+    @SerialName("cover_url") val coverUrl: String = "",
     @SerialName("record_type") val recordType: String = "album",
     @SerialName("in_library") val inLibrary: Boolean = false,
     @SerialName("local_track_count") val localTrackCount: Int = 0,
-)
+    @SerialName("browse_id") val browseId: String = "",
+    @SerialName("album_id") val albumId: String = "",
+    @SerialName("local_album_id") val localAlbumId: String? = null,
+) {
+    val displayTitle: String get() = title.ifBlank { name }
+    val displayCover: String get() = cover.ifBlank { coverUrl }
+}
 
 @Serializable
 data class ArtistSimilarDto(
@@ -586,15 +605,22 @@ data class ArtistSimilarDto(
 @Serializable
 data class ArtistOverviewDto(
     val artist: String = "",
+    val name: String = "",
     val bio: String = "",
     @SerialName("bio_source") val bioSource: String = "",
     @SerialName("bio_url") val bioUrl: String = "",
     val image: String = "",
+    @SerialName("cover_url") val coverUrl: String = "",
     val fans: Int = 0,
     @SerialName("popular_songs") val popularSongs: List<ArtistPopularSongDto> = emptyList(),
+    @SerialName("top_songs") val topSongs: List<ArtistPopularSongDto> = emptyList(),
     @SerialName("top_albums") val topAlbums: List<ArtistTopAlbumDto> = emptyList(),
     @SerialName("similar_artists") val similarArtists: List<ArtistSimilarDto> = emptyList(),
-)
+) {
+    val displayArtist: String get() = artist.ifBlank { name }
+    val displayImage: String get() = image.ifBlank { coverUrl }
+    val allSongs: List<ArtistPopularSongDto> get() = popularSongs.ifEmpty { topSongs }
+}
 
 @Serializable
 data class UpdateCheckDto(

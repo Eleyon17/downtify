@@ -1285,7 +1285,7 @@ def _resolve_playlist_info(
         if key in visibility:
             public = bool(visibility[key])
         else:
-            public = bool(monitored)
+            public = bool(monitored) or (owner_id == 0)
         is_owner = bool(
             (user_id > 0 and owner_id == user_id)
             or (owner_id == 0 and is_admin)
@@ -1322,7 +1322,8 @@ def _playlist_visible(
     )
     key = str(name or '').strip().casefold()
     monitored = key in monitored_owners
-    public = bool(visibility[key]) if key in visibility else bool(monitored)
+    owner_id = catalog_names.get(key, 0) or monitored_owners.get(key, 0) or manual_owners.get(key, 0) or 0
+    public = bool(visibility[key]) if key in visibility else (bool(monitored) or (owner_id == 0))
     if public:
         return True
     if not user_id:
@@ -1354,7 +1355,7 @@ def _filter_playlists_for(
             if state.auth is not None:
                 prefs = state.auth.users.preferences(user_id)
                 if prefs.get(
-                    'hide_public_playlists_by_default', True
+                    'hide_public_playlists_by_default', False
                 ) and not prefs.get('public_playlists_initialized'):
                     if state.manual_playlist_owners.hidden_set(user_id):
                         state.auth.users.set_preferences(
@@ -1676,7 +1677,7 @@ def playlist_entry_for_request(
             if state.auth is not None:
                 prefs = state.auth.users.preferences(user_id)
                 if prefs.get(
-                    'hide_public_playlists_by_default', True
+                    'hide_public_playlists_by_default', False
                 ) and not prefs.get('public_playlists_initialized'):
                     if state.manual_playlist_owners.hidden_set(user_id):
                         state.auth.users.set_preferences(
@@ -3073,18 +3074,36 @@ def artist_photo_proxy_endpoint(
             photo = artist_photo_proxy.fetch_photo_at(_decode_base64url(url))
         else:
             photo = artist_photo_proxy.fetch_proxied_photo(name)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except artist_photo_proxy.PhotoUnavailable:
-        # Not "no photo": never cached, so whatever went wrong (a rate
-        # limit, say) is gone the next time the page asks.
-        return Response(status_code=503, headers={'Cache-Control': 'no-store'})
+    except (ValueError, artist_photo_proxy.PhotoUnavailable):
+        photo = None
+
     if photo is None:
-        # Deezer's own answer that the artist has none: cacheable, or the
-        # page would re-ask for every tile on every visit.
-        return Response(
-            status_code=404, headers={'Cache-Control': cache_control}
-        )
+        # Fallback to local artist folder cover or album cover if available
+        dl_dir = _artist_profile_download_dir()
+        if dl_dir and dl_dir.exists():
+            clean_name = name.strip().lower()
+            for child in dl_dir.iterdir():
+                if child.is_dir() and child.name.strip().lower() == clean_name:
+                    for cand in ['photo.jpg', 'photo.png', 'banner.jpg', 'cover.jpg', 'folder.jpg']:
+                        c_file = child / cand
+                        if c_file.is_file():
+                            return FileResponse(
+                                c_file,
+                                media_type=mimetypes.guess_type(str(c_file))[0] or 'image/jpeg',
+                                headers={'Cache-Control': cache_control},
+                            )
+                    for alb in child.iterdir():
+                        if alb.is_dir():
+                            for cand in ['cover.jpg', 'folder.jpg', 'cover.png']:
+                                c_file = alb / cand
+                                if c_file.is_file():
+                                    return FileResponse(
+                                        c_file,
+                                        media_type=mimetypes.guess_type(str(c_file))[0] or 'image/jpeg',
+                                        headers={'Cache-Control': cache_control},
+                                    )
+                    break
+        return Response(status_code=404, headers={'Cache-Control': cache_control})
     data, content_type = photo
     return Response(
         content=data,

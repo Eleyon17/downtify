@@ -231,8 +231,10 @@ def artist_overview(
         if s.get('album_name') and s.get('cover_url')
     }
 
-    # Find any local covers from download_dir for this artist
+    # Find any local covers and tracks from download_dir for this artist
     local_covers: dict[str, str] = {}
+    local_tracks: dict[str, str] = {}
+    local_albums: set[str] = set()
     if download_dir and download_dir.exists():
         try:
             artist_folder = None
@@ -244,13 +246,14 @@ def artist_overview(
                 for alb_dir in artist_folder.iterdir():
                     if alb_dir.is_dir():
                         alb_norm = _normalize_title(alb_dir.name)
-                        audio_file = next(
-                            (
-                                f for f in alb_dir.iterdir()
-                                if f.is_file() and f.suffix.lower() in {'.flac', '.mp3', '.m4a', '.ogg', '.opus'}
-                            ),
-                            None,
-                        )
+                        local_albums.add(alb_norm)
+                        audio_file = None
+                        for f in alb_dir.iterdir():
+                            if f.is_file() and f.suffix.lower() in {'.flac', '.mp3', '.m4a', '.ogg', '.opus', '.wav'}:
+                                if audio_file is None:
+                                    audio_file = f
+                                rel = f.relative_to(download_dir).as_posix()
+                                local_tracks[_normalize_title(f.stem)] = rel
                         if audio_file:
                             rel = audio_file.relative_to(download_dir).as_posix()
                             local_covers[alb_norm] = f'/cover?file={quote(rel)}'
@@ -285,8 +288,25 @@ def artist_overview(
     for a in top_albums:
         if not a.get('cover_url') and resolved_cover:
             a['cover_url'] = resolved_cover
+        alb_norm = _normalize_title(a.get('name') or a.get('title') or '')
+        a['in_library'] = alb_norm in local_albums
+        a['title'] = a.get('name') or a.get('title') or ''
+        a['cover'] = a.get('cover_url') or ''
+
+    # Normalize fields on top_songs for both web and mobile client models
+    for s in top_songs:
+        s_norm = _normalize_title(s.get('name') or s.get('title') or '')
+        s_match = local_tracks.get(s_norm)
+        s['in_library'] = bool(s_match)
+        s['local_file'] = s_match
+        s['title'] = s.get('name') or s.get('title') or ''
+        s['album'] = s.get('album_name') or s.get('album') or ''
+        s['cover'] = s.get('cover_url') or ''
+        s['video_id'] = s.get('song_id') or s.get('video_id') or ''
+        s['song_id'] = s['video_id']
 
     result = {
+        'artist': str(info.get('name') or clean),
         'name': str(info.get('name') or clean),
         'channel_id': channel_id,
         'url': (
@@ -294,10 +314,12 @@ def artist_overview(
             if channel_id
             else ''
         ),
+        'image': resolved_cover,
         'cover_url': resolved_cover,
         'bio': bio,
         'bio_source': bio_source,
         'top_songs': top_songs,
+        'popular_songs': top_songs,
         'top_albums': top_albums,
     }
     # A failed lookup isn't cached: the next flip tries again.

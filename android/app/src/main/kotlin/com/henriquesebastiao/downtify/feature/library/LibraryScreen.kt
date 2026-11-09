@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.AlertDialog
@@ -221,6 +222,32 @@ fun LibraryScreen(
     trackActions: TrackActions = TrackActions(),
 ) {
     val scheme = MaterialTheme.colorScheme
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+
+    val filteredAlbums = remember(state.albums, searchQuery) {
+        if (searchQuery.isBlank()) state.albums
+        else state.albums.filter { it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true) }
+    }
+    val filteredArtists = remember(state.artists, searchQuery) {
+        if (searchQuery.isBlank()) state.artists
+        else state.artists.filter { it.name.contains(searchQuery, ignoreCase = true) }
+    }
+    val filteredPlaylists = remember(state.playlists, searchQuery) {
+        if (searchQuery.isBlank()) state.playlists
+        else state.playlists.filter { (it.playlist?.title ?: "Liked songs").contains(searchQuery, ignoreCase = true) }
+    }
+    val filteredSongs = remember(state.songs, searchQuery) {
+        if (searchQuery.isBlank()) state.songs
+        else state.songs.filter { it.displayTitle.contains(searchQuery, ignoreCase = true) || it.displayArtist.contains(searchQuery, ignoreCase = true) || it.album.contains(searchQuery, ignoreCase = true) }
+    }
+    val displayState = state.copy(
+        albums = filteredAlbums,
+        artists = filteredArtists,
+        playlists = filteredPlaylists,
+        songs = filteredSongs,
+    )
+
     Scaffold(
         modifier = modifier,
         contentWindowInsets = WindowInsets(0),
@@ -230,7 +257,15 @@ fun LibraryScreen(
                 listOf(scheme.primary.copy(alpha = TINT_ALPHA).compositeOver(scheme.surface), scheme.surface),
             )
             Column(Modifier.background(wash)) {
-                Header(onSearch = navigation.onSearch)
+                Header(
+                    searchOpen = searchOpen,
+                    searchQuery = searchQuery,
+                    onSearchToggle = {
+                        searchOpen = !searchOpen
+                        if (!searchOpen) searchQuery = ""
+                    },
+                    onQueryChange = { searchQuery = it },
+                )
                 PillTabs(
                     tabs = LibraryTab.entries.map { stringResource(it.label) },
                     selectedIndex = LibraryTab.entries.indexOf(state.tab),
@@ -247,7 +282,7 @@ fun LibraryScreen(
                 modifier = Modifier.fillMaxSize().padding(top = Spacing.xs),
             ) {
                 Column {
-                    Toolbar(state, onSort, onSortDescending, onToggleLayout, onShuffle)
+                    Toolbar(displayState, onSort, onSortDescending, onToggleLayout, onShuffle)
                     PullToRefreshBox(
                         isRefreshing = state.refreshing,
                         onRefresh = onRefresh,
@@ -259,16 +294,16 @@ fun LibraryScreen(
                             }
 
                             else -> when (state.tab) {
-                                LibraryTab.Albums -> Albums(state, navigation)
-                                LibraryTab.Artists -> Artists(state, navigation)
+                                LibraryTab.Albums -> Albums(displayState, navigation)
+                                LibraryTab.Artists -> Artists(displayState, navigation)
                                 LibraryTab.Playlists -> Playlists(
-                                    state = state,
+                                    state = displayState,
                                     navigation = navigation,
                                     onCreatePlaylist = onCreatePlaylist,
                                     onToggleHidden = onToggleHiddenPlaylists,
                                     onUnhide = onUnhidePlaylist,
                                 )
-                                LibraryTab.Songs -> Songs(state, onPlaySong, trackActions)
+                                LibraryTab.Songs -> Songs(displayState, onPlaySong, trackActions)
                             }
                         }
                     }
@@ -279,38 +314,78 @@ fun LibraryScreen(
 }
 
 /**
- * The title in 36 sp bold primary on the row of its search button, as in PixelPlayer: one row,
- * not a large title under a bar. A long word steps down to fit.
+ * The title in 36 sp bold primary on the row of its search button.
+ * Tapping search expands an in-library filter that only searches what is stored/downloaded.
  */
 @Composable
-private fun Header(onSearch: () -> Unit) {
+private fun Header(
+    searchOpen: Boolean,
+    searchQuery: String,
+    onSearchToggle: () -> Unit,
+    onQueryChange: (String) -> Unit,
+) {
     val scheme = MaterialTheme.colorScheme
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .windowInsetsPadding(TopAppBarDefaults.windowInsets)
-            .padding(start = Spacing.xl, end = Spacing.md, top = Spacing.sm, bottom = Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            stringResource(R.string.library_title),
-            style = MaterialTheme.typography.displayMedium,
-            color = scheme.primary,
-            maxLines = 1,
-            autoSize = TextAutoSize.StepBased(
-                minFontSize = 24.sp,
-                maxFontSize = MaterialTheme.typography.displayMedium.fontSize,
-                stepSize = 2.sp,
-            ),
-            modifier = Modifier.weight(1f).semantics { heading() },
-        )
-        CircleButton(
-            DowntifyIcons.Search,
-            stringResource(R.string.library_search),
-            onSearch,
-            containerColor = scheme.primaryContainer,
-            contentColor = scheme.onPrimaryContainer,
-        )
+    if (searchOpen) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(TopAppBarDefaults.windowInsets)
+                .padding(horizontal = Spacing.screen, vertical = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onQueryChange,
+                placeholder = { Text("Filter library tracks, albums, playlists…") },
+                singleLine = true,
+                leadingIcon = {
+                    Icon(painterResource(DowntifyIcons.Search), contentDescription = null, tint = scheme.primary)
+                },
+                trailingIcon = {
+                    CircleButton(
+                        DowntifyIcons.Close,
+                        stringResource(R.string.action_close),
+                        {
+                            if (searchQuery.isNotEmpty()) onQueryChange("")
+                            else onSearchToggle()
+                        },
+                        containerColor = scheme.surfaceContainerHighest,
+                        contentColor = scheme.onSurface,
+                    )
+                },
+                shape = CircleShape,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    } else {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(TopAppBarDefaults.windowInsets)
+                .padding(start = Spacing.xl, end = Spacing.md, top = Spacing.sm, bottom = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.library_title),
+                style = MaterialTheme.typography.displayMedium,
+                color = scheme.primary,
+                maxLines = 1,
+                autoSize = TextAutoSize.StepBased(
+                    minFontSize = 24.sp,
+                    maxFontSize = MaterialTheme.typography.displayMedium.fontSize,
+                    stepSize = 2.sp,
+                ),
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+            CircleButton(
+                DowntifyIcons.Search,
+                stringResource(R.string.library_search),
+                onSearchToggle,
+                containerColor = scheme.primaryContainer,
+                contentColor = scheme.onPrimaryContainer,
+            )
+        }
     }
 }
 
@@ -601,9 +676,10 @@ private fun Artists(state: LibraryUiState, navigation: LibraryNavigation) {
             ) {
                 items(state.artists, key = { it.id }) { artist ->
                     ArtistCard(
-                        artist.name,
-                        covers.artistPhoto(artist.name) ?: covers.track(artist.coverTrackId),
-                        { navigation.onArtist(artist.id) },
+                        name = artist.name,
+                        coverUrl = covers.artistPhoto(artist.name),
+                        fallbackUrl = covers.track(artist.coverTrackId),
+                        onClick = { navigation.onArtist(artist.id) },
                         size = 104.dp,
                     )
                 }
@@ -614,10 +690,11 @@ private fun Artists(state: LibraryUiState, navigation: LibraryNavigation) {
             LazyColumn(Modifier.fillMaxSize(), list, contentPadding = listPadding, verticalArrangement = listGap) {
                 items(state.artists, key = { it.id }) { artist ->
                     CoverItem(
-                        artist.name,
-                        artistSubtitle(artist),
-                        covers.artistPhoto(artist.name) ?: covers.track(artist.coverTrackId, ServerUrls.COVER_SMALL),
-                        { navigation.onArtist(artist.id) },
+                        title = artist.name,
+                        subtitle = artistSubtitle(artist),
+                        coverUrl = covers.artistPhoto(artist.name),
+                        fallbackUrl = covers.track(artist.coverTrackId, ServerUrls.COVER_SMALL),
+                        onClick = { navigation.onArtist(artist.id) },
                         round = true,
                         placeholderIcon = DowntifyIcons.Artist,
                     )
@@ -745,7 +822,15 @@ private fun Playlists(
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (state.layout == LibraryLayout.Grid) {
+            if (state.playlists.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    EmptyState(
+                        icon = DowntifyIcons.Playlist,
+                        title = "No playlists found",
+                        body = "Create a new playlist above or add tracks from your library.",
+                    )
+                }
+            } else if (state.layout == LibraryLayout.Grid) {
                 val grid = rememberLazyGridState()
                 LazyVerticalGrid(
                     columns = gridCells,
@@ -755,7 +840,7 @@ private fun Playlists(
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(state.playlists, key = { it.playlist?.name ?: "" }) { item ->
+                    items(state.playlists, key = { it.playlist?.name ?: "__liked__" }) { item ->
                         CoverCard(
                             title = item.playlist?.title ?: liked,
                             subtitle = subtitleOf(item),
@@ -769,7 +854,7 @@ private fun Playlists(
             } else {
                 val list = rememberLazyListState()
                 LazyColumn(Modifier.fillMaxSize(), list, contentPadding = listPadding, verticalArrangement = listGap) {
-                    items(state.playlists, key = { it.playlist?.name ?: "" }) { item ->
+                    items(state.playlists, key = { it.playlist?.name ?: "__liked__" }) { item ->
                         CoverItem(
                             title = item.playlist?.title ?: liked,
                             subtitle = subtitleOf(item),

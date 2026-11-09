@@ -93,6 +93,7 @@ import kotlin.math.roundToInt
 fun SettingsRoute(
     onBack: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenDownloads: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -130,6 +131,7 @@ fun SettingsRoute(
             onFont = viewModel::setFont,
             onFloatingNavBar = viewModel::setFloatingNavBar,
             onOpenAbout = onOpenAbout,
+            onOpenDownloads = onOpenDownloads,
             onOpenLanguage = { openAppLanguageSettings(context) },
             onDownloadWifiOnly = viewModel::setDownloadWifiOnly,
             onOfflineLimit = viewModel::setOfflineLimit,
@@ -167,6 +169,7 @@ data class SettingsActions(
     val onFont: (AppFont) -> Unit = {},
     val onFloatingNavBar: (Boolean) -> Unit = {},
     val onOpenAbout: () -> Unit = {},
+    val onOpenDownloads: () -> Unit = {},
     val onOpenLanguage: () -> Unit = {},
     val onDownloadWifiOnly: (Boolean) -> Unit = {},
     val onOfflineLimit: (Long) -> Unit = {},
@@ -778,6 +781,12 @@ private fun downloadRows(
     actions: SettingsActions,
     open: (SettingsDialog) -> Unit,
 ): List<GroupedRow> = listOf(
+    GroupedRow(
+        title = stringResource(R.string.nav_downloads),
+        summary = "View and manage downloaded music on this device",
+        icon = DowntifyIcons.Downloads,
+        action = RowAction.Click(actions.onOpenDownloads),
+    ),
     GroupedRow(
         title = stringResource(R.string.settings_download_wifi_only),
         summary = stringResource(R.string.settings_download_wifi_only_body),

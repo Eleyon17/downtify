@@ -60,25 +60,30 @@ fun Artwork(
     tone: ArtworkTone = ArtworkTone.Neutral,
     onReady: ((Boolean) -> Unit)? = null,
     crossfade: Boolean = true,
+    fallbackUrl: String? = null,
 ) {
     val (container, content) = tone.colors()
     val context = LocalPlatformContext.current
-    val model = remember(url, crossfade, context) {
-        if (crossfade || url == null) url else ImageRequest.Builder(context).data(url).crossfade(false).build()
+    var currentUrl by remember(url) { mutableStateOf(url ?: fallbackUrl) }
+    val model = remember(currentUrl, crossfade, context) {
+        if (crossfade || currentUrl == null) currentUrl else ImageRequest.Builder(context).data(currentUrl).crossfade(false).build()
     }
-    var loaded by remember(url) { mutableStateOf(false) }
-    if (url == null && onReady != null) SideEffect { onReady(true) }
+    var loaded by remember(currentUrl) { mutableStateOf(false) }
+    if (currentUrl == null && onReady != null) SideEffect { onReady(true) }
     Box(modifier.clip(shape).background(container)) {
         // Under the image, not instead of it: gone once the image is in (a cover may be transparent in places).
         if (!loaded) ArtworkPlaceholder(placeholderIcon, content)
-        if (url != null) {
+        if (currentUrl != null) {
             AsyncImage(
                 model = model,
                 contentDescription = contentDescription,
                 contentScale = ContentScale.Crop,
-                onState = {
-                    loaded = it is AsyncImagePainter.State.Success
-                    onReady?.invoke(loaded || it is AsyncImagePainter.State.Error)
+                onState = { state ->
+                    loaded = state is AsyncImagePainter.State.Success
+                    if (state is AsyncImagePainter.State.Error && currentUrl != fallbackUrl && fallbackUrl != null) {
+                        currentUrl = fallbackUrl
+                    }
+                    onReady?.invoke(loaded || (state is AsyncImagePainter.State.Error && currentUrl == fallbackUrl))
                 },
                 modifier = Modifier.fillMaxSize(),
             )

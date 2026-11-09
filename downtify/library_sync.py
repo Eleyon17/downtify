@@ -486,17 +486,59 @@ class LibrarySync:
         """``{path: track_id}`` for the paths that are known."""
 
         wanted = [p for p in paths if p]
+        if not wanted:
+            return {}
+
+        # Index both forward-slash and backslash variants
+        variant_map: dict[str, list[str]] = {}
+        for p in wanted:
+            variant_map.setdefault(p, []).append(p)
+            norm_fwd = p.replace('\\', '/')
+            if norm_fwd != p:
+                variant_map.setdefault(norm_fwd, []).append(p)
+            norm_back = p.replace('/', '\\')
+            if norm_back != p:
+                variant_map.setdefault(norm_back, []).append(p)
+
+        all_query_paths = list(variant_map.keys())
         found: dict[str, str] = {}
         with self._connect() as conn:
-            for start in range(0, len(wanted), 500):
-                chunk = wanted[start : start + 500]
+            for start in range(0, len(all_query_paths), 500):
+                chunk = all_query_paths[start : start + 500]
                 marks = ','.join('?' * len(chunk))
                 for row in conn.execute(
                     f'SELECT track_id, path FROM sync_tracks '
                     f'WHERE deleted_at IS NULL AND path IN ({marks})',
                     chunk,
                 ).fetchall():
-                    found[row['path']] = row['track_id']
+                    row_path = row['path']
+                    tid = row['track_id']
+                    for orig in variant_map.get(row_path, ()):
+                        found[orig] = tid
+                    for orig in variant_map.get(row_path.replace('\\', '/'), ()):
+                        found[orig] = tid
+                    for orig in variant_map.get(row_path.replace('/', '\\'), ()):
+                        found[orig] = tid
+
+            # If some paths still weren't found, try matching by base filename
+            missing = [p for p in wanted if p not in found]
+            if missing:
+                base_map: dict[str, list[str]] = {}
+                for p in missing:
+                    base = os.path.basename(p.replace('\\', '/'))
+                    if base:
+                        base_map.setdefault(base, []).append(p)
+                for base, origs in base_map.items():
+                    like_pattern = f'%/{base}'
+                    like_pattern_win = f'%\\{base}'
+                    row = conn.execute(
+                        'SELECT track_id FROM sync_tracks '
+                        'WHERE deleted_at IS NULL AND (path LIKE ? OR path LIKE ? OR path = ?) LIMIT 1',
+                        (like_pattern, like_pattern_win, base),
+                    ).fetchone()
+                    if row:
+                        for orig in origs:
+                            found[orig] = row['track_id']
         return found
 
     def keys_for_paths(self, paths: Iterable[str]) -> set[str]:
