@@ -6,6 +6,7 @@ import com.henriquesebastiao.downtify.core.data.catalog.CatalogRepository
 import com.henriquesebastiao.downtify.core.data.catalog.ServerQueueRepository
 import com.henriquesebastiao.downtify.core.data.library.LibraryRepository
 import com.henriquesebastiao.downtify.core.data.session.ServerRepository
+import com.henriquesebastiao.downtify.core.model.CatalogSource
 import com.henriquesebastiao.downtify.core.model.Lyrics
 import com.henriquesebastiao.downtify.core.model.PlaybackContext
 import com.henriquesebastiao.downtify.core.model.PlaybackContextType
@@ -202,10 +203,15 @@ class PlayerViewModel @Inject constructor(
             val remote = RemoteSong(
                 id = song.streamVideoId,
                 title = song.displayTitle,
-                artist = song.artist,
+                artists = listOf(song.artist),
                 album = song.displayAlbum,
-                duration = song.duration.toLong(),
-                cover = song.displayCover,
+                coverUrl = song.displayCover,
+                durationSeconds = song.duration.toInt(),
+                url = "",
+                source = CatalogSource.YouTube,
+                previewUrl = "",
+                year = "",
+                raw = "{}",
             )
             player.playStreams(
                 listOf(StreamEntry(remote, song.streamVideoId)),

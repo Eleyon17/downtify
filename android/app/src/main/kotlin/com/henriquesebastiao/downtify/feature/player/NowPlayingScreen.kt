@@ -1111,7 +1111,6 @@ private fun ArtistFlipCard(
         }
     }
 }
-}
 
 private val COMPACT_HEIGHT = 720.dp
 private val MAX_COVER = 420.dp

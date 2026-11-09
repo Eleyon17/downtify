@@ -391,7 +391,7 @@ private fun AppNavHost(navController: NavHostController, onOpenMenu: () -> Unit)
             SettingsRoute(
                 onBack = navController::popBackStack,
                 onOpenAbout = { navController.navigate(AboutDestination) },
-                onOpenDownloads = { navController.navigate(DownloadsRoute) },
+                onOpenDownloads = { navController.navigate(DownloadsDestination) },
             )
         }
         composable<AboutDestination> {
