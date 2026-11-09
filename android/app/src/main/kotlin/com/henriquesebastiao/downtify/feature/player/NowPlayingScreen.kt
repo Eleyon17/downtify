@@ -92,6 +92,7 @@ import com.henriquesebastiao.downtify.core.model.kilohertz
 import com.henriquesebastiao.downtify.core.network.ServerUrls
 import com.henriquesebastiao.downtify.core.network.dto.ArtistOverviewDto
 import com.henriquesebastiao.downtify.core.network.dto.ArtistPopularSongDto
+import com.henriquesebastiao.downtify.core.network.dto.ArtistTopAlbumDto
 import com.henriquesebastiao.downtify.core.network.dto.CoverSearchResponseDto
 import com.henriquesebastiao.downtify.core.player.PlaybackError
 import com.henriquesebastiao.downtify.core.player.PlayerState
