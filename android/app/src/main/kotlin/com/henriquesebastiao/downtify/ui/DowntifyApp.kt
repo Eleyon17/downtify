@@ -177,8 +177,6 @@ private fun MainShell() {
     val expansion = rememberPlayerExpansion()
     val scope = rememberCoroutineScope()
     LaunchedEffect(hasMedia) { if (!hasMedia) expansion.snapTo(open = false) }
-    // The side menu, opened from Home's menu button.
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
     var currentTab by rememberSaveable { mutableStateOf(TopLevelDestination.Home) }
     val onSettings = destination?.hasRoute<SettingsDestination>() == true ||
         destination?.hasRoute<AboutDestination>() == true ||
@@ -213,17 +211,8 @@ private fun MainShell() {
     // The same instance MoveToTrashHost uses: whether this pairing gets the music trash.
     val trash: MoveToTrashViewModel = hiltViewModel()
     val trashOn by trash.canManage.collectAsStateWithLifecycle()
-    AppDrawer(
-        drawerState = drawerState,
-        selected = DrawerDestination.entries.firstOrNull { destination?.hasRoute(it.route::class) == true },
-        onSelect = { item ->
-            scope.launch { drawerState.close() }
-            navController.navigate(item.route) { launchSingleTop = true }
-        },
-        destinations = DrawerDestination.entries.filter { trashOn || !it.trashOnly },
-    ) {
-        Box(Modifier.fillMaxSize()) {
-            NavigationSuiteScaffold(
+    Box(Modifier.fillMaxSize()) {
+        NavigationSuiteScaffold(
                 navigationSuiteItems = {
                     TopLevelDestination.entries.forEach { tab ->
                         val selected = tab == currentTab
@@ -261,7 +250,7 @@ private fun MainShell() {
                     CompositionLocalProvider(LocalBottomBarsInset provides covered) {
                         Box(Modifier.fillMaxSize().then(content)) {
                             MoveToTrashHost(onMessage = { text -> scope.launch { snackbar.showSnackbar(text) } }) {
-                                AppNavHost(navController, onOpenMenu = { scope.launch { drawerState.open() } })
+                                AppNavHost(navController)
                             }
                         }
                     }
@@ -306,7 +295,7 @@ private fun MainShell() {
 }
 
 @Composable
-private fun AppNavHost(navController: NavHostController, onOpenMenu: () -> Unit) {
+private fun AppNavHost(navController: NavHostController, onOpenMenu: () -> Unit = {}) {
     val toAlbum: (String) -> Unit = { navController.navigate(AlbumRoute(it)) }
     val toArtist: (String) -> Unit = { navController.navigate(ArtistDestination(it)) }
     val toPlaylist: (String) -> Unit = { navController.navigate(PlaylistRoute(it)) }
@@ -388,10 +377,13 @@ private fun AppNavHost(navController: NavHostController, onOpenMenu: () -> Unit)
         }
         composable<TrashDestination> { TrashScreenRoute(onBack = navController::popBackStack) }
         composable<SettingsDestination> {
+            val trash: MoveToTrashViewModel = hiltViewModel()
+            val trashOn by trash.canManage.collectAsStateWithLifecycle()
             SettingsRoute(
                 onBack = navController::popBackStack,
                 onOpenAbout = { navController.navigate(AboutDestination) },
                 onOpenDownloads = { navController.navigate(DownloadsDestination) },
+                onOpenTrash = if (trashOn) ({ navController.navigate(TrashRoute) }) else null,
             )
         }
         composable<AboutDestination> {
@@ -505,6 +497,17 @@ private fun NowPlayingOverlay(
             onOpenContext = { routeFor(it)?.let(onNavigate) },
             onGoToArtist = { onNavigate(ArtistDestination(it)) },
             onGoToAlbum = { onNavigate(AlbumRoute(it)) },
+            onOpenSimilar = {
+                val currentTrack = state.track ?: streamTrack
+                val currentStream = state.stream
+                val artist = currentTrack?.displayArtist ?: currentStream?.artist ?: ""
+                val title = currentTrack?.displayTitle ?: currentStream?.title ?: ""
+                if (artist.isNotBlank() && title.isNotBlank()) {
+                    onClose()
+                    onNavigate(SimilarRoute(artist, title))
+                }
+            },
+            onQueueTopAlbum = player::queueTopAlbum,
             onSkipBack = player::skipBack,
             onSkipForward = player::skipForward,
             onCycleSpeed = player::cycleSpeed,
@@ -548,6 +551,7 @@ private fun NowPlayingOverlay(
                 onQueueLibraryFile = player::queueLibraryFile,
                 onPlayPopularSong = player::playPopularSong,
                 onQueuePopularSong = player::queuePopularSong,
+                onQueueTopAlbum = player::queueTopAlbum,
                 onAddToPlaylist = { name -> player.addCurrentTrackToPlaylist(name) },
                 onCreatePlaylistAndAdd = { name, pub -> player.createPlaylistAndAddCurrentTrack(name, pub) },
                 onShareTrack = {

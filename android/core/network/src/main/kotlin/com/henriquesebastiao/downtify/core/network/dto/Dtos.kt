@@ -590,9 +590,14 @@ data class ArtistTopAlbumDto(
     @SerialName("browse_id") val browseId: String = "",
     @SerialName("album_id") val albumId: String = "",
     @SerialName("local_album_id") val localAlbumId: String? = null,
+    val url: String = "",
 ) {
     val displayTitle: String get() = title.ifBlank { name }
     val displayCover: String get() = cover.ifBlank { coverUrl }
+    val resolvedUrl: String get() = url.ifBlank {
+        val id = browseId.ifBlank { albumId }
+        if (id.isNotBlank()) "https://music.youtube.com/browse/$id" else ""
+    }
 }
 
 @Serializable

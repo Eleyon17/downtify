@@ -391,6 +391,7 @@ fun CollectionScreen(
                             isLiked = track.id in state.likedIds,
                             downloaded = track.id in state.offline.downloadedIds,
                             actions = trackActions,
+                            showDuration = false,
                             modifier = Modifier.padding(horizontal = Spacing.screen),
                         )
                     }
@@ -755,11 +756,6 @@ private fun Details(state: CollectionUiState) {
             Tag("by ${pl.owner}", small = true, tone = TagTone.OnColor)
         }
         Tag(songsCount(state.tracks.size), small = true, tone = TagTone.OnColor)
-        Tag(
-            stringResource(R.string.minutes_short, totalMinutes(state.durationSeconds)),
-            small = true,
-            tone = TagTone.OnColor,
-        )
     }
 }
 

@@ -293,6 +293,16 @@ fun LibraryScreen(
                                 LoadingIndicator()
                             }
 
+                            searchQuery.isNotBlank() -> {
+                                LibrarySearchResults(
+                                    state = displayState,
+                                    currentTab = state.tab,
+                                    navigation = navigation,
+                                    onPlaySong = onPlaySong,
+                                    trackActions = trackActions,
+                                )
+                            }
+
                             else -> when (state.tab) {
                                 LibraryTab.Albums -> Albums(displayState, navigation)
                                 LibraryTab.Artists -> Artists(displayState, navigation)
@@ -888,6 +898,144 @@ private fun Songs(state: LibraryUiState, onPlay: (Int) -> Unit, actions: TrackAc
                     actions = actions,
                     compact = true,
                 )
+            }
+        }
+        Scrollbar(list)
+    }
+}
+
+@Composable
+private fun LibrarySearchResults(
+    state: LibraryUiState,
+    currentTab: LibraryTab,
+    navigation: LibraryNavigation,
+    onPlaySong: (Int) -> Unit,
+    trackActions: TrackActions,
+) {
+    val covers = LocalCoverUrls.current
+    val scheme = MaterialTheme.colorScheme
+    val liked = stringResource(R.string.liked_songs)
+    val hasResults = state.playlists.isNotEmpty() || state.songs.isNotEmpty() || state.albums.isNotEmpty() || state.artists.isNotEmpty()
+
+    if (!hasResults) {
+        Box(Modifier.fillMaxSize().padding(Spacing.xl), contentAlignment = Alignment.Center) {
+            Text(
+                "No matching results in library",
+                style = MaterialTheme.typography.bodyLarge,
+                color = scheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
+    val orderedTabs = remember(currentTab) {
+        listOf(currentTab) + LibraryTab.entries.filter { it != currentTab }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        val list = rememberLazyListState()
+        LazyColumn(Modifier.fillMaxSize(), list, contentPadding = listPadding, verticalArrangement = listGap) {
+            orderedTabs.forEach { tab ->
+                when (tab) {
+                    LibraryTab.Playlists -> {
+                        if (state.playlists.isNotEmpty()) {
+                            item(key = "section-playlists-header") {
+                                Text(
+                                    text = "Playlists (${state.playlists.size})",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = scheme.primary,
+                                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                                )
+                            }
+                            items(state.playlists, key = { "pl-${it.playlist?.name ?: "__liked__"}" }) { pl ->
+                                CoverItem(
+                                    title = pl.playlist?.displayTitle ?: liked,
+                                    subtitle = if (pl.isLiked) "${pl.count} songs" else playlistSubtitle(pl.playlist),
+                                    coverUrl = covers.playlist(pl.playlist, pl.coverTrackId, ServerUrls.COVER_SMALL),
+                                    onClick = {
+                                        if (pl.isLiked) navigation.onLiked()
+                                        else pl.playlist?.let { navigation.onPlaylist(it.name) }
+                                    },
+                                    placeholderIcon = if (pl.isLiked) DowntifyIcons.FavoriteFilled else DowntifyIcons.Playlist,
+                                )
+                            }
+                        }
+                    }
+
+                    LibraryTab.Songs -> {
+                        if (state.songs.isNotEmpty()) {
+                            item(key = "section-songs-header") {
+                                Text(
+                                    text = "Songs (${state.songs.size})",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = scheme.primary,
+                                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                                )
+                            }
+                            itemsIndexed(state.songs, key = { _, track -> "song-${track.id}" }) { index, track ->
+                                TrackItem(
+                                    track = track,
+                                    onClick = { onPlaySong(index) },
+                                    coverUrl = covers.track(track.id.takeIf { track.hasCover }, ServerUrls.COVER_SMALL),
+                                    isCurrent = track.id == state.currentTrackId,
+                                    isPlaying = state.isPlaying,
+                                    isLiked = track.id in state.likedIds,
+                                    actions = trackActions,
+                                    compact = true,
+                                )
+                            }
+                        }
+                    }
+
+                    LibraryTab.Albums -> {
+                        if (state.albums.isNotEmpty()) {
+                            item(key = "section-albums-header") {
+                                Text(
+                                    text = "Albums (${state.albums.size})",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = scheme.primary,
+                                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                                )
+                            }
+                            items(state.albums, key = { "alb-${it.id}" }) { album ->
+                                CoverItem(
+                                    title = album.title,
+                                    subtitle = albumSubtitle(album),
+                                    coverUrl = covers.track(album.coverTrackId, ServerUrls.COVER_SMALL),
+                                    onClick = { navigation.onAlbum(album.id) },
+                                )
+                            }
+                        }
+                    }
+
+                    LibraryTab.Artists -> {
+                        if (state.artists.isNotEmpty()) {
+                            item(key = "section-artists-header") {
+                                Text(
+                                    text = "Artists (${state.artists.size})",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = scheme.primary,
+                                    modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                                )
+                            }
+                            items(state.artists, key = { "art-${it.id}" }) { artist ->
+                                CoverItem(
+                                    title = artist.name,
+                                    subtitle = artistSubtitle(artist),
+                                    coverUrl = covers.artistPhoto(artist.name),
+                                    fallbackUrl = covers.track(artist.coverTrackId, ServerUrls.COVER_SMALL),
+                                    onClick = { navigation.onArtist(artist.id) },
+                                    round = true,
+                                    placeholderIcon = DowntifyIcons.Artist,
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
         Scrollbar(list)

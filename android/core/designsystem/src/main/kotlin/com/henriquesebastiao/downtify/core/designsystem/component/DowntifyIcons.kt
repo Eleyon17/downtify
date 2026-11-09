@@ -21,6 +21,8 @@ object DowntifyIcons {
 
     @DrawableRes val Settings = R.drawable.ic_settings
 
+    @DrawableRes val Share = R.drawable.ic_share
+
     /** Home's button for the side menu. */
     @DrawableRes val Menu = R.drawable.ic_menu
 

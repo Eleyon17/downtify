@@ -6,6 +6,7 @@ import com.henriquesebastiao.downtify.core.data.catalog.CatalogRepository
 import com.henriquesebastiao.downtify.core.data.catalog.ServerQueueRepository
 import com.henriquesebastiao.downtify.core.data.library.LibraryRepository
 import com.henriquesebastiao.downtify.core.data.session.ServerRepository
+import com.henriquesebastiao.downtify.core.data.ServerResult
 import com.henriquesebastiao.downtify.core.model.CatalogSource
 import com.henriquesebastiao.downtify.core.model.Lyrics
 import com.henriquesebastiao.downtify.core.model.PlaybackContext
@@ -15,10 +16,12 @@ import com.henriquesebastiao.downtify.core.model.Playlist
 import com.henriquesebastiao.downtify.core.model.RemoteSong
 import com.henriquesebastiao.downtify.core.model.ServerJob
 import com.henriquesebastiao.downtify.core.model.ServerJobStatus
+import com.henriquesebastiao.downtify.core.model.StreamVideo
 import com.henriquesebastiao.downtify.core.model.Track
 import com.henriquesebastiao.downtify.core.network.CatalogJson
 import com.henriquesebastiao.downtify.core.network.dto.ArtistOverviewDto
 import com.henriquesebastiao.downtify.core.network.dto.ArtistPopularSongDto
+import com.henriquesebastiao.downtify.core.network.dto.ArtistTopAlbumDto
 import com.henriquesebastiao.downtify.core.network.dto.CoverSearchResponseDto
 import com.henriquesebastiao.downtify.core.player.PlayerController
 import com.henriquesebastiao.downtify.core.player.PlayerEvent
@@ -229,6 +232,38 @@ class PlayerViewModel @Inject constructor(
             }
         if (local != null) {
             player.addToQueue(local)
+        }
+    }
+
+    fun queueTopAlbum(album: ArtistTopAlbumDto) {
+        val localTracks = library.library.value?.tracks?.filter {
+            (album.localAlbumId != null && it.albumId == album.localAlbumId) ||
+            it.album.equals(album.displayTitle, ignoreCase = true)
+        }.orEmpty()
+        if (localTracks.isNotEmpty()) {
+            localTracks.forEach { player.addToQueue(it) }
+            return
+        }
+        viewModelScope.launch {
+            val url = album.resolvedUrl.ifBlank {
+                val id = album.browseId.ifBlank { album.albumId }
+                if (id.isNotBlank()) "https://music.youtube.com/browse/$id" else ""
+            }
+            if (url.isNotBlank()) {
+                when (val res = catalog.resolve(url)) {
+                    is ServerResult.Ok -> {
+                        val tracks = res.value.tracks
+                        val entries = tracks.mapNotNull { song ->
+                            val vid = song.id.takeIf { it.isNotBlank() } ?: StreamVideo.videoIdOf(song)
+                            if (vid != null) StreamEntry(song, vid) else null
+                        }
+                        if (entries.isNotEmpty()) {
+                            player.appendStreams(entries)
+                        }
+                    }
+                    else -> {}
+                }
+            }
         }
     }
 

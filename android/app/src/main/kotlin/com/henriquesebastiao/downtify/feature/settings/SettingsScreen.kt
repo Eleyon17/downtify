@@ -94,6 +94,7 @@ fun SettingsRoute(
     onBack: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenDownloads: () -> Unit = {},
+    onOpenTrash: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -132,6 +133,7 @@ fun SettingsRoute(
             onFloatingNavBar = viewModel::setFloatingNavBar,
             onOpenAbout = onOpenAbout,
             onOpenDownloads = onOpenDownloads,
+            onOpenTrash = onOpenTrash,
             onOpenLanguage = { openAppLanguageSettings(context) },
             onDownloadWifiOnly = viewModel::setDownloadWifiOnly,
             onOfflineLimit = viewModel::setOfflineLimit,
@@ -170,6 +172,7 @@ data class SettingsActions(
     val onFloatingNavBar: (Boolean) -> Unit = {},
     val onOpenAbout: () -> Unit = {},
     val onOpenDownloads: () -> Unit = {},
+    val onOpenTrash: (() -> Unit)? = null,
     val onOpenLanguage: () -> Unit = {},
     val onDownloadWifiOnly: (Boolean) -> Unit = {},
     val onOfflineLimit: (Long) -> Unit = {},
@@ -780,19 +783,33 @@ private fun downloadRows(
     state: SettingsUiState,
     actions: SettingsActions,
     open: (SettingsDialog) -> Unit,
-): List<GroupedRow> = listOf(
-    GroupedRow(
-        title = stringResource(R.string.nav_downloads),
-        summary = "View and manage downloaded music on this device",
-        icon = DowntifyIcons.Downloads,
-        action = RowAction.Click(actions.onOpenDownloads),
-    ),
-    GroupedRow(
-        title = stringResource(R.string.settings_download_wifi_only),
-        summary = stringResource(R.string.settings_download_wifi_only_body),
-        icon = DowntifyIcons.Downloads,
-        action = RowAction.Toggle(state.settings.downloadWifiOnly, actions.onDownloadWifiOnly),
-    ),
+): List<GroupedRow> = buildList {
+    add(
+        GroupedRow(
+            title = stringResource(R.string.nav_downloads),
+            summary = "View and manage downloaded music on this device",
+            icon = DowntifyIcons.Downloads,
+            action = RowAction.Click(actions.onOpenDownloads),
+        ),
+    )
+    if (actions.onOpenTrash != null) {
+        add(
+            GroupedRow(
+                title = stringResource(R.string.trash_title),
+                summary = "Manage deleted music in server trash",
+                icon = DowntifyIcons.Delete,
+                action = RowAction.Click(actions.onOpenTrash),
+            ),
+        )
+    }
+    add(
+        GroupedRow(
+            title = stringResource(R.string.settings_download_wifi_only),
+            summary = stringResource(R.string.settings_download_wifi_only_body),
+            icon = DowntifyIcons.Downloads,
+            action = RowAction.Toggle(state.settings.downloadWifiOnly, actions.onDownloadWifiOnly),
+        ),
+    )
     GroupedRow(
         title = stringResource(R.string.settings_offline_limit),
         summary = stringResource(

@@ -94,11 +94,9 @@ class HomeScreenTest {
     }
 
     @Test
-    fun theMenuButtonOpensTheSideMenu() {
-        var menu = 0
-        show(state, onOpenMenu = { menu++ })
-        compose.onNodeWithContentDescription("Open menu").performClick()
-        assertEquals(1, menu)
+    fun theMenuButtonDoesNotExist() {
+        show(state)
+        compose.onNodeWithContentDescription("Open menu").assertDoesNotExist()
     }
 
     @Test

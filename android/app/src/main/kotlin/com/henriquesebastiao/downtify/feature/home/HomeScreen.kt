@@ -123,18 +123,11 @@ fun HomeScreen(
         contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
-                navigationIcon = {
-                    CircleButton(
-                        DowntifyIcons.Menu,
-                        stringResource(R.string.action_open_menu),
-                        onOpenMenu,
-                        Modifier.padding(start = Spacing.sm),
-                    )
-                },
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                        modifier = Modifier.padding(start = Spacing.xs),
                     ) {
                         DowntifyLogo(size = 32.dp)
                         Text(

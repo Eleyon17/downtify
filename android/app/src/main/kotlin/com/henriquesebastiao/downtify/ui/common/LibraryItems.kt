@@ -148,6 +148,7 @@ fun TrackItem(
     shape: Shape = ListStyle.Separated.shapeOf(0, 1),
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     compact: Boolean = false,
+    showDuration: Boolean = true,
 ) {
     val scheme = MaterialTheme.colorScheme
     val motion = MaterialTheme.motionScheme
@@ -174,7 +175,7 @@ fun TrackItem(
             title = track.displayTitle,
             subtitle = track.displayArtist.ifBlank { stringResource(R.string.unknown_artist) },
             // The duration is a technical value: its own line, in tabular figures.
-            meta = if (compact) null else formatDuration(track.duration),
+            meta = if (compact || !showDuration) null else formatDuration(track.duration),
             onClick = onClick,
             active = isCurrent,
             shape = rowShape,
@@ -392,7 +393,7 @@ private fun TrackMenu(track: Track, isLiked: Boolean, actions: TrackActions, col
             actions.onShare?.let { share ->
                 DropdownMenuItem(
                     text = { Text("Share link") },
-                    leadingIcon = { Icon(painterResource(DowntifyIcons.OpenInNew), contentDescription = null) },
+                    leadingIcon = { Icon(painterResource(DowntifyIcons.Share), contentDescription = null) },
                     onClick = {
                         open = false
                         share(track)

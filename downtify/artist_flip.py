@@ -292,6 +292,10 @@ def artist_overview(
         a['in_library'] = alb_norm in local_albums
         a['title'] = a.get('name') or a.get('title') or ''
         a['cover'] = a.get('cover_url') or ''
+        b_id = str(a.get('browse_id') or a.get('browseId') or a.get('album_id') or '').strip()
+        a['browse_id'] = b_id
+        a['album_id'] = b_id
+        a['url'] = a.get('url') or (f'https://music.youtube.com/browse/{b_id}' if b_id else '')
 
     # Normalize fields on top_songs for both web and mobile client models
     for s in top_songs:

@@ -119,6 +119,8 @@ data class NowPlayingActions(
     val onGoToShow: (Long) -> Unit = {},
     val onGoToArtist: (String) -> Unit = {},
     val onGoToAlbum: (String) -> Unit = {},
+    val onOpenSimilar: () -> Unit = {},
+    val onQueueTopAlbum: (ArtistTopAlbumDto) -> Unit = {},
     val onDownloadStream: () -> Unit = {},
     /** Moves the synced lyrics this many ms later (earlier when negative). */
     val onShiftLyrics: (Long) -> Unit = {},
@@ -156,6 +158,7 @@ fun NowPlayingScreen(
     onQueueLibraryFile: (String) -> Unit = {},
     onPlayPopularSong: (ArtistPopularSongDto) -> Unit = {},
     onQueuePopularSong: (ArtistPopularSongDto) -> Unit = {},
+    onQueueTopAlbum: (ArtistTopAlbumDto) -> Unit = actions.onQueueTopAlbum,
     onAddToPlaylist: (String) -> Unit = {},
     onCreatePlaylistAndAdd: (String, Boolean) -> Unit = { _, _ -> },
     onShareTrack: () -> Unit = {},
@@ -362,6 +365,7 @@ fun NowPlayingScreen(
                         actions = actions,
                         lyrics = episode == null && (stream == null || hasLibraryCopy),
                         queue = episode == null,
+                        onShareTrack = onShareTrack,
                     )
                     val flipRotation by animateFloatAsState(
                         targetValue = if (flipped && episode == null) 180f else 0f,
@@ -410,6 +414,7 @@ fun NowPlayingScreen(
                                     onQueueFile = onQueueLibraryFile,
                                     onPlayPopularSong = onPlayPopularSong,
                                     onQueuePopularSong = onQueuePopularSong,
+                                    onQueueTopAlbum = onQueueTopAlbum,
                                     onGoToAlbum = actions.onGoToAlbum,
                                     onAddToPlaylist = { showAddToPlaylistDialog = true },
                                     onShareTrack = onShareTrack,
@@ -477,6 +482,7 @@ private fun Header(
     actions: NowPlayingActions,
     lyrics: Boolean,
     queue: Boolean,
+    onShareTrack: () -> Unit = {},
 ) {
     Row(
         Modifier.fillMaxWidth().height(64.dp),
@@ -523,7 +529,13 @@ private fun Header(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            HeaderButton(
+                DowntifyIcons.Share,
+                "Share",
+                onShareTrack,
+                CircleShape,
+            )
             if (lyrics) {
                 HeaderButton(
                     DowntifyIcons.Lyrics,
@@ -658,6 +670,14 @@ internal fun TrackTransport(
                 ),
             )
         }
+        add(
+            PlayerToggle(
+                icon = DowntifyIcons.Explore,
+                label = stringResource(R.string.similar_find),
+                checked = false,
+                onClick = actions.onOpenSimilar,
+            ),
+        )
     }
     if (trailing == null) {
         PlayerToggles(toggles, Modifier.fillMaxWidth(TOGGLES_WIDTH))
@@ -852,6 +872,7 @@ private fun ArtistFlipCard(
     onQueueFile: (String) -> Unit,
     onPlayPopularSong: (ArtistPopularSongDto) -> Unit = {},
     onQueuePopularSong: (ArtistPopularSongDto) -> Unit = {},
+    onQueueTopAlbum: (ArtistTopAlbumDto) -> Unit = {},
     onGoToAlbum: (String) -> Unit = {},
     onAddToPlaylist: () -> Unit,
     onShareTrack: () -> Unit,
@@ -911,24 +932,25 @@ private fun ArtistFlipCard(
                     Text("Cover")
                 }
             }
-            if (hasLibraryTrack) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                ) {
-                    AssistChip(
-                        onClick = onAddToPlaylist,
-                        label = { Text("+ Playlist") },
-                    )
-                    AssistChip(
-                        onClick = onShareTrack,
-                        label = { Text("Share") },
-                    )
-                    AssistChip(
-                        onClick = onOpenCoverPicker,
-                        label = { Text("Artwork") },
-                    )
-                }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                AssistChip(
+                    onClick = onAddToPlaylist,
+                    label = { Text("+ Playlist") },
+                )
+                AssistChip(
+                    onClick = onShareTrack,
+                    label = { Text("Share") },
+                    leadingIcon = {
+                        Icon(painterResource(DowntifyIcons.Share), contentDescription = null, modifier = Modifier.size(16.dp))
+                    },
+                )
+                AssistChip(
+                    onClick = onOpenCoverPicker,
+                    label = { Text("Artwork") },
+                )
             }
             Column(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()),
@@ -1044,8 +1066,7 @@ private fun ArtistFlipCard(
                         albums.take(6).forEach { alb ->
                             Surface(
                                 onClick = {
-                                    val albKey = alb.localAlbumId ?: "alb-${alb.displayTitle}"
-                                    onGoToAlbum(albKey)
+                                    onQueueTopAlbum(alb)
                                 },
                                 shape = RoundedCornerShape(12.dp),
                                 color = scheme.surfaceContainer,
@@ -1096,12 +1117,17 @@ private fun ArtistFlipCard(
                                             )
                                         }
                                     }
-                                    Icon(
-                                        painter = painterResource(DowntifyIcons.ChevronRight),
-                                        contentDescription = null,
-                                        tint = scheme.onSurfaceVariant,
-                                        modifier = Modifier.size(18.dp),
-                                    )
+                                    IconButton(
+                                        onClick = { onQueueTopAlbum(alb) },
+                                        modifier = Modifier.size(32.dp),
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(DowntifyIcons.AddToQueue),
+                                            contentDescription = "Add album to queue",
+                                            tint = scheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1114,7 +1140,7 @@ private fun ArtistFlipCard(
 
 private val COMPACT_HEIGHT = 720.dp
 private val MAX_COVER = 420.dp
-private const val TOGGLES_WIDTH = 0.82f
+private const val TOGGLES_WIDTH = 0.92f
 private const val TINT_ALPHA = 0.12f
 private const val MUTED_ALPHA = 0.72f
 private const val SUBTITLE_ALPHA = 0.8f
