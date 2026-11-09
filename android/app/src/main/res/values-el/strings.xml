@@ -1,0 +1,554 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Navigation -->
+    <string name="nav_home">Αρχική</string>
+    <string name="nav_search">Αναζήτηση</string>
+    <string name="nav_library">Βιβλιοθήκη</string>
+    <string name="nav_downloads">Λήψεις</string>
+    <string name="nav_trash">Κάδος</string>
+    <string name="action_back">Πίσω</string>
+    <string name="action_settings">Ρυθμίσεις</string>
+    <string name="action_open_menu">Άνοιγμα μενού</string>
+    <string name="action_retry">Δοκιμή ξανά</string>
+    <string name="action_cancel">Ακύρωση</string>
+
+    <!-- Connect -->
+    <string name="connect_title_line1">Η μουσική σου,</string>
+    <string name="connect_title_line2">από τον δικό σου διακομιστή.</string>
+    <string name="connect_address_label">Διεύθυνση διακομιστή</string>
+    <string name="connect_address_hint">Αυτή που ανοίγεις στο πρόγραμμα περιήγησης.</string>
+    <string name="connect_found">Βρέθηκαν σε αυτό το δίκτυο</string>
+    <string name="connect_searching">Αναζήτηση διακομιστών…</string>
+    <string name="connect_none_found">Δεν βρέθηκε ακόμη διακομιστής σε αυτό το δίκτυο.</string>
+    <string name="connect_server_subtitle">%1$s · Downtify\u00A0%2$s</string>
+    <string name="connect_action">Σύνδεση</string>
+    <string name="connect_step">Βήμα %1$d από %2$d</string>
+    <string name="connect_scan">Σάρωση QR αντιστοίχισης</string>
+    <string name="connect_cleartext_warning">Εκτός οικιακού δικτύου και χωρίς HTTPS: το κλειδί του τηλεφώνου θα ταξίδευε χωρίς κρυπτογράφηση.</string>
+    <string name="connect_revoked">Το τηλέφωνο αποσυνδέθηκε από τον διακομιστή. Συνδέσου ξανά για να συνεχίσεις.</string>
+    <string name="connect_error_invalid">Αυτό δεν μοιάζει με διεύθυνση. Δοκίμασε http://192.168.1.20:8000.</string>
+    <string name="connect_error_unreachable">Δεν είναι δυνατή η πρόσβαση σε διακομιστή σε αυτή τη διεύθυνση. Έλεγξέ την και δες αν το τηλέφωνο είναι στο ίδιο δίκτυο.</string>
+    <string name="connect_error_not_downtify">Κάτι απάντησε, αλλά δεν είναι Downtify.</string>
+    <string name="connect_error_too_new">Αυτός ο διακομιστής (Downtify %1$s) είναι νεότερος από ό,τι καταλαβαίνει η εφαρμογή. Ενημέρωσε την εφαρμογή.</string>
+
+    <string name="sign_in_title">Σύνδεση στο %1$s</string>
+    <string name="sign_in_body">Ο λογαριασμός της σελίδας ιστού.</string>
+    <string name="sign_in_username">Όνομα χρήστη</string>
+    <string name="sign_in_password">Κωδικός</string>
+    <string name="sign_in_show_password">Εμφάνιση κωδικού</string>
+    <string name="sign_in_hide_password">Απόκρυψη κωδικού</string>
+    <string name="sign_in_action">Σύνδεση</string>
+    <string name="sign_in_use_code">Αντιστοίχιση με κωδικό</string>
+    <string name="sign_in_use_password">Σύνδεση με τον κωδικό σου</string>
+    <string name="sign_in_error_wrong">Λάθος όνομα χρήστη ή κωδικός.</string>
+    <string name="sign_in_error_off">Η σύνδεση είναι απενεργοποιημένη σε αυτόν τον διακομιστή. Χρησιμοποίησε κωδικό αντιστοίχισης.</string>
+    <string name="sign_in_error_failed">Ο διακομιστής δεν μπόρεσε να συνδέσει αυτό το τηλέφωνο (σφάλμα %1$d).</string>
+    <string name="sign_in_cleartext_warning">Εκτός οικιακού δικτύου και χωρίς HTTPS: ο κωδικός σου θα ταξίδευε χωρίς κρυπτογράφηση.</string>
+
+    <string name="pair_title">Αντιστοίχιση με %1$s</string>
+    <string name="pair_body">Από Ρυθμίσεις › Εφαρμογές στη σελίδα ιστού.</string>
+    <string name="pair_code_label">Κωδικός αντιστοίχισης</string>
+    <string name="pair_code_placeholder">XXXX-XXXX</string>
+    <string name="pair_action">Αντιστοίχιση</string>
+    <string name="pair_scan">Σάρωση κωδικού QR</string>
+    <string name="pair_other_server">Χρήση άλλου διακομιστή</string>
+    <string name="pair_error_wrong_code">Ο κωδικός είναι λάθος, έχει λήξει ή έχει ήδη χρησιμοποιηθεί. Οι κωδικοί ισχύουν μία φορά, για πέντε λεπτά.</string>
+    <string name="pair_error_too_many">Πάρα πολλές προσπάθειες. Δοκίμασε ξανά σε %1$d\u00A0δ.</string>
+    <string name="pair_error_unreachable">Δεν είναι δυνατή η πρόσβαση στον διακομιστή. Έλεγξε τη σύνδεση και δοκίμασε ξανά.</string>
+    <string name="pair_error_failed">Ο διακομιστής δεν μπόρεσε να αντιστοιχίσει αυτό το τηλέφωνο (σφάλμα %1$d).</string>
+    <string name="pair_error_other_server">Αυτός ο κωδικός είναι για διαφορετικό διακομιστή από αυτόν σε εκείνη τη διεύθυνση.</string>
+
+    <string name="scan_title">Σάρωση κωδικού αντιστοίχισης</string>
+    <string name="scan_hint">Στόχευσε την κάμερα στον κωδικό QR στις Ρυθμίσεις › Εφαρμογές › Αντιστοίχιση τηλεφώνου.</string>
+    <string name="scan_close">Κλείσιμο σαρωτή</string>
+    <string name="connect_local_network_denied">Η πρόσβαση στο τοπικό δίκτυο είναι απενεργοποιημένη. Για να πληκτρολογήσεις διεύθυνση, επίτρεψέ το στις ρυθμίσεις της εφαρμογής.</string>
+    <string name="scan_permission_denied">Η πρόσβαση στην κάμερα είναι απενεργοποιημένη. Πληκτρολόγησε τον κωδικό ή επίτρεψε την κάμερα στις ρυθμίσεις του τηλεφώνου.</string>
+    <string name="scan_not_downtify">Αυτός ο κωδικός QR δεν είναι κωδικός αντιστοίχισης Downtify.</string>
+
+    <!-- Home -->
+    <string name="home_streaming_from">Αναπαραγωγή από %1$s</string>
+    <string name="home_unreachable">Δεν είναι δυνατή η πρόσβαση στο %1$s · εμφανίζεται η συγχρονισμένη βιβλιοθήκη σου</string>
+    <string name="home_different_server">Άλλος διακομιστής απαντά σε αυτή τη διεύθυνση · συνδέσου ξανά στις Ρυθμίσεις</string>
+    <string name="home_syncing">Συγχρονισμός με %1$s…</string>
+    <string name="home_jump_back_in">Συνέχισε από εκεί που έμεινες</string>
+    <string name="home_recently_added">Προστέθηκαν πρόσφατα</string>
+    <string name="home_see_all">Εμφάνιση όλων</string>
+    <string name="home_empty_title">Η βιβλιοθήκη σου είναι άδεια</string>
+    <string name="home_empty_body">Η μουσική που κατεβάζεις στον διακομιστή εμφανίζεται εδώ. Τράβηξε προς τα κάτω για νέο έλεγχο.</string>
+    <string name="home_loading">Φόρτωση της βιβλιοθήκης σου…</string>
+
+    <!-- Library -->
+    <string name="library_title">Βιβλιοθήκη</string>
+    <string name="library_search">Αναζήτηση στη βιβλιοθήκη σου</string>
+    <string name="library_albums">Άλμπουμ</string>
+    <string name="library_artists">Καλλιτέχνες</string>
+    <string name="library_playlists">Λίστες αναπαραγωγής</string>
+    <string name="library_songs">Τραγούδια</string>
+    <string name="library_sort">Ταξινόμηση κατά: %1$s</string>
+    <string name="library_sort_recent">Προστέθηκαν πρόσφατα</string>
+    <string name="library_sort_alpha">Αλφαβητικά</string>
+    <string name="library_sort_artist">Καλλιτέχνης</string>
+    <string name="library_sort_by">Ταξινόμηση κατά</string>
+    <string name="library_sort_order">Σειρά</string>
+    <string name="library_sort_ascending">Αύξουσα</string>
+    <string name="library_sort_descending">Φθίνουσα</string>
+    <string name="library_show_list">Εμφάνιση ως λίστα</string>
+    <string name="library_show_grid">Εμφάνιση ως πλέγμα</string>
+    <string name="library_empty_albums">Δεν υπάρχουν άλμπουμ ακόμα</string>
+    <string name="library_empty_artists">Δεν υπάρχουν καλλιτέχνες ακόμα</string>
+    <string name="library_empty_playlists">Δεν υπάρχουν λίστες αναπαραγωγής ακόμα</string>
+    <string name="library_empty_songs">Δεν υπάρχουν τραγούδια ακόμα</string>
+    <string name="library_empty_body">Τράβηξε προς τα κάτω για συγχρονισμό με τον διακομιστή.</string>
+
+    <string name="liked_songs">Αγαπημένα τραγούδια</string>
+    <string name="album_subtitle">%1$s · %2$s</string>
+    <plurals name="songs_count">
+        <item quantity="one">%d τραγούδι</item>
+        <item quantity="other">%d τραγούδια</item>
+    </plurals>
+    <plurals name="albums_count">
+        <item quantity="one">%d άλμπουμ</item>
+        <item quantity="other">%d άλμπουμ</item>
+    </plurals>
+    <string name="minutes_short">%d\u00A0λ.</string>
+    <string name="unknown_artist">Άγνωστος καλλιτέχνης</string>
+    <string name="unknown_album">Άγνωστο άλμπουμ</string>
+
+    <!-- Album / playlist / artist -->
+    <string name="collection_play">Αναπαραγωγή %1$s</string>
+    <string name="collection_pause">Παύση %1$s</string>
+    <string name="collection_shuffle">Τυχαία σειρά</string>
+    <string name="collection_not_found">Αυτό δεν υπάρχει πια στη βιβλιοθήκη σου.</string>
+    <string name="track_more">Περισσότερες επιλογές για %1$s</string>
+    <string name="track_like">Προσθήκη στα Αγαπημένα τραγούδια</string>
+    <string name="track_unlike">Αφαίρεση από τα Αγαπημένα τραγούδια</string>
+    <string name="track_go_to_album">Μετάβαση στο άλμπουμ</string>
+    <string name="track_go_to_artist">Μετάβαση στον καλλιτέχνη</string>
+    <string name="track_playing">Παίζει</string>
+    <string name="track_add_to_queue">Προσθήκη στην ουρά</string>
+    <string name="track_added_to_queue">Προστέθηκε στην ουρά</string>
+    <string name="artist_songs">Τραγούδια</string>
+    <string name="artist_albums">Άλμπουμ</string>
+
+    <!-- Search -->
+    <string name="search_placeholder">Αναζήτησε ή επικόλλησε σύνδεσμο Spotify ή YouTube</string>
+    <string name="search_clear">Εκκαθάριση αναζήτησης</string>
+    <string name="search_all">Όλα</string>
+    <string name="search_in_library">Στη βιβλιοθήκη σου</string>
+    <string name="search_no_results">Τίποτα στη βιβλιοθήκη σου δεν ταιριάζει με «%1$s».</string>
+    <string name="search_prompt">Βρες μουσική στη βιβλιοθήκη σου ή νέα μουσική για να κατεβάσει ο διακομιστής. Λειτουργεί και σύνδεσμος Spotify ή YouTube Music.</string>
+    <string name="search_not_in_library">Δεν είναι ακόμα στη βιβλιοθήκη σου</string>
+    <string name="search_server_body">Άκουσέ το ολόκληρο ή ζήτα από τον διακομιστή να το κατεβάσει.</string>
+    <string name="search_server_loading">Αναζήτηση στον διακομιστή…</string>
+    <string name="search_link_loading">Άνοιγμα του συνδέσμου…</string>
+    <string name="search_server_unreachable">Δεν είναι δυνατή η πρόσβαση στον διακομιστή, οπότε αναζητήθηκε μόνο η βιβλιοθήκη σου.</string>
+    <string name="search_server_failed">Ο διακομιστής δεν μπόρεσε να αναζητήσει αυτή τη στιγμή.</string>
+    <string name="search_link_unsupported">Ο διακομιστής δεν μπορεί να ανοίξει αυτόν τον σύνδεσμο.</string>
+    <string name="search_link_empty">Δεν βρέθηκε τίποτα σε αυτόν τον σύνδεσμο.</string>
+    <string name="search_server_nothing">Ο διακομιστής δεν βρήκε κάτι άλλο για «%1$s».</string>
+    <string name="search_retry">Δοκιμή ξανά</string>
+    <string name="search_play_full">Αναπαραγωγή %1$s ολόκληρου</string>
+    <string name="search_stop_full">Διακοπή %1$s</string>
+    <string name="search_similar">Τραγούδια σαν το %1$s</string>
+
+    <string name="search_download_to_server">Λήψη του %1$s στον διακομιστή</string>
+    <string name="search_job_queued">Αναμονή για τον διακομιστή</string>
+    <string name="search_job_downloading">Ο διακομιστής το κατεβάζει</string>
+    <string name="search_job_done">Λήφθηκε στον διακομιστή</string>
+    <string name="search_job_error">Η λήψη απέτυχε. Δοκίμασε ξανά</string>
+    <string name="search_album_progress">Λήψη %1$d/%2$d</string>
+    <string name="search_album_done">Στον διακομιστή</string>
+    <string name="search_link_download">Λήψη στον διακομιστή</string>
+    <plurals name="search_link_download_all">
+        <item quantity="one">Λήψη %1$d τραγουδιού στον διακομιστή</item>
+        <item quantity="other">Λήψη όλων των %1$d τραγουδιών στον διακομιστή</item>
+    </plurals>
+    <string name="search_link_play_all">Αναπαραγωγή όλων ολόκληρων</string>
+    <string name="search_source_spotify">Spotify</string>
+    <string name="search_source_youtube">YT Music</string>
+    <string name="search_source_soulseek">Soulseek</string>
+    <string name="search_queued_one">Ο διακομιστής θα κατεβάσει το %1$s</string>
+    <plurals name="search_queued_many">
+        <item quantity="one">Ο διακομιστής θα κατεβάσει %2$d τραγούδι από %1$s</item>
+        <item quantity="other">Ο διακομιστής θα κατεβάσει %2$d τραγούδια από %1$s</item>
+    </plurals>
+    <string name="search_no_stream">Αυτό το τραγούδι δεν μπορεί να παιχτεί τώρα</string>
+    <string name="search_request_failed">Ο διακομιστής δεν δέχτηκε τη λήψη</string>
+    <string name="search_unreachable">Δεν είναι δυνατή η πρόσβαση στον διακομιστή</string>
+    <string name="search_kind_album">Άλμπουμ</string>
+    <string name="search_kind_artist">Καλλιτέχνης</string>
+    <string name="search_kind_song">Τραγούδι</string>
+    <string name="search_kind_playlist">Λίστα αναπαραγωγής</string>
+
+    <!-- Similar -->
+    <string name="similar_title">Παρόμοια</string>
+    <string name="similar_artist">Καλλιτέχνης</string>
+    <string name="similar_track">Τραγούδι</string>
+    <string name="similar_find">Εύρεση παρόμοιων</string>
+    <string name="similar_empty">Γράψε έναν καλλιτέχνη ή ένα τραγούδι για να ακούσεις κάτι που του μοιάζει.</string>
+    <string name="similar_failed">Δεν βρέθηκαν παρόμοια τραγούδια</string>
+    <string name="similar_unreachable">Δεν είναι δυνατή η πρόσβαση στον διακομιστή</string>
+    <string name="similar_no_results">Δεν βρέθηκε τίποτα παρόμοιο</string>
+    <string name="similar_no_stream">Αυτό το τραγούδι δεν μπορεί να παιχτεί τώρα</string>
+    <string name="home_shortcut_similar">Παρόμοια τραγούδια</string>
+    <string name="home_shortcut_similar_body">Γράψε ένα τραγούδι για να ακούσεις κάτι που του μοιάζει — χωρίς λήψη.</string>
+    <string name="search_play">Αναπαραγωγή %1$s</string>
+
+    <!-- Downloads -->
+    <string name="downloads_title">Λήψεις</string>
+    <string name="load_error_unreachable">Δεν είναι δυνατή η πρόσβαση στον διακομιστή.</string>
+    <string name="load_error_failed">Ο διακομιστής δεν μπόρεσε να απαντήσει αυτή τη στιγμή.</string>
+    <string name="discover_title">Ανακάλυψη</string>
+    <string name="discover_refresh">Ανανέωση προτάσεων</string>
+    <string name="discover_loading">Ζητούνται προτάσεις από τον διακομιστή. Την πρώτη φορά μπορεί να πάρει λίγη ώρα.</string>
+    <string name="discover_loading_more">Αναζήτηση άλμπουμ και λιστών αναπαραγωγής…</string>
+    <string name="discover_empty_title">Δεν υπάρχει ακόμα τίποτα για να βασιστούμε</string>
+    <string name="discover_empty_body">Η Ανακάλυψη προτείνει νέους καλλιτέχνες με βάση αυτούς της βιβλιοθήκης σου. Πρόσθεσε πρώτα λίγη μουσική.</string>
+    <string name="discover_none_title">Καμία πρόταση αυτή τη στιγμή</string>
+    <string name="discover_none_body">Άκουσε και αγάπησε περισσότερη μουσική ή δοκίμασε αργότερα. Οι καλλιτέχνες που έκρυψες αποκλείονται.</string>
+    <string name="discover_try_again">Πάτα ανανέωση για να δοκιμάσεις ξανά.</string>
+    <string name="discover_partial">Ο διακομιστής δεν μπόρεσε να φτάσει στο Deezer για ορισμένους καλλιτέχνες σου, οπότε η λίστα είναι πιο σύντομη από το συνηθισμένο. Δοκίμασε αργότερα.</string>
+    <string name="discover_artists">Καλλιτέχνες για σένα</string>
+    <string name="discover_albums">Άλμπουμ για σένα</string>
+    <string name="discover_more_albums">Περισσότερα από τους καλλιτέχνες σου</string>
+    <string name="discover_playlists">Λίστες αναπαραγωγής για σένα</string>
+    <string name="discover_because">Επειδή σου αρέσει: %1$s</string>
+    <string name="discover_show_all">Εμφάνιση και των %1$d</string>
+    <string name="discover_artist_options">Επιλογές για %1$s</string>
+    <string name="discover_preview">Προεπισκόπηση %1$s</string>
+    <string name="discover_not_interested">Δεν με ενδιαφέρει</string>
+    <string name="discover_hidden">Το %1$s δεν θα προταθεί ξανά</string>
+    <string name="discover_undo">Αναίρεση</string>
+    <string name="home_shortcut_discover">Ανακάλυψη</string>
+    <string name="home_shortcut_discover_body">Νέοι καλλιτέχνες, άλμπουμ και λίστες αναπαραγωγής με βάση όσα ακούς</string>
+    <string name="home_shortcut_podcasts">Podcast</string>
+    <string name="home_shortcut_podcasts_body">Οι εκπομπές που παρακολουθεί ο διακομιστής σου, με το σημείο σου σε κάθε μία</string>
+    <string name="podcasts_title">Podcast</string>
+    <string name="podcasts_empty_title">Δεν υπάρχουν podcast ακόμα</string>
+    <string name="podcasts_empty_body">Τα podcast προστίθενται στη σελίδα ιστού του Downtify, στα Podcast. Εμφανίζονται εδώ και παίζουν από τον διακομιστή σου.</string>
+    <string name="podcasts_pull_to_retry">Τράβηξε προς τα κάτω για να δοκιμάσεις ξανά.</string>
+    <plurals name="podcasts_episodes">
+        <item quantity="one">%1$d επεισόδιο</item>
+        <item quantity="other">%1$d επεισόδια</item>
+    </plurals>
+    <string name="show_no_episodes">Δεν υπάρχουν επεισόδια ακόμα. Ο διακομιστής ελέγχει τη ροή με το δικό του πρόγραμμα.</string>
+    <string name="show_untitled_episode">Επεισόδιο χωρίς τίτλο</string>
+    <string name="show_played">Αναπαράχθηκε</string>
+    <string name="show_resume_at">Συνέχεια από %1$s</string>
+    <string name="show_play_episode">Αναπαραγωγή %1$s</string>
+    <string name="show_download_episode">Λήψη του %1$s στον διακομιστή</string>
+    <string name="show_downloading">Ο διακομιστής το κατεβάζει</string>
+    <string name="show_episode_options">Επιλογές για %1$s</string>
+    <string name="show_mark_played">Σήμανση ως αναπαραχθέν</string>
+    <string name="show_mark_unplayed">Σήμανση ως μη αναπαραχθέν</string>
+    <string name="show_download_failed">Ο διακομιστής δεν μπόρεσε να κατεβάσει το %1$s</string>
+    <string name="downloads_used">%1$s σε χρήση</string>
+    <string name="downloads_of_limit">από όριο %1$s</string>
+    <string name="downloads_no_limit">χωρίς όριο</string>
+    <plurals name="downloads_storage_body">
+        <item quantity="one">%1$d τραγούδι παίζει χωρίς τον διακομιστή. %2$s ελεύθερα σε αυτό το τηλέφωνο.</item>
+        <item quantity="other">%1$d τραγούδια παίζουν χωρίς τον διακομιστή. %2$s ελεύθερα σε αυτό το τηλέφωνο.</item>
+    </plurals>
+    <string name="downloads_storage_a11y">Χρησιμοποιούμενος αποθηκευτικός χώρος εκτός σύνδεσης</string>
+    <string name="downloads_keep_liked">Διατήρηση των Αγαπημένων τραγουδιών εκτός σύνδεσης</string>
+    <string name="downloads_keep_liked_body_wifi">Ένα τραγούδι που αγαπάς κατεβαίνει σε αυτό το τηλέφωνο μέσω Wi-Fi.</string>
+    <string name="downloads_keep_liked_body">Ένα τραγούδι που αγαπάς κατεβαίνει σε αυτό το τηλέφωνο.</string>
+    <string name="downloads_on_phone">Σε αυτό το τηλέφωνο</string>
+    <string name="downloads_tab_phone">Σε αυτό το τηλέφωνο</string>
+    <string name="downloads_tab_server">Στον διακομιστή</string>
+    <plurals name="downloads_server_card">
+        <item quantity="one">Ο διακομιστής κατεβάζει %1$d τραγούδι</item>
+        <item quantity="other">Ο διακομιστής κατεβάζει %1$d τραγούδια</item>
+    </plurals>
+    <string name="downloads_server_card_detail">%1$s · %2$d από %3$d</string>
+    <string name="downloads_server_empty_title">Ο διακομιστής δεν κατεβάζει τίποτα</string>
+    <string name="downloads_server_empty_body">Βρες νέα μουσική στην Αναζήτηση ή επικόλλησε εκεί σύνδεσμο Spotify ή YouTube Music, και ο διακομιστής την κατεβάζει στη βιβλιοθήκη σου.</string>
+    <string name="downloads_server_job_queued">Σε αναμονή</string>
+    <string name="downloads_server_job_downloading">Λήψη · %1$d%%</string>
+    <string name="downloads_server_job_done">Στη βιβλιοθήκη σου</string>
+    <string name="downloads_server_job_error">Απέτυχε</string>
+    <string name="downloads_server_job_error_detail">Απέτυχε: %1$s</string>
+    <string name="downloads_empty_title">Τίποτα σε αυτό το τηλέφωνο ακόμα</string>
+    <string name="downloads_empty_body">Πάτα Λήψη σε ένα άλμπουμ ή μια λίστα αναπαραγωγής, ή κράτα τα Αγαπημένα τραγούδια εκτός σύνδεσης, για να ακούς χωρίς τον διακομιστή.</string>
+    <plurals name="downloads_status_done">
+        <item quantity="one">%1$d τραγούδι · %2$s</item>
+        <item quantity="other">%1$d τραγούδια · %2$s</item>
+    </plurals>
+    <string name="downloads_status_done_synced">%1$s · διατηρείται συγχρονισμένο</string>
+    <string name="downloads_status_progress">Λήψη %1$d από %2$d</string>
+    <string name="downloads_status_waiting_wifi">%1$s · αναμονή για Wi-Fi</string>
+    <string name="downloads_status_waiting_network">%1$s · αναμονή για σύνδεση</string>
+    <plurals name="downloads_status_over_limit">
+        <item quantity="one">%1$d από %2$d · 1 τραγούδι δεν χωράει στο όριο αποθήκευσης</item>
+        <item quantity="other">%1$d από %2$d · %3$d τραγούδια δεν χωράνε στο όριο αποθήκευσης</item>
+    </plurals>
+    <string name="downloads_status_missing">Δεν υπάρχει πια στη βιβλιοθήκη</string>
+    <string name="downloads_options">Επιλογές για %1$s</string>
+    <string name="downloads_remove">Αφαίρεση από αυτό το τηλέφωνο</string>
+    <string name="downloads_downloaded">Λήφθηκε</string>
+    <string name="collection_download">Λήψη</string>
+    <string name="collection_downloading">Λήψη %1$d από %2$d</string>
+    <string name="collection_on_phone">Σε αυτό το τηλέφωνο</string>
+    <string name="collection_remove_title">Αφαίρεση από αυτό το τηλέφωνο;</string>
+    <string name="collection_remove_message">Το %1$s παραμένει στη βιβλιοθήκη σου και αναπαράγεται από τον διακομιστή.</string>
+    <string name="collection_remove_confirm">Αφαίρεση</string>
+    <string name="settings_downloads">Λήψεις</string>
+    <string name="settings_signed_in_as">Συνδεδεμένος ως %1$s</string>
+    <string name="settings_download_wifi_only">Λήψη μόνο μέσω Wi-Fi</string>
+    <string name="settings_download_wifi_only_body">Τα αντίγραφα εκτός σύνδεσης περιμένουν το Wi-Fi</string>
+    <string name="settings_offline_limit">Όριο αποθήκευσης εκτός σύνδεσης</string>
+    <string name="settings_offline_limit_summary">%1$s · %2$s σε χρήση</string>
+    <string name="settings_offline_limit_none">Χωρίς όριο</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Ρυθμίσεις</string>
+    <string name="settings_connected">Συνδεδεμένο</string>
+    <string name="settings_unreachable">Μη προσβάσιμο</string>
+    <string name="settings_checking">Έλεγχος…</string>
+    <string name="settings_different_server">Διαφορετικός διακομιστής</string>
+    <string name="settings_change_server">Αλλαγή διακομιστή</string>
+    <string name="settings_open_web">Ρυθμίσεις διακομιστή</string>
+    <string name="settings_playback">Αναπαραγωγή</string>
+    <string name="settings_normalize_volume">Κανονικοποίηση έντασης</string>
+    <string name="settings_normalize_volume_hint">Παίζει τα τραγούδια σε παρόμοια ένταση με τις μετρήσεις του διακομιστή, από το επόμενο τραγούδι. Τα τραγούδια χωρίς μέτρηση κρατούν την αρχική τους ένταση.</string>
+    <string name="settings_quality_wifi">Ποιότητα ροής μέσω Wi-Fi</string>
+    <string name="settings_quality_mobile">Ποιότητα ροής με δεδομένα κινητής</string>
+    <string name="settings_quality_no_transcoding">Ο διακομιστής δεν μπορεί να κάνει μετατροπή κωδικοποίησης (χωρίς ffmpeg): τα αρχεία παίζουν όπως είναι.</string>
+    <string name="settings_quality_original">Αρχική · όπως λήφθηκε</string>
+    <string name="settings_quality_transcoded">%1$s · %2$d\u00A0kbps · μετατροπή από τον διακομιστή</string>
+    <string name="settings_quality_label">%1$s · %2$d\u00A0kbps</string>
+    <string name="settings_appearance">Εμφάνιση</string>
+    <string name="settings_theme">Θέμα</string>
+    <string name="settings_theme_system">Σύστημα</string>
+    <string name="settings_theme_dark">Σκούρο</string>
+    <string name="settings_theme_light">Φωτεινό</string>
+    <string name="settings_theme_body">Το «Σύστημα» ακολουθεί τη φωτεινή ή σκοτεινή λειτουργία της συσκευής.</string>
+    <string name="settings_dynamic_color">Χρήση χρωμάτων ταπετσαρίας</string>
+    <string name="settings_dynamic_color_body">Material You αντί για το πράσινο του Downtify</string>
+    <string name="settings_about">Σχετικά</string>
+    <string name="settings_app_version">Downtify για Android %1$s</string>
+    <string name="settings_server_api">Έκδοση API διακομιστή %1$d</string>
+    <string name="settings_unpair">Αποσύνδεση</string>
+    <string name="settings_unpair_body">Λήθη του κλειδιού αυτού του διακομιστή στο τηλέφωνο</string>
+    <string name="settings_unpair_title">Αποσύνδεση από αυτόν τον διακομιστή;</string>
+    <string name="settings_unpair_message">Το τηλέφωνο ξεχνά το κλειδί του και επιστρέφει στην οθόνη σύνδεσης. Για να το αφαιρέσεις και από τον διακομιστή, άνοιξε Ρυθμίσεις › Εφαρμογές › Αντιστοιχισμένες εφαρμογές στη σελίδα ιστού. Η συγχρονισμένη βιβλιοθήκη σου παραμένει μέχρι να συνδεθείς σε άλλον διακομιστή.</string>
+    <string name="settings_unpair_confirm">Αποσύνδεση</string>
+
+    <!-- Player -->
+    <string name="player_play">Αναπαραγωγή</string>
+    <string name="player_pause">Παύση</string>
+    <string name="player_next">Επόμενο</string>
+    <string name="player_previous">Προηγούμενο</string>
+    <string name="player_shuffle_on">Τυχαία σειρά, ενεργή</string>
+    <string name="player_shuffle_off">Τυχαία σειρά, ανενεργή</string>
+    <string name="player_repeat_off">Επανάληψη, ανενεργή</string>
+    <string name="player_repeat_all">Επανάληψη όλων</string>
+    <string name="player_repeat_one">Επανάληψη ενός</string>
+    <string name="player_seek">Αναζήτηση στο κομμάτι</string>
+    <string name="player_close">Κλείσιμο του Παίζει τώρα</string>
+    <string name="player_open">Άνοιγμα του Παίζει τώρα</string>
+    <string name="player_lyrics">Στίχοι</string>
+    <string name="player_queue">Ουρά</string>
+    <string name="player_queue_close">Κλείσιμο ουράς</string>
+    <string name="player_queue_now_playing">Παίζει τώρα</string>
+    <string name="player_queue_next_in_queue">Επόμενο στην ουρά</string>
+    <string name="player_queue_next_from">Επόμενο από: %1$s</string>
+    <string name="player_queue_next_up">Στη συνέχεια</string>
+    <string name="player_queue_clear">Εκκαθάριση ουράς</string>
+    <string name="player_queue_empty">Τίποτα δεν παίζει μετά από αυτό το τραγούδι.</string>
+    <string name="player_queue_remove">Αφαίρεση από την ουρά</string>
+    <string name="player_queue_reorder">Σύρε για αναδιάταξη</string>
+    <string name="player_queue_move_up">Μετακίνηση πάνω</string>
+    <string name="player_queue_move_down">Μετακίνηση κάτω</string>
+    <string name="player_like">Προσθήκη στα Αγαπημένα τραγούδια</string>
+    <string name="player_source_stream">Αναπαραγωγή από %1$s</string>
+    <string name="player_unlike">Αφαίρεση από τα Αγαπημένα τραγούδια</string>
+    <string name="player_playing_from_album">Αναπαραγωγή από άλμπουμ</string>
+    <string name="player_playing_from_artist">Αναπαραγωγή από καλλιτέχνη</string>
+    <string name="player_playing_from_playlist">Αναπαραγωγή από λίστα αναπαραγωγής</string>
+    <string name="player_now_playing">Παίζει τώρα</string>
+    <string name="player_source_original_quality">Αναπαραγωγή από %1$s · Αρχική ποιότητα</string>
+    <string name="player_sample_rate">%1$s\u00A0kHz</string>
+    <string name="player_bitrate">%1$d\u00A0kbps</string>
+    <string name="player_source_unknown">Αναπαραγωγή από %1$s</string>
+    <string name="player_playing_from_podcast">Podcast</string>
+    <string name="player_skip_back">Πίσω 10 δευτερόλεπτα</string>
+    <string name="player_skip_forward">Εμπρός 30 δευτερόλεπτα</string>
+    <string name="player_speed">Ταχύτητα αναπαραγωγής %1$s. Πάτα για αλλαγή</string>
+    <string name="player_source_this_phone">Αναπαραγωγή από αυτό το τηλέφωνο</string>
+    <string name="player_lyrics_none">Δεν υπάρχουν στίχοι για αυτό το τραγούδι.</string>
+    <string name="player_lyrics_loading">Φόρτωση στίχων…</string>
+    <string name="player_lyrics_synced">Συγχρονισμένοι</string>
+    <string name="player_lyrics_static">Στατικοί</string>
+    <string name="player_lyrics_timing">Ρύθμιση συγχρονισμού</string>
+    <string name="player_lyrics_earlier">Στίχοι νωρίτερα</string>
+    <string name="player_lyrics_later">Στίχοι αργότερα</string>
+    <string name="player_lyrics_timing_reset">Επαναφορά συγχρονισμού</string>
+    <string name="player_lyrics_offset">%1$s\u00A0δ</string>
+    <string name="player_error_network">Δεν είναι δυνατή η πρόσβαση στον διακομιστή για να παιχτεί αυτό το τραγούδι.</string>
+    <string name="player_error_not_found">Αυτό το τραγούδι δεν υπάρχει πια στον διακομιστή.</string>
+    <string name="player_error_old_server">Ο διακομιστής είναι πολύ παλιός για ροή — ενημέρωσε το Downtify στον διακομιστή.</string>
+    <string name="player_error_other">Αυτό το τραγούδι δεν μπόρεσε να παιχτεί.</string>
+    <string name="player_notifications_rationale">Επίτρεψε τις ειδοποιήσεις για να ελέγχεις την αναπαραγωγή από την οθόνη κλειδώματος και τον πίνακα ειδοποιήσεων.</string>
+
+    <!-- Settings: appearance, language, about -->
+    <string name="action_close">Κλείσιμο</string>
+    <string name="settings_server">Διακομιστής</string>
+    <string name="settings_language">Γλώσσα</string>
+    <string name="settings_language_summary">%1$s · ορίζεται στις ρυθμίσεις γλώσσας εφαρμογών του Android</string>
+    <string name="settings_amoled">Καθαρό μαύρο</string>
+    <string name="settings_amoled_body">Αληθινό μαύρο στο σκούρο θέμα. Εξοικονομεί μπαταρία σε οθόνες OLED.</string>
+    <string name="settings_floating_nav_bar">Αιωρούμενη γραμμή πλοήγησης</string>
+    <string name="settings_floating_nav_bar_body">Στο τηλέφωνο, η γραμμή γίνεται στρογγυλεμένη κάψουλα αντί να καλύπτει όλο το πλάτος της οθόνης</string>
+    <string name="settings_font">Γραμματοσειρά</string>
+    <string name="settings_font_downtify">Κλασικό Downtify</string>
+    <string name="settings_font_system">Γραμματοσειρά συστήματος</string>
+    <string name="settings_about_entry">Σχετικά με το Downtify</string>
+
+    <!-- About -->
+    <string name="about_title">Σχετικά</string>
+    <string name="about_tagline">Η επίσημη εφαρμογή Android για τον δικό σου διακομιστή Downtify.</string>
+    <string name="about_report_bug">Αναφορά σφάλματος</string>
+    <string name="about_report_bug_body">Άνοιξε ένα issue στο GitHub</string>
+    <string name="about_version">Έκδοση</string>
+    <string name="about_version_value">%1$s (%2$d)</string>
+    <string name="about_version_copied">Η έκδοση αντιγράφηκε</string>
+    <string name="about_source">Πηγαίος κώδικας</string>
+    <string name="about_source_body">Δες το έργο στο GitHub</string>
+    <string name="about_license">Άδεια</string>
+    <string name="about_terms">Όροι και αποποίηση ευθύνης</string>
+    <string name="about_terms_body">Όροι χρήσης και αποποίηση ευθύνης των προγραμματιστών</string>
+    <string name="about_donate">Υποστήριξε το έργο</string>
+    <string name="about_donate_body">Κέρασε έναν καφέ τον προγραμματιστή ή γίνε χορηγός στο GitHub</string>
+
+    <!-- Support sheet -->
+    <string name="donate_title">Υποστήριξε το Downtify</string>
+    <string name="donate_body">Το Downtify για Android είναι δωρεάν και ανοιχτού κώδικα, φτιαγμένο στον ελεύθερο χρόνο. Αν σου είναι χρήσιμο, μπορείς να βοηθήσεις να συνεχίσει να υπάρχει. Ποτέ δεν είναι υποχρεωτικό και πάντα εκτιμάται.</string>
+    <string name="donate_buy_me_a_coffee_body">Ένας εφάπαξ καφές για τον προγραμματιστή</string>
+    <string name="donate_github_sponsors_body">Υποστήριξε τη δουλειά στο GitHub</string>
+
+    <!-- Terms and disclaimer sheet -->
+    <string name="terms_title">Όροι και αποποίηση ευθύνης</string>
+    <string name="terms_use_title">Τι είναι αυτή η εφαρμογή</string>
+    <string name="terms_use_body">Το Downtify για Android είναι δωρεάν πελάτης ανοιχτού κώδικα για το Downtify, έναν διακομιστή μουσικής που φιλοξενείς ο ίδιος. Αναπαράγει και διαχειρίζεται τη μουσική του δικού σου διακομιστή. Δεν είναι υπηρεσία μουσικής και δεν φιλοξενεί καθόλου μουσική.</string>
+    <string name="terms_responsibility_title">Η ευθύνη σου</string>
+    <string name="terms_responsibility_body">Είσαι υπεύθυνος για τη μουσική που αναζητάς, κατεβάζεις, αποθηκεύεις και αναπαράγεις με το Downtify, καθώς και για την τήρηση των νόμων περί πνευματικών δικαιωμάτων και των όρων των σχετικών υπηρεσιών στον τόπο όπου ζεις. Το Downtify δεν υποστηρίζει τη μη εξουσιοδοτημένη λήψη υλικού που προστατεύεται από πνευματικά δικαιώματα και οι προγραμματιστές δεν αναλαμβάνουν ευθύνη για τις ενέργειες των χρηστών ούτε για τις νομικές συνέπειές τους.</string>
+    <string name="terms_affiliation_title">Καμία σχέση</string>
+    <string name="terms_affiliation_body">Το Downtify δεν συνδέεται με, δεν εγκρίνεται από και δεν χορηγείται από τα Spotify, YouTube, YouTube Music, Deezer, Soulseek ή οποιαδήποτε άλλη υπηρεσία μέσω της οποίας βρίσκει μουσική, προεπισκοπήσεις ή εξώφυλλα. Τα ονόματα και τα λογότυπά τους ανήκουν στους ιδιοκτήτες τους.</string>
+    <string name="terms_warranty_title">Καμία εγγύηση, καμία ευθύνη</string>
+    <string name="terms_warranty_body">Η εφαρμογή παρέχεται «ως έχει», χωρίς καμία εγγύηση, ρητή ή σιωπηρή, συμπεριλαμβανομένης της καταλληλότητας για συγκεκριμένο σκοπό. Οι προγραμματιστές δεν ευθύνονται για αξιώσεις, ζημιές, απώλεια δεδομένων ή νομικές συνέπειες που προκύπτουν από τη χρήση της εφαρμογής.</string>
+    <string name="terms_privacy_title">Τα δεδομένα σου</string>
+    <string name="terms_privacy_body">Η εφαρμογή δεν έχει διαφημίσεις, αναλυτικά στοιχεία ή παρακολούθηση και δεν στέλνει τίποτα στους προγραμματιστές. Επικοινωνεί με τον διακομιστή με τον οποίο την αντιστοίχισες. Οι προεπισκοπήσεις, τα εξώφυλλα, οι εικόνες podcast και οι γραμματοσειρές που λαμβάνονται προέρχονται από τρίτους διακομιστές (όπως Spotify, Deezer και Google), οι οποίοι μπορεί να βλέπουν τη διεύθυνση IP του τηλεφώνου σου.</string>
+
+    <!-- License screen -->
+    <string name="license_title">Άδεια</string>
+    <string name="license_intro">Το Downtify για Android είναι ελεύθερο λογισμικό. Μπορείς να το χρησιμοποιείς, να το μελετάς, να το μοιράζεσαι και να το τροποποιείς υπό τους όρους της Γενικής Δημόσιας Άδειας GNU, έκδοση 3, όπως δημοσιεύθηκε από το Free Software Foundation. Εν συντομία:</string>
+    <string name="license_permissions">Δικαιώματα</string>
+    <string name="license_conditions">Προϋποθέσεις</string>
+    <string name="license_limitations">Περιορισμοί</string>
+    <string name="license_permission_commercial">Εμπορική χρήση</string>
+    <string name="license_permission_commercial_body">Μπορείς να χρησιμοποιείς το λογισμικό και τον πηγαίο κώδικά του για εμπορικούς σκοπούς.</string>
+    <string name="license_permission_modification">Τροποποίηση</string>
+    <string name="license_permission_modification_body">Μπορείς να τροποποιείς το λογισμικό.</string>
+    <string name="license_permission_distribution">Διανομή</string>
+    <string name="license_permission_distribution_body">Μπορείς να μοιράζεσαι το λογισμικό και τις τροποποιημένες εκδόσεις του.</string>
+    <string name="license_permission_patent">Χρήση διπλωμάτων ευρεσιτεχνίας</string>
+    <string name="license_permission_patent_body">Οι συνεισφέροντες σού παραχωρούν άδεια χρήσης των διπλωμάτων ευρεσιτεχνίας τους σε αυτό.</string>
+    <string name="license_permission_private">Ιδιωτική χρήση</string>
+    <string name="license_permission_private_body">Μπορείς να το χρησιμοποιείς και να το τροποποιείς για τον εαυτό σου χωρίς να μοιραστείς τίποτα.</string>
+    <string name="license_condition_notice">Ειδοποίηση άδειας και πνευματικών δικαιωμάτων</string>
+    <string name="license_condition_notice_body">Κράτα την ειδοποίηση πνευματικών δικαιωμάτων και αντίγραφο της άδειας σε κάθε αντίγραφο που μοιράζεσαι.</string>
+    <string name="license_condition_changes">Δήλωση αλλαγών</string>
+    <string name="license_condition_changes_body">Πες τι άλλαξες και πότε.</string>
+    <string name="license_condition_source">Διάθεση πηγαίου κώδικα</string>
+    <string name="license_condition_source_body">Όταν το διανέμεις, κάνε διαθέσιμο τον πηγαίο κώδικα.</string>
+    <string name="license_condition_same">Ίδια άδεια</string>
+    <string name="license_condition_same_body">Οι εκδόσεις που διανέμεις πρέπει να έχουν την ίδια άδεια, GPL-3.0.</string>
+    <string name="license_limitation_liability">Ευθύνη</string>
+    <string name="license_limitation_liability_body">Οι δημιουργοί δεν μπορούν να θεωρηθούν υπεύθυνοι για ζημιές.</string>
+    <string name="license_limitation_warranty">Εγγύηση</string>
+    <string name="license_limitation_warranty_body">Το λογισμικό παρέχεται χωρίς καμία εγγύηση.</string>
+    <string name="license_full_text">Πλήρες κείμενο της άδειας</string>
+    <string name="license_text_unavailable">Το κείμενο της άδειας δεν μπόρεσε να φορτωθεί.</string>
+    <string name="settings_read_ahead">Προφόρτωση επόμενων τραγουδιών</string>
+    <string name="settings_read_ahead_off">Ανενεργό</string>
+    <string name="settings_read_ahead_count">Τραγούδια εκ των προτέρων: %1$d</string>
+    <string name="settings_stream_cache">Προσωρινή κρυφή μνήμη ήχου</string>
+    <string name="settings_stream_cache_size">%1$d\u00A0MB</string>
+    <string name="settings_stream_cache_body">Χώρος για πρόσφατο και προφορτωμένο ήχο. Οι λήψεις εκτός σύνδεσης είναι ξεχωριστές. Τα μεγάλα τραγούδια μπορεί να υπερβούν το όριο· μόνο τα πλήρη τραγούδια θεωρούνται έτοιμα.</string>
+    <string name="settings_read_ahead_mobile">Προφόρτωση με δεδομένα κινητής</string>
+    <string name="settings_read_ahead_mobile_body">Να επιτρέπεται επιπλέον χρήση δεδομένων για τα επόμενα τραγούδια.</string>
+    <string name="settings_cache_apply">Εφαρμογή</string>
+    <string name="player_buffer_ready">Προσωρινή μνήμη εκτός σύνδεσης: %1$d/%2$d</string>
+
+    <!-- Music trash (admins, when the server has it on) -->
+    <string name="trash_title">Κάδος</string>
+    <string name="trash_move">Μετακίνηση στον κάδο</string>
+    <string name="trash_checking">Έλεγχος αρχείων…</string>
+    <string name="trash_checking_body">Ο διακομιστής ελέγχει ακριβώς ποια αρχεία θα μετακινηθούν. Μπορεί να πάρει λίγο χρόνο.</string>
+    <string name="trash_failed">Δεν ολοκληρώθηκε</string>
+    <string name="trash_admin_only">Μόνο οι διαχειριστές μπορούν να το δουν αυτό</string>
+    <string name="trash_admin_only_body">Ζήτησε από έναν διαχειριστή αυτού του διακομιστή να επαναφέρει ένα κομμάτι.</string>
+    <string name="trash_tab_trash">Στον κάδο</string>
+    <string name="trash_tab_kept_out">Εκτός λήψεων</string>
+    <string name="trash_search">Αναζήτηση στον κάδο</string>
+    <string name="trash_empty">Ο κάδος είναι άδειος</string>
+    <string name="trash_empty_body">Τα κομμάτια που μετακινούνται στον κάδο εμφανίζονται εδώ μέχρι να λήξουν.</string>
+    <string name="trash_no_match">Τίποτα στον κάδο δεν ταιριάζει</string>
+    <string name="trash_show_more">Εμφάνιση περισσότερων</string>
+    <string name="trash_kept_out_body">Κομμάτια των οποίων ο χρόνος στον κάδο έληξε. Οι αυτόματες λήψεις τα παραλείπουν μέχρι να τα επιτρέψεις ξανά.</string>
+    <string name="trash_kept_out_empty">Τίποτα δεν είναι εκτός λήψεων</string>
+    <string name="trash_allow">Επίτρεψε λήψεις</string>
+    <string name="trash_allow_title">Να επιτραπεί ξανά η λήψη του «%1$s»;</string>
+    <string name="trash_allow_body">Οι αυτόματες λήψεις μπορεί να το κατεβάσουν ξανά. Τίποτα δεν κατεβαίνει τώρα.</string>
+    <string name="trash_kept_until">Φυλάσσεται έως %1$s</string>
+    <string name="trash_restore">Επαναφορά</string>
+    <string name="trash_error_admin">Μόνο ένας διαχειριστής μπορεί να χρησιμοποιήσει τον κάδο.</string>
+    <string name="trash_error_changed">Ένα αρχείο άλλαξε μετά τον έλεγχο. Δεν χάθηκε τίποτα· επίλεξε ξανά το κομμάτι.</string>
+    <string name="trash_error_missing">Λείπει ένα αρχείο. Έλεγξε τον χώρο αποθήκευσης του διακομιστή και δοκίμασε ξανά.</string>
+    <string name="trash_error_collision">Υπάρχει ήδη άλλο αρχείο στη θέση του. Δεν αντικαταστάθηκε τίποτα· το κομμάτι μένει στον κάδο.</string>
+    <string name="trash_error_playing">Κάποιος ακούει αυτό το κομμάτι. Βάλ’ το σε παύση πρώτα.</string>
+    <string name="trash_error_upgrade">Η αναβάθμιση της βιβλιοθήκης τρέχει. Περίμενε ή βάλ’ την σε παύση πρώτα.</string>
+    <string name="trash_error_confirmation">Ο έλεγχος έληξε. Επίλεξε ξανά τα κομμάτια.</string>
+    <string name="trash_error_identity">Τα tags αυτού του κομματιού δεν αρκούν για να μείνει εκτός αυτόματων λήψεων. Δεν μετακινήθηκε τίποτα.</string>
+    <string name="trash_error_busy">Κάτι είναι ακόμη καθ’ οδόν. Περίμενε να τελειώσει.</string>
+    <string name="trash_error_expired">Ο χρόνος του στον κάδο έληξε.</string>
+    <string name="trash_error_folder">Ο φάκελος αυτού του κομματιού δεν καλύπτεται από τον κάδο.</string>
+    <string name="trash_error_storage">Ο χώρος αποθήκευσης του διακομιστή δεν είναι έτοιμος. Δεν μετακινήθηκε τίποτα· έλεγξέ τον και δοκίμασε ξανά.</string>
+    <string name="trash_error_off">Ο κάδος είναι απενεργοποιημένος σε αυτόν τον διακομιστή.</string>
+    <string name="trash_error">Ο κάδος δεν απάντησε. Δεν μετακινήθηκε ούτε διαγράφηκε τίποτα.</string>
+    <string name="trash_state_pending">Αναμονή μετακίνησης</string>
+    <string name="trash_state_moving">Μετακινείται</string>
+    <string name="trash_state_trashed">Στον κάδο</string>
+    <string name="trash_state_restoring">Επαναφέρεται</string>
+    <string name="trash_state_restored">Επανήλθε</string>
+    <string name="trash_state_expired">Έληξε</string>
+    <string name="trash_state_error">Σταμάτησε — τα αρχεία κρατήθηκαν</string>
+    <string name="trash_state_unknown">Ενημερώνεται</string>
+    <plurals name="trash_moving">
+        <item quantity="one">Μετακίνηση %1$d κομματιού στον κάδο</item>
+        <item quantity="other">Μετακίνηση %1$d κομματιών στον κάδο</item>
+    </plurals>
+    <plurals name="trash_confirm_title">
+        <item quantity="one">Μετακίνηση %1$d κομματιού στον κάδο;</item>
+        <item quantity="other">Μετακίνηση %1$d κομματιών στον κάδο;</item>
+    </plurals>
+    <plurals name="trash_confirm_body">
+        <item quantity="one">Μετακινούνται μόνο αυτά τα αρχεία, μαζί με τους στίχους τους. Βγαίνουν από τη βιβλιοθήκη για όλους και μπορούν να επανέλθουν για %1$d ημέρα.</item>
+        <item quantity="other">Μετακινούνται μόνο αυτά τα αρχεία, μαζί με τους στίχους τους. Βγαίνουν από τη βιβλιοθήκη για όλους και μπορούν να επανέλθουν για %1$d ημέρες.</item>
+    </plurals>
+    <plurals name="trash_summary">
+        <item quantity="one">%1$d κομμάτι · %2$s</item>
+        <item quantity="other">%1$d κομμάτια · %2$s</item>
+    </plurals>
+    <plurals name="trash_kept_days">
+        <item quantity="one">φυλάσσονται %1$d ημέρα μετά τη μετακίνηση</item>
+        <item quantity="other">φυλάσσονται %1$d ημέρες μετά τη μετακίνηση</item>
+    </plurals>
+    <string name="settings_normalization_level">Επίπεδο ήχου</string>
+    <string name="settings_normalization_normal">Κανονικό</string>
+    <string name="settings_normalization_louder">Πιο δυνατά</string>
+    <string name="settings_normalization_maximum">Μέγιστο</string>
+    <string name="settings_normalization_level_hint">Αυξάνει την ένταση εντός του ασφαλούς ορίου κάθε τραγουδιού. Τα αρχεία ήχου δεν αλλάζουν.</string>
+</resources>

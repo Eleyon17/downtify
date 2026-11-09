@@ -1,0 +1,126 @@
+package com.henriquesebastiao.downtify.core.player
+
+import android.net.Uri
+import android.util.LruCache
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.ResolvingDataSource
+import com.henriquesebastiao.downtify.core.data.NetworkMonitor
+import com.henriquesebastiao.downtify.core.data.di.ApplicationScope
+import com.henriquesebastiao.downtify.core.data.loudness.LoudnessProfiles
+import com.henriquesebastiao.downtify.core.data.offline.OfflineRepository
+import com.henriquesebastiao.downtify.core.data.session.ServerRepository
+import com.henriquesebastiao.downtify.core.data.settings.SettingsRepository
+import com.henriquesebastiao.downtify.core.data.settings.UserSettings
+import com.henriquesebastiao.downtify.core.model.StreamIds
+import com.henriquesebastiao.downtify.core.model.StreamPolicy
+import com.henriquesebastiao.downtify.core.model.StreamQuality
+import com.henriquesebastiao.downtify.core.model.Transcoding
+import com.henriquesebastiao.downtify.core.network.ServerUrls
+import com.henriquesebastiao.downtify.core.network.session.SessionStore
+import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+
+/**
+ * Turns `downtify://track/{id}` into what the player reads at the moment it
+ * opens it: the offline copy when the phone has one, else the server's stream
+ * URL — the original on Wi-Fi, the mobile-data quality on a metered network
+ * (when the server can transcode) — as set in Settings.
+ *
+ * The quality is chosen when a track starts from the beginning and kept for
+ * that track's later range requests (seeks), so a network change mid-song
+ * never mixes byte ranges of two different files.
+ */
+@UnstableApi
+@Singleton
+class StreamResolver @Inject constructor(
+    private val sessions: SessionStore,
+    private val server: ServerRepository,
+    private val network: NetworkMonitor,
+    private val offline: OfflineRepository,
+    private val loudness: LoudnessProfiles,
+    settings: SettingsRepository,
+    @ApplicationScope scope: CoroutineScope,
+    private val cache: AudioCacheStore,
+) : ResolvingDataSource.Resolver {
+
+    private val settings = settings.settings.stateIn(scope, SharingStarted.Eagerly, UserSettings())
+    private val chosen = LruCache<String, StreamQuality>(CHOSEN_CACHE_SIZE)
+    private val local = LruCache<String, Boolean>(CHOSEN_CACHE_SIZE)
+
+    override fun resolveDataSpec(dataSpec: DataSpec): DataSpec {
+        // A song that isn't in the library: the server's stream cache has
+        // the audio (or downloads it now), with seeking, under the token.
+        MediaItems.streamVideoIdOf(dataSpec.uri)?.let { videoId ->
+            val session = sessions.current ?: throw IOException("Not paired with a server")
+            return dataSpec.withUri(Uri.parse(ServerUrls.streamFile(session.baseUrl, videoId))).buildUpon()
+                .setKey(cache.key(StreamIds.mediaId(videoId), "source")).build()
+        }
+        val trackId = MediaItems.trackIdOf(dataSpec.uri) ?: return dataSpec
+        offline.localFile(trackId)?.let { file ->
+            chosen.put(trackId, StreamQuality.Original)
+            local.put(trackId, true)
+            loudness.prepareLocalBlocking(trackId, file)
+            return dataSpec.withUri(Uri.fromFile(file))
+        }
+        local.remove(trackId)
+        val session = sessions.current ?: throw IOException("Not paired with a server")
+        val quality = if (dataSpec.position == 0L || chosen[trackId] == null) {
+            (if (!network.status.value.online) cache.completedQuality(trackId) ?: qualityNow() else qualityNow())
+                .also { chosen.put(trackId, it) }
+        } else {
+            chosen[trackId]!!
+        }
+        // Before its audio is decoded: the normalizer reads the gain at the stream's first sample.
+        loudness.prepareStreamBlocking(trackId, ask = dataSpec.position == 0L && network.status.value.online)
+        return dataSpec.withUri(Uri.parse(ServerUrls.stream(session.baseUrl, trackId, quality))).buildUpon()
+            .setKey(cache.key(trackId, quality.encode())).build()
+    }
+
+    /** Resolve a future item without changing a playing track's selected representation. */
+    fun preloadSpec(uri: Uri, quality: StreamQuality): DataSpec? {
+        val paired = sessions.current ?: return null
+        MediaItems.streamVideoIdOf(uri)?.let { videoId ->
+            return DataSpec.Builder().setUri(ServerUrls.streamFile(paired.baseUrl, videoId))
+                .setKey(cache.key(StreamIds.mediaId(videoId), "source")).build()
+        }
+        val trackId = MediaItems.trackIdOf(uri) ?: return null
+        offline.localFile(trackId)?.let { return DataSpec.Builder().setUri(Uri.fromFile(it)).build() }
+        val selected = if (!network.status.value.online) cache.completedQuality(trackId) ?: quality else quality
+        return DataSpec.Builder().setUri(ServerUrls.stream(paired.baseUrl, trackId, selected))
+            .setKey(cache.key(trackId, selected.encode())).build()
+    }
+
+    /** What a stream started now would use (shown in Now Playing). */
+    fun qualityNow(): StreamQuality {
+        val s = settings.value
+        val transcoding = server.serverInfo.value?.capabilities?.transcoding ?: Transcoding()
+        return StreamPolicy.select(s.wifiQuality, s.mobileQuality, network.isMetered, transcoding)
+    }
+
+    /**
+     * The address [trackId] would stream from if it started now, when that asks the
+     * server for a transcoded copy: null for an offline copy, the original file, or no
+     * session. Touches the disk (the offline check): call it off the main thread.
+     */
+    fun transcodedUrl(trackId: String): String? {
+        if (offline.localFile(trackId) != null) return null
+        val quality = qualityNow().takeUnless { it.isOriginal } ?: return null
+        val session = sessions.current ?: return null
+        return ServerUrls.stream(session.baseUrl, trackId, quality)
+    }
+
+    /** The quality [trackId] is streaming in, when it has started. */
+    fun qualityOf(trackId: String): StreamQuality? = chosen[trackId]
+
+    /** Whether [trackId] is playing from its offline copy. */
+    fun isLocal(trackId: String): Boolean = local[trackId] == true
+
+    private companion object {
+        const val CHOSEN_CACHE_SIZE = 64
+    }
+}

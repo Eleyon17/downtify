@@ -868,12 +868,15 @@ RULES: list[tuple[frozenset[str], re.Pattern[str], str]] = [
         (_READ, r'^/api/auth/google/login$', PUBLIC),
         (_READ, r'^/api/auth/google/callback$', PUBLIC),
         (_m('POST'), r'^/api/auth/pair$', PUBLIC),
+        (_m('POST'), r'^/api/auth/token$', PUBLIC),
         # Public: shared tracks and playlists (zero login, sandbox-confined).
         (_READ, r'^/api/share/[a-zA-Z0-9_-]+(/.*)?$', PUBLIC),
         # Any signed-in user: their own account, devices and pairing
         # (the routes check whose), and a WebSocket ticket.
         (_m('POST'), r'^/api/auth/ws-ticket$', CLIENT),
         (_READ, r'^/api/me$', CLIENT),
+        (_m('GET', 'DELETE'), r'^/api/me/stats$', CLIENT),
+        (_READ, r'^/api/me/suggested-mix$', CLIENT),
         (_ALL, r'^/api/me(/|$)', USER),
         (_ALL, r'^/api/auth/(devices|pairing)(/|$)', USER),
         # A signed-in browser (a user or an admin - paired apps stay

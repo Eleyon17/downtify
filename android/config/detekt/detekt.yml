@@ -1,0 +1,61 @@
+# Overrides on top of detekt's default config (buildUponDefaultConfig = true).
+config:
+  # compose-rules reads options its bundled default config doesn't declare.
+  excludes: 'Compose>.*'
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][A-Za-z0-9_]*'
+  MatchingDeclarationName:
+    active: false
+
+complexity:
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+    ignoreDefaultParameters: true
+    ignoreAnnotated: ['Composable']
+  LongMethod:
+    threshold: 80
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    thresholdInFiles: 25
+    thresholdInClasses: 20
+    thresholdInInterfaces: 20
+    thresholdInObjects: 20
+    ignorePrivate: true
+  CyclomaticComplexMethod:
+    ignoreSimpleWhenEntries: true
+    ignoreAnnotated: ['Composable']
+
+style:
+  MagicNumber:
+    active: false
+  WildcardImport:
+    active: true
+  ForbiddenComment:
+    active: false
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Preview', 'PreviewLightDark', 'PhonePreviews']
+  ReturnCount:
+    # Parsers return null early for each malformed part; that reads better than nesting.
+    max: 6
+  MaxLineLength:
+    maxLineLength: 120
+
+Compose:
+  ModifierMissing:
+    active: true
+  ViewModelForwarding:
+    active: true
+  CompositionLocalAllowlist:
+    active: true
+    allowedCompositionLocals: LocalDowntifyColors,LocalFloatingNavBar
+  PreviewPublic:
+    active: false
+  ModifierNotUsedAtRoot:
+    active: true
+  LambdaParameterInRestartableEffect:
+    active: false

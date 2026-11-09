@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Downtify is self-hosted: the server is wherever the user runs it, usually a
+  plain-http address on the home network (http://192.168.1.20:8000,
+  http://nas.local:8000) that the user types or the LAN announces. Android's
+  network security config can't allow "private addresses only" (it matches
+  host names, not IP ranges), so cleartext is allowed app-wide.
+
+  The trade-off: over plain http the device token travels unencrypted. On the
+  home network that's the same exposure as the web page itself; beyond it
+  (a public address) the connect screen warns and recommends HTTPS through a
+  reverse proxy. User-installed CAs are trusted too, so a proxy with a private
+  CA (Caddy's local CA, step-ca) works without disabling certificate checks.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

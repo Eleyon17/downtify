@@ -1,0 +1,554 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Navigation -->
+    <string name="nav_home">Kezdőlap</string>
+    <string name="nav_search">Keresés</string>
+    <string name="nav_library">Könyvtár</string>
+    <string name="nav_downloads">Letöltések</string>
+    <string name="nav_trash">Kuka</string>
+    <string name="action_back">Vissza</string>
+    <string name="action_settings">Beállítások</string>
+    <string name="action_open_menu">Menü megnyitása</string>
+    <string name="action_retry">Újra</string>
+    <string name="action_cancel">Mégse</string>
+
+    <!-- Connect -->
+    <string name="connect_title_line1">A zenéd,</string>
+    <string name="connect_title_line2">a saját szervereden.</string>
+    <string name="connect_address_label">Szerver címe</string>
+    <string name="connect_address_hint">Ugyanaz a cím, amelyen böngészőben megnyitod a Downtifyt.</string>
+    <string name="connect_found">Ezen a hálózaton találhatók</string>
+    <string name="connect_searching">Szerverek keresése…</string>
+    <string name="connect_none_found">Ezen a hálózaton még nem található szerver.</string>
+    <string name="connect_server_subtitle">%1$s · Downtify\u00A0%2$s</string>
+    <string name="connect_action">Csatlakozás</string>
+    <string name="connect_step">%1$d/%2$d. lépés</string>
+    <string name="connect_scan">Párosító QR-kód beolvasása</string>
+    <string name="connect_cleartext_warning">Nem az otthoni hálózaton van, és nincs HTTPS: a telefon kulcsa titkosítatlanul utazna.</string>
+    <string name="connect_revoked">Ezt a telefont kijelentkeztették a szerverről. Jelentkezz be újra, hogy tovább hallgathass zenét.</string>
+    <string name="connect_error_invalid">Ez nem úgy néz ki, mint egy cím. Próbáld így: http://192.168.1.20:8000.</string>
+    <string name="connect_error_unreachable">Ezen a címen nem érhető el szerver. Ellenőrizd a címet, és hogy a telefon ugyanazon a hálózaton van-e.</string>
+    <string name="connect_error_not_downtify">Valami válaszolt, de nem Downtify.</string>
+    <string name="connect_error_too_new">Ez a szerver (Downtify %1$s) újabb, mint amit az alkalmazás ismer. Frissítsd az alkalmazást.</string>
+
+    <string name="sign_in_title">Bejelentkezés ide: %1$s</string>
+    <string name="sign_in_body">Használd a weboldalon használt fiókodat.</string>
+    <string name="sign_in_username">Felhasználónév</string>
+    <string name="sign_in_password">Jelszó</string>
+    <string name="sign_in_show_password">Jelszó megjelenítése</string>
+    <string name="sign_in_hide_password">Jelszó elrejtése</string>
+    <string name="sign_in_action">Bejelentkezés</string>
+    <string name="sign_in_use_code">Párosítás kóddal</string>
+    <string name="sign_in_use_password">Bejelentkezés jelszóval</string>
+    <string name="sign_in_error_wrong">Hibás felhasználónév vagy jelszó.</string>
+    <string name="sign_in_error_off">Ezen a szerveren ki van kapcsolva a bejelentkezés. Használj párosítókódot.</string>
+    <string name="sign_in_error_failed">A szerver nem tudta bejelentkeztetni a telefont (hiba: %1$d).</string>
+    <string name="sign_in_cleartext_warning">Nem az otthoni hálózaton van, és nincs HTTPS: a jelszavad titkosítatlanul utazna.</string>
+
+    <string name="pair_title">Párosítás: %1$s</string>
+    <string name="pair_body">A weboldal Beállítások › Alkalmazások részéből.</string>
+    <string name="pair_code_label">Párosítókód</string>
+    <string name="pair_code_placeholder">XXXX-XXXX</string>
+    <string name="pair_action">Párosítás</string>
+    <string name="pair_scan">QR-kód beolvasása</string>
+    <string name="pair_other_server">Másik szerver használata</string>
+    <string name="pair_error_wrong_code">Ez a kód hibás, lejárt vagy már felhasználták. A kódok öt percig érvényesek, és csak egyszer használhatók.</string>
+    <string name="pair_error_too_many">Túl sok próbálkozás. Próbáld újra %1$d\u00A0mp múlva.</string>
+    <string name="pair_error_unreachable">A szerver nem érhető el. Ellenőrizd a kapcsolatot, és próbáld újra.</string>
+    <string name="pair_error_failed">A szerver nem tudta párosítani a telefont (hiba: %1$d).</string>
+    <string name="pair_error_other_server">Ez a kód nem az ezen a címen lévő szerverhez tartozik.</string>
+
+    <string name="scan_title">Párosítókód beolvasása</string>
+    <string name="scan_hint">Irányítsd a kamerát a Beállítások › Alkalmazások › Telefon párosítása oldalon látható QR-kódra.</string>
+    <string name="scan_close">Olvasó bezárása</string>
+    <string name="connect_local_network_denied">A helyi hálózati hozzáférés ki van kapcsolva. Cím beírásához engedélyezd az alkalmazás beállításaiban.</string>
+    <string name="scan_permission_denied">A kamerahozzáférés ki van kapcsolva. Írd be a kódot, vagy engedélyezd a kamerát a telefon beállításaiban.</string>
+    <string name="scan_not_downtify">Ez a QR-kód nem Downtify párosítókód.</string>
+
+    <!-- Home -->
+    <string name="home_streaming_from">Streamelés innen: %1$s</string>
+    <string name="home_unreachable">%1$s nem érhető el · a szinkronizált könyvtárad látható</string>
+    <string name="home_different_server">Ezen a címen másik szerver válaszol · jelentkezz be újra a Beállításokban</string>
+    <string name="home_syncing">Szinkronizálás: %1$s…</string>
+    <string name="home_jump_back_in">Folytasd, ahol abbahagytad</string>
+    <string name="home_recently_added">Nemrég hozzáadott</string>
+    <string name="home_see_all">Összes</string>
+    <string name="home_empty_title">A könyvtárad üres</string>
+    <string name="home_empty_body">A szerveren letöltött zenék itt jelennek meg. Húzd lefelé az újbóli ellenőrzéshez.</string>
+    <string name="home_loading">A könyvtár betöltése…</string>
+
+    <!-- Library -->
+    <string name="library_title">Könyvtár</string>
+    <string name="library_search">Keresés a könyvtárban</string>
+    <string name="library_albums">Albumok</string>
+    <string name="library_artists">Előadók</string>
+    <string name="library_playlists">Lejátszási listák</string>
+    <string name="library_songs">Dalok</string>
+    <string name="library_sort">Rendezés: %1$s</string>
+    <string name="library_sort_recent">Nemrég hozzáadott</string>
+    <string name="library_sort_alpha">Betűrend</string>
+    <string name="library_sort_artist">Előadó</string>
+    <string name="library_sort_by">Rendezés</string>
+    <string name="library_sort_order">Sorrend</string>
+    <string name="library_sort_ascending">Növekvő</string>
+    <string name="library_sort_descending">Csökkenő</string>
+    <string name="library_show_list">Megjelenítés listaként</string>
+    <string name="library_show_grid">Megjelenítés rácsként</string>
+    <string name="library_empty_albums">Még nincs album</string>
+    <string name="library_empty_artists">Még nincs előadó</string>
+    <string name="library_empty_playlists">Még nincs lejátszási lista</string>
+    <string name="library_empty_songs">Még nincs dal</string>
+    <string name="library_empty_body">Húzd lefelé a szerverrel való szinkronizáláshoz.</string>
+
+    <string name="liked_songs">Kedvelt dalok</string>
+    <string name="album_subtitle">%1$s · %2$s</string>
+    <plurals name="songs_count">
+        <item quantity="one">%d dal</item>
+        <item quantity="other">%d dal</item>
+    </plurals>
+    <plurals name="albums_count">
+        <item quantity="one">%d album</item>
+        <item quantity="other">%d album</item>
+    </plurals>
+    <string name="minutes_short">%d\u00A0perc</string>
+    <string name="unknown_artist">Ismeretlen előadó</string>
+    <string name="unknown_album">Ismeretlen album</string>
+
+    <!-- Album / playlist / artist -->
+    <string name="collection_play">%1$s lejátszása</string>
+    <string name="collection_pause">%1$s szüneteltetése</string>
+    <string name="collection_shuffle">Keverés</string>
+    <string name="collection_not_found">Ez már nincs a könyvtáradban.</string>
+    <string name="track_more">További lehetőségek: %1$s</string>
+    <string name="track_like">Hozzáadás a Kedvelt dalokhoz</string>
+    <string name="track_unlike">Eltávolítás a Kedvelt dalok közül</string>
+    <string name="track_go_to_album">Ugrás az albumra</string>
+    <string name="track_go_to_artist">Ugrás az előadóra</string>
+    <string name="track_playing">Szól</string>
+    <string name="track_add_to_queue">Hozzáadás a sorhoz</string>
+    <string name="track_added_to_queue">Hozzáadva a sorhoz</string>
+    <string name="artist_songs">Dalok</string>
+    <string name="artist_albums">Albumok</string>
+
+    <!-- Search -->
+    <string name="search_placeholder">Keress, vagy illessz be Spotify- vagy YouTube-linket</string>
+    <string name="search_clear">Keresés törlése</string>
+    <string name="search_all">Mind</string>
+    <string name="search_in_library">A könyvtáradban</string>
+    <string name="search_no_results">A könyvtáradban semmi sem egyezik ezzel: „%1$s”.</string>
+    <string name="search_prompt">Találj zenét a könyvtáradban, vagy újat, amit a szerver letölt. Spotify- vagy YouTube Music-link is működik.</string>
+    <string name="search_not_in_library">Még nincs a könyvtáradban</string>
+    <string name="search_server_body">Hallgasd meg egészben, vagy kérd, hogy a szerver töltse le.</string>
+    <string name="search_server_loading">Keresés a szerveren…</string>
+    <string name="search_link_loading">A link megnyitása…</string>
+    <string name="search_server_unreachable">A szerver nem érhető el, ezért csak a könyvtáradban kerestünk.</string>
+    <string name="search_server_failed">A szerver most nem tudott keresni.</string>
+    <string name="search_link_unsupported">A szerver nem tudja megnyitni ezt a linket.</string>
+    <string name="search_link_empty">Ezen a linken nem található semmi.</string>
+    <string name="search_server_nothing">A szerver nem talált több találatot erre: „%1$s”.</string>
+    <string name="search_retry">Újra</string>
+    <string name="search_play_full">%1$s lejátszása egészben</string>
+    <string name="search_stop_full">%1$s leállítása</string>
+    <string name="search_similar">%1$s-hoz hasonló dalok</string>
+
+    <string name="search_download_to_server">%1$s letöltése a szerverre</string>
+    <string name="search_job_queued">Várakozás a szerverre</string>
+    <string name="search_job_downloading">A szerver letölti</string>
+    <string name="search_job_done">Letöltve a szerverre</string>
+    <string name="search_job_error">A letöltés nem sikerült. Próbáld újra</string>
+    <string name="search_album_progress">Letöltés %1$d/%2$d</string>
+    <string name="search_album_done">A szerveren</string>
+    <string name="search_link_download">Letöltés a szerverre</string>
+    <plurals name="search_link_download_all">
+        <item quantity="one">%1$d dal letöltése a szerverre</item>
+        <item quantity="other">Mind a(z) %1$d dal letöltése a szerverre</item>
+    </plurals>
+    <string name="search_link_play_all">Összes lejátszása egészben</string>
+    <string name="search_source_spotify">Spotify</string>
+    <string name="search_source_youtube">YT Music</string>
+    <string name="search_source_soulseek">Soulseek</string>
+    <string name="search_queued_one">A szerver letölti: %1$s</string>
+    <plurals name="search_queued_many">
+        <item quantity="one">A szerver letölt %2$d dalt ebből: %1$s</item>
+        <item quantity="other">A szerver letölt %2$d dalt ebből: %1$s</item>
+    </plurals>
+    <string name="search_no_stream">Ez a dal most nem játszható le</string>
+    <string name="search_request_failed">A szerver nem fogadta el a letöltést</string>
+    <string name="search_unreachable">A szerver nem érhető el</string>
+    <string name="search_kind_album">Album</string>
+    <string name="search_kind_artist">Előadó</string>
+    <string name="search_kind_song">Dal</string>
+    <string name="search_kind_playlist">Lejátszási lista</string>
+
+    <!-- Similar -->
+    <string name="similar_title">Hasonlók</string>
+    <string name="similar_artist">Előadó</string>
+    <string name="similar_track">Dal</string>
+    <string name="similar_find">Hasonlók keresése</string>
+    <string name="similar_empty">Add meg egy előadó vagy dal nevét, hogy meghallgathasd, mi szól hozzá hasonlóan.</string>
+    <string name="similar_failed">Nem sikerült hasonló dalokat találni</string>
+    <string name="similar_unreachable">A szerver nem érhető el</string>
+    <string name="similar_no_results">Nem található hasonló</string>
+    <string name="similar_no_stream">Ez a dal most nem játszható le</string>
+    <string name="home_shortcut_similar">Hasonló dalok</string>
+    <string name="home_shortcut_similar_body">Adj meg egy dalt, és hallgasd meg, mi szól hasonlóan — letöltés nélkül.</string>
+    <string name="search_play">%1$s lejátszása</string>
+
+    <!-- Downloads -->
+    <string name="downloads_title">Letöltések</string>
+    <string name="load_error_unreachable">A szerver nem érhető el.</string>
+    <string name="load_error_failed">A szerver most nem tudott válaszolni.</string>
+    <string name="discover_title">Felfedezés</string>
+    <string name="discover_refresh">Javaslatok frissítése</string>
+    <string name="discover_loading">Javaslatok kérése a szervertől. Első alkalommal kicsit tovább tarthat.</string>
+    <string name="discover_loading_more">Albumok és lejátszási listák keresése…</string>
+    <string name="discover_empty_title">Még nincs mire építeni</string>
+    <string name="discover_empty_body">A Felfedezés új előadókat javasol a könyvtáradban lévők alapján. Előbb adj hozzá zenét.</string>
+    <string name="discover_none_title">Most nincs javaslat</string>
+    <string name="discover_none_body">Hallgass és kedvelj több zenét, vagy próbáld később. Az elrejtett előadók kimaradnak.</string>
+    <string name="discover_try_again">Koppints a frissítésre az újrapróbáláshoz.</string>
+    <string name="discover_partial">A szerver néhány előadódhoz nem érte el a Deezert, ezért ez a lista a szokásosnál rövidebb. Próbáld később.</string>
+    <string name="discover_artists">Előadók neked</string>
+    <string name="discover_albums">Albumok neked</string>
+    <string name="discover_more_albums">Még több a kedvenc előadóidtól</string>
+    <string name="discover_playlists">Lejátszási listák neked</string>
+    <string name="discover_because">Mert szereted: %1$s</string>
+    <string name="discover_show_all">Mind a(z) %1$d megjelenítése</string>
+    <string name="discover_artist_options">Lehetőségek: %1$s</string>
+    <string name="discover_preview">%1$s előnézete</string>
+    <string name="discover_not_interested">Nem érdekel</string>
+    <string name="discover_hidden">%1$s többé nem lesz javasolva</string>
+    <string name="discover_undo">Visszavonás</string>
+    <string name="home_shortcut_discover">Felfedezés</string>
+    <string name="home_shortcut_discover_body">Új előadók, albumok és lejátszási listák a hallgatásod alapján</string>
+    <string name="home_shortcut_podcasts">Podcastok</string>
+    <string name="home_shortcut_podcasts_body">A szervered által követett műsorok, mindegyikben a megállási pontoddal</string>
+    <string name="podcasts_title">Podcastok</string>
+    <string name="podcasts_empty_title">Még nincs podcast</string>
+    <string name="podcasts_empty_body">A podcastokat a Downtify weboldalán, a Podcastok résznél lehet hozzáadni. Itt jelennek meg, és a szerveredről játszódnak le.</string>
+    <string name="podcasts_pull_to_retry">Húzd lefelé az újrapróbáláshoz.</string>
+    <plurals name="podcasts_episodes">
+        <item quantity="one">%1$d epizód</item>
+        <item quantity="other">%1$d epizód</item>
+    </plurals>
+    <string name="show_no_episodes">Még nincs epizód. A szerver a saját ütemezése szerint ellenőrzi a csatornát.</string>
+    <string name="show_untitled_episode">Cím nélküli epizód</string>
+    <string name="show_played">Meghallgatva</string>
+    <string name="show_resume_at">Folytatás itt: %1$s</string>
+    <string name="show_play_episode">%1$s lejátszása</string>
+    <string name="show_download_episode">%1$s letöltése a szerverre</string>
+    <string name="show_downloading">A szerver letölti</string>
+    <string name="show_episode_options">Lehetőségek: %1$s</string>
+    <string name="show_mark_played">Megjelölés meghallgatottként</string>
+    <string name="show_mark_unplayed">Megjelölés meg nem hallgatottként</string>
+    <string name="show_download_failed">A szerver nem tudta letölteni: %1$s</string>
+    <string name="downloads_used">%1$s felhasználva</string>
+    <string name="downloads_of_limit">a(z) %1$s korlátból</string>
+    <string name="downloads_no_limit">nincs korlát</string>
+    <plurals name="downloads_storage_body">
+        <item quantity="one">%1$d dal szerver nélkül is lejátszható. %2$s szabad ezen a telefonon.</item>
+        <item quantity="other">%1$d dal szerver nélkül is lejátszható. %2$s szabad ezen a telefonon.</item>
+    </plurals>
+    <string name="downloads_storage_a11y">Felhasznált offline tárhely</string>
+    <string name="downloads_keep_liked">Kedvelt dalok offline tartása</string>
+    <string name="downloads_keep_liked_body_wifi">A kedvelt dalok Wi-Fi-n letöltődnek erre a telefonra.</string>
+    <string name="downloads_keep_liked_body">A kedvelt dalok letöltődnek erre a telefonra.</string>
+    <string name="downloads_on_phone">Ezen a telefonon</string>
+    <string name="downloads_tab_phone">Ezen a telefonon</string>
+    <string name="downloads_tab_server">A szerveren</string>
+    <plurals name="downloads_server_card">
+        <item quantity="one">A szerver %1$d dalt tölt le</item>
+        <item quantity="other">A szerver %1$d dalt tölt le</item>
+    </plurals>
+    <string name="downloads_server_card_detail">%1$s · %2$d / %3$d</string>
+    <string name="downloads_server_empty_title">A szerver nem tölt le semmit</string>
+    <string name="downloads_server_empty_body">Találj új zenét a Keresésben, vagy illessz be oda Spotify- vagy YouTube Music-linket, és a szerver letölti a könyvtáradba.</string>
+    <string name="downloads_server_job_queued">Várakozik</string>
+    <string name="downloads_server_job_downloading">Letöltés · %1$d%%</string>
+    <string name="downloads_server_job_done">A könyvtáradban</string>
+    <string name="downloads_server_job_error">Sikertelen</string>
+    <string name="downloads_server_job_error_detail">Sikertelen: %1$s</string>
+    <string name="downloads_empty_title">Még nincs semmi ezen a telefonon</string>
+    <string name="downloads_empty_body">Koppints a Letöltés gombra egy albumon vagy lejátszási listán, vagy tartsd offline a Kedvelt dalokat, hogy szerver nélkül hallgathass.</string>
+    <plurals name="downloads_status_done">
+        <item quantity="one">%1$d dal · %2$s</item>
+        <item quantity="other">%1$d dal · %2$s</item>
+    </plurals>
+    <string name="downloads_status_done_synced">%1$s · szinkronban tartva</string>
+    <string name="downloads_status_progress">Letöltés: %1$d / %2$d</string>
+    <string name="downloads_status_waiting_wifi">%1$s · Wi-Fire vár</string>
+    <string name="downloads_status_waiting_network">%1$s · kapcsolatra vár</string>
+    <plurals name="downloads_status_over_limit">
+        <item quantity="one">%1$d / %2$d · 1 dal nem fér bele a tárhelykorlátba</item>
+        <item quantity="other">%1$d / %2$d · %3$d dal nem fér bele a tárhelykorlátba</item>
+    </plurals>
+    <string name="downloads_status_missing">Már nincs a könyvtárban</string>
+    <string name="downloads_options">Lehetőségek: %1$s</string>
+    <string name="downloads_remove">Eltávolítás erről a telefonról</string>
+    <string name="downloads_downloaded">Letöltve</string>
+    <string name="collection_download">Letöltés</string>
+    <string name="collection_downloading">Letöltés: %1$d / %2$d</string>
+    <string name="collection_on_phone">Ezen a telefonon</string>
+    <string name="collection_remove_title">Eltávolítod erről a telefonról?</string>
+    <string name="collection_remove_message">A(z) %1$s a könyvtáradban marad, és a szerverről streamel.</string>
+    <string name="collection_remove_confirm">Eltávolítás</string>
+    <string name="settings_downloads">Letöltések</string>
+    <string name="settings_signed_in_as">Bejelentkezve mint %1$s</string>
+    <string name="settings_download_wifi_only">Letöltés csak Wi-Fi-n</string>
+    <string name="settings_download_wifi_only_body">Az offline másolatok Wi-Fire várnak</string>
+    <string name="settings_offline_limit">Offline tárhelykorlát</string>
+    <string name="settings_offline_limit_summary">%1$s · %2$s felhasználva</string>
+    <string name="settings_offline_limit_none">Nincs korlát</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Beállítások</string>
+    <string name="settings_connected">Csatlakozva</string>
+    <string name="settings_unreachable">Nem elérhető</string>
+    <string name="settings_checking">Ellenőrzés…</string>
+    <string name="settings_different_server">Másik szerver</string>
+    <string name="settings_change_server">Szerver váltása</string>
+    <string name="settings_open_web">Szerverbeállítások</string>
+    <string name="settings_playback">Lejátszás</string>
+    <string name="settings_normalize_volume">Hangerő normalizálása</string>
+    <string name="settings_normalize_volume_hint">A szerver mérései alapján hasonló hangerővel játssza le a dalokat, a következő daltól. A mérés nélküli dalok megtartják eredeti hangerejüket.</string>
+    <string name="settings_quality_wifi">Streamelési minőség Wi-Fi-n</string>
+    <string name="settings_quality_mobile">Streamelési minőség mobiladaton</string>
+    <string name="settings_quality_no_transcoding">A szerver nem tud átkódolni (nincs ffmpeg): a fájlok eredeti formában streamelnek.</string>
+    <string name="settings_quality_original">Eredeti · ahogy letöltötték</string>
+    <string name="settings_quality_transcoded">%1$s · %2$d\u00A0kbps · a szerver átkódolja</string>
+    <string name="settings_quality_label">%1$s · %2$d\u00A0kbps</string>
+    <string name="settings_appearance">Megjelenés</string>
+    <string name="settings_theme">Téma</string>
+    <string name="settings_theme_system">Rendszer</string>
+    <string name="settings_theme_dark">Sötét</string>
+    <string name="settings_theme_light">Világos</string>
+    <string name="settings_theme_body">A Rendszer az eszköz világos vagy sötét módját követi.</string>
+    <string name="settings_dynamic_color">Háttérkép színeinek használata</string>
+    <string name="settings_dynamic_color_body">Material You a Downtify-zöld helyett</string>
+    <string name="settings_about">Névjegy</string>
+    <string name="settings_app_version">Downtify Androidra %1$s</string>
+    <string name="settings_server_api">Szerver API-verziója: %1$d</string>
+    <string name="settings_unpair">Kijelentkezés</string>
+    <string name="settings_unpair_body">A szerver kulcsának elfelejtése a telefonon</string>
+    <string name="settings_unpair_title">Kijelentkezel erről a szerverről?</string>
+    <string name="settings_unpair_message">A telefon elfelejti a kulcsát, és visszatér a csatlakozási képernyőre. Hogy a szerverről is eltávolítsd, nyisd meg a weboldalon a Beállítások › Alkalmazások › Párosított alkalmazások részt. A szinkronizált könyvtárad megmarad, amíg másik szerverre nem jelentkezel be.</string>
+    <string name="settings_unpair_confirm">Kijelentkezés</string>
+
+    <!-- Player -->
+    <string name="player_play">Lejátszás</string>
+    <string name="player_pause">Szünet</string>
+    <string name="player_next">Következő</string>
+    <string name="player_previous">Előző</string>
+    <string name="player_shuffle_on">Keverés bekapcsolva</string>
+    <string name="player_shuffle_off">Keverés kikapcsolva</string>
+    <string name="player_repeat_off">Ismétlés kikapcsolva</string>
+    <string name="player_repeat_all">Összes ismétlése</string>
+    <string name="player_repeat_one">Egy ismétlése</string>
+    <string name="player_seek">Tekerés</string>
+    <string name="player_close">A Most szól bezárása</string>
+    <string name="player_open">A Most szól megnyitása</string>
+    <string name="player_lyrics">Dalszöveg</string>
+    <string name="player_queue">Sor</string>
+    <string name="player_queue_close">Sor bezárása</string>
+    <string name="player_queue_now_playing">Most szól</string>
+    <string name="player_queue_next_in_queue">Következő a sorban</string>
+    <string name="player_queue_next_from">Következő innen: %1$s</string>
+    <string name="player_queue_next_up">Következik</string>
+    <string name="player_queue_clear">Sor törlése</string>
+    <string name="player_queue_empty">Ez után a dal után semmi sem szól.</string>
+    <string name="player_queue_remove">Eltávolítás a sorból</string>
+    <string name="player_queue_reorder">Húzd az átrendezéshez</string>
+    <string name="player_queue_move_up">Feljebb</string>
+    <string name="player_queue_move_down">Lejjebb</string>
+    <string name="player_like">Hozzáadás a Kedvelt dalokhoz</string>
+    <string name="player_source_stream">Streamelés innen: %1$s</string>
+    <string name="player_unlike">Eltávolítás a Kedvelt dalok közül</string>
+    <string name="player_playing_from_album">Lejátszás albumból</string>
+    <string name="player_playing_from_artist">Lejátszás előadótól</string>
+    <string name="player_playing_from_playlist">Lejátszás lejátszási listából</string>
+    <string name="player_now_playing">Most szól</string>
+    <string name="player_source_original_quality">Streamelés innen: %1$s · Eredeti minőség</string>
+    <string name="player_sample_rate">%1$s\u00A0kHz</string>
+    <string name="player_bitrate">%1$d\u00A0kbps</string>
+    <string name="player_source_unknown">Streamelés innen: %1$s</string>
+    <string name="player_playing_from_podcast">Podcast</string>
+    <string name="player_skip_back">Vissza 10 másodpercet</string>
+    <string name="player_skip_forward">Előre 30 másodpercet</string>
+    <string name="player_speed">Lejátszási sebesség: %1$s. Koppints a módosításhoz</string>
+    <string name="player_source_this_phone">Lejátszás erről a telefonról</string>
+    <string name="player_lyrics_none">Ehhez a dalhoz nincs szöveg.</string>
+    <string name="player_lyrics_loading">Dalszöveg betöltése…</string>
+    <string name="player_lyrics_synced">Időzített</string>
+    <string name="player_lyrics_static">Statikus</string>
+    <string name="player_lyrics_timing">Időzítés igazítása</string>
+    <string name="player_lyrics_earlier">Dalszöveg korábban</string>
+    <string name="player_lyrics_later">Dalszöveg később</string>
+    <string name="player_lyrics_timing_reset">Időzítés visszaállítása</string>
+    <string name="player_lyrics_offset">%1$s\u00A0mp</string>
+    <string name="player_error_network">A szerver nem érhető el a dal lejátszásához.</string>
+    <string name="player_error_not_found">Ez a dal már nincs a szerveren.</string>
+    <string name="player_error_old_server">A szerver túl régi a streameléshez — frissítsd a Downtifyt a szerveren.</string>
+    <string name="player_error_other">Ezt a dalt nem lehetett lejátszani.</string>
+    <string name="player_notifications_rationale">Engedélyezd az értesítéseket, hogy a lejátszást a zárolási képernyőről és az értesítési sávból is vezérelhesd.</string>
+
+    <!-- Settings: appearance, language, about -->
+    <string name="action_close">Bezárás</string>
+    <string name="settings_server">Szerver</string>
+    <string name="settings_language">Nyelv</string>
+    <string name="settings_language_summary">%1$s · az Android alkalmazásnyelv-beállításaiban módosítható</string>
+    <string name="settings_amoled">Tiszta fekete</string>
+    <string name="settings_amoled_body">Valódi fekete a sötét témában. Energiát takarít meg OLED kijelzőn.</string>
+    <string name="settings_floating_nav_bar">Lebegő navigációs sáv</string>
+    <string name="settings_floating_nav_bar_body">Telefonon a sáv lekerekített kapszula a képernyő teljes szélessége helyett</string>
+    <string name="settings_font">Betűtípus</string>
+    <string name="settings_font_downtify">Klasszikus Downtify</string>
+    <string name="settings_font_system">Rendszer betűtípusa</string>
+    <string name="settings_about_entry">A Downtifyról</string>
+
+    <!-- About -->
+    <string name="about_title">Névjegy</string>
+    <string name="about_tagline">A saját üzemeltetésű Downtify szerveredhez készült hivatalos Android-kliens.</string>
+    <string name="about_report_bug">Hiba jelentése</string>
+    <string name="about_report_bug_body">Hibajegy nyitása a GitHubon</string>
+    <string name="about_version">Verzió</string>
+    <string name="about_version_value">%1$s (%2$d)</string>
+    <string name="about_version_copied">Verzió másolva</string>
+    <string name="about_source">Forráskód</string>
+    <string name="about_source_body">A projekt megtekintése a GitHubon</string>
+    <string name="about_license">Licenc</string>
+    <string name="about_terms">Feltételek és felelősségkizárás</string>
+    <string name="about_terms_body">Használati feltételek és a fejlesztők felelősségkizárása</string>
+    <string name="about_donate">A projekt támogatása</string>
+    <string name="about_donate_body">Hívd meg a fejlesztőt egy kávéra, vagy támogasd GitHubon</string>
+
+    <!-- Support sheet -->
+    <string name="donate_title">A Downtify támogatása</string>
+    <string name="donate_body">A Downtify Androidra ingyenes és nyílt forráskódú, szabadidőben készül. Ha hasznos számodra, segíthetsz életben tartani. Soha nem kötelező, és mindig hálásak vagyunk érte.</string>
+    <string name="donate_buy_me_a_coffee_body">Egyszeri kávé a fejlesztőnek</string>
+    <string name="donate_github_sponsors_body">A munka támogatása GitHubon</string>
+
+    <!-- Terms and disclaimer sheet -->
+    <string name="terms_title">Feltételek és felelősségkizárás</string>
+    <string name="terms_use_title">Mi ez az alkalmazás</string>
+    <string name="terms_use_body">A Downtify Androidra a Downtify ingyenes, nyílt forráskódú klienseként egy saját üzemeltetésű zeneszerverhez készült. A saját szervered zenéit játssza le és kezeli. Nem zenei szolgáltatás, és nem tárol zenét.</string>
+    <string name="terms_responsibility_title">A te felelősséged</string>
+    <string name="terms_responsibility_body">Te felelsz azért a zenéért, amelyet a Downtifyjal keresel, töltesz le, tárolsz és játszol le, valamint a szerzői jogi törvények és az érintett szolgáltatások feltételeinek betartásáért ott, ahol élsz. A Downtify nem támogatja a szerzői jogvédelem alatt álló anyagok jogosulatlan letöltését, és a fejlesztők nem vállalnak felelősséget a felhasználók tetteiért és azok jogi következményeiért.</string>
+    <string name="terms_affiliation_title">Nincs kapcsolat</string>
+    <string name="terms_affiliation_body">A Downtify nincs kapcsolatban a Spotifyjal, a YouTube-bal, a YouTube Music-kal, a Deezerrel, a Soulseek-kel vagy bármely más szolgáltatással, amelyen keresztül zenét, előnézetet vagy borítót talál, és azok nem támogatják, nem hagyták jóvá. Nevük és logójuk a tulajdonosaiké.</string>
+    <string name="terms_warranty_title">Nincs garancia, nincs felelősség</string>
+    <string name="terms_warranty_body">Az alkalmazást „adott állapotban” kapod, bármilyen kifejezett vagy hallgatólagos garancia nélkül, beleértve az adott célra való alkalmasságot is. A fejlesztők nem felelnek az alkalmazás használatából eredő követelésekért, károkért, adatvesztésért vagy jogi következményekért.</string>
+    <string name="terms_privacy_title">Az adataid</string>
+    <string name="terms_privacy_body">Az alkalmazásban nincs hirdetés, elemzés vagy nyomkövetés, és nem küld semmit a fejlesztőknek. Azzal a szerverrel kommunikál, amellyel párosítottad. Az előnézetek, borítók, podcastképek és a letölthető betűtípusok külső szerverekről (például Spotify, Deezer és Google) érkeznek, amelyek láthatják a telefonod IP-címét.</string>
+
+    <!-- License screen -->
+    <string name="license_title">Licenc</string>
+    <string name="license_intro">A Downtify Androidra szabad szoftver. A Free Software Foundation által kiadott GNU Általános Nyilvános Licenc 3. verziójának feltételei szerint használhatod, tanulmányozhatod, megoszthatod és módosíthatod. Röviden:</string>
+    <string name="license_permissions">Engedélyek</string>
+    <string name="license_conditions">Feltételek</string>
+    <string name="license_limitations">Korlátozások</string>
+    <string name="license_permission_commercial">Kereskedelmi felhasználás</string>
+    <string name="license_permission_commercial_body">A szoftvert és a forráskódját kereskedelmi célra is használhatod.</string>
+    <string name="license_permission_modification">Módosítás</string>
+    <string name="license_permission_modification_body">Módosíthatod a szoftvert.</string>
+    <string name="license_permission_distribution">Terjesztés</string>
+    <string name="license_permission_distribution_body">Megoszthatod a szoftvert és a módosított változataidat.</string>
+    <string name="license_permission_patent">Szabadalmak használata</string>
+    <string name="license_permission_patent_body">A közreműködők licencet adnak a szabadalmaik használatára.</string>
+    <string name="license_permission_private">Magáncélú használat</string>
+    <string name="license_permission_private_body">Magadnak használhatod és módosíthatod anélkül, hogy bármit megosztanál.</string>
+    <string name="license_condition_notice">Licenc- és szerzői jogi közlemény</string>
+    <string name="license_condition_notice_body">Minden megosztott példányhoz tartsd meg a szerzői jogi közleményt és a licenc egy másolatát.</string>
+    <string name="license_condition_changes">A változtatások jelzése</string>
+    <string name="license_condition_changes_body">Írd le, mit és mikor változtattál.</string>
+    <string name="license_condition_source">A forráskód közzététele</string>
+    <string name="license_condition_source_body">Terjesztéskor tedd elérhetővé a forráskódot.</string>
+    <string name="license_condition_same">Azonos licenc</string>
+    <string name="license_condition_same_body">Az általad terjesztett változatoknak ugyanazon licenc, a GPL-3.0 alatt kell állniuk.</string>
+    <string name="license_limitation_liability">Felelősség</string>
+    <string name="license_limitation_liability_body">A szerzők nem vonhatók felelősségre a károkért.</string>
+    <string name="license_limitation_warranty">Garancia</string>
+    <string name="license_limitation_warranty_body">A szoftver bármilyen garancia nélkül érkezik.</string>
+    <string name="license_full_text">A licenc teljes szövege</string>
+    <string name="license_text_unavailable">A licenc szövegét nem sikerült betölteni.</string>
+    <string name="settings_read_ahead">Következő számok előtöltése</string>
+    <string name="settings_read_ahead_off">Kikapcsolva</string>
+    <string name="settings_read_ahead_count">Előtöltött számok száma: %1$d</string>
+    <string name="settings_stream_cache">Ideiglenes hanggyorsítótár</string>
+    <string name="settings_stream_cache_size">%1$d\u00A0MB</string>
+    <string name="settings_stream_cache_body">A nemrég játszott és előtöltött hang tárhelye. Az offline letöltések külön maradnak. A nagy számok túlléphetik a korlátot; csak a teljes számok számítanak késznek.</string>
+    <string name="settings_read_ahead_mobile">Előtöltés mobiladattal</string>
+    <string name="settings_read_ahead_mobile_body">Többlet adatforgalom engedélyezése a következő számokhoz.</string>
+    <string name="settings_cache_apply">Alkalmaz</string>
+    <string name="player_buffer_ready">Offline puffer: %1$d/%2$d</string>
+
+    <!-- Music trash (admins, when the server has it on) -->
+    <string name="trash_title">Kuka</string>
+    <string name="trash_move">Áthelyezés a kukába</string>
+    <string name="trash_checking">Fájlok ellenőrzése…</string>
+    <string name="trash_checking_body">A szerver ellenőrzi, pontosan mely fájlok kerülnének át. Ez eltarthat egy pillanatig.</string>
+    <string name="trash_failed">Nem sikerült</string>
+    <string name="trash_admin_only">Ezt csak adminisztrátorok láthatják</string>
+    <string name="trash_admin_only_body">Kérd meg a szerver egyik adminisztrátorát, hogy állítson vissza egy számot.</string>
+    <string name="trash_tab_trash">A kukában</string>
+    <string name="trash_tab_kept_out">Letöltésekből kizárva</string>
+    <string name="trash_search">Keresés a kukában</string>
+    <string name="trash_empty">A kuka üres</string>
+    <string name="trash_empty_body">A kukába tett számok itt látszanak, amíg le nem járnak.</string>
+    <string name="trash_no_match">Semmi sem egyezik a kukában</string>
+    <string name="trash_show_more">Több megjelenítése</string>
+    <string name="trash_kept_out_body">Számok, amelyek ideje lejárt a kukában. Az automatikus letöltések kihagyják őket, amíg újra nem engedélyezed.</string>
+    <string name="trash_kept_out_empty">Semmi sincs kizárva a letöltésekből</string>
+    <string name="trash_allow">Letöltés engedélyezése</string>
+    <string name="trash_allow_title">Újra letölthető legyen ez: „%1$s”?</string>
+    <string name="trash_allow_body">Az automatikus letöltések újra letölthetik. Most semmi sem töltődik le.</string>
+    <string name="trash_kept_until">Megőrizve eddig: %1$s</string>
+    <string name="trash_restore">Visszaállítás</string>
+    <string name="trash_error_admin">Csak adminisztrátor használhatja a kukát.</string>
+    <string name="trash_error_changed">Egy fájl az ellenőrzés után megváltozott. Semmi sem veszett el; válaszd ki újra a számot.</string>
+    <string name="trash_error_missing">Hiányzik egy fájl. Ellenőrizd a szerver tárhelyét, majd próbáld újra.</string>
+    <string name="trash_error_collision">A helyén már van egy másik fájl. Semmi sem lett felülírva; a szám a kukában marad.</string>
+    <string name="trash_error_playing">Valaki épp ezt a számot hallgatja. Előbb szüneteltesd.</string>
+    <string name="trash_error_upgrade">A könyvtár feljavítása fut. Várd meg, vagy előbb szüneteltesd.</string>
+    <string name="trash_error_confirmation">Az ellenőrzés lejárt. Válaszd ki újra a számokat.</string>
+    <string name="trash_error_identity">Ennek a számnak a címkéi kevesek ahhoz, hogy kimaradjon az automatikus letöltésekből. Semmi sem került át.</string>
+    <string name="trash_error_busy">Valami még folyamatban van. Várd meg, amíg befejeződik.</string>
+    <string name="trash_error_expired">Lejárt az ideje a kukában.</string>
+    <string name="trash_error_folder">Ennek a számnak a mappáját nem fedi le a kuka.</string>
+    <string name="trash_error_storage">A szerver tárhelye nem áll készen. Semmi sem került át; ellenőrizd, majd próbáld újra.</string>
+    <string name="trash_error_off">A kuka ki van kapcsolva ezen a szerveren.</string>
+    <string name="trash_error">A kuka nem válaszolt. Semmi sem került át és semmi sem törlődött.</string>
+    <string name="trash_state_pending">Áthelyezésre vár</string>
+    <string name="trash_state_moving">Áthelyezés</string>
+    <string name="trash_state_trashed">A kukában</string>
+    <string name="trash_state_restoring">Visszaállítás</string>
+    <string name="trash_state_restored">Visszaállítva</string>
+    <string name="trash_state_expired">Lejárt</string>
+    <string name="trash_state_error">Leállt — a fájlok megmaradtak</string>
+    <string name="trash_state_unknown">Frissítés</string>
+    <plurals name="trash_moving">
+        <item quantity="one">%1$d szám áthelyezése a kukába</item>
+        <item quantity="other">%1$d szám áthelyezése a kukába</item>
+    </plurals>
+    <plurals name="trash_confirm_title">
+        <item quantity="one">Áthelyezel %1$d számot a kukába?</item>
+        <item quantity="other">Áthelyezel %1$d számot a kukába?</item>
+    </plurals>
+    <plurals name="trash_confirm_body">
+        <item quantity="one">Csak ezek a fájlok kerülnek át, a dalszövegeikkel. Mindenkinél eltűnnek a könyvtárból, és %1$d napig visszaállíthatók.</item>
+        <item quantity="other">Csak ezek a fájlok kerülnek át, a dalszövegeikkel. Mindenkinél eltűnnek a könyvtárból, és %1$d napig visszaállíthatók.</item>
+    </plurals>
+    <plurals name="trash_summary">
+        <item quantity="one">%1$d szám · %2$s</item>
+        <item quantity="other">%1$d szám · %2$s</item>
+    </plurals>
+    <plurals name="trash_kept_days">
+        <item quantity="one">az áthelyezés után %1$d napig megmaradnak</item>
+        <item quantity="other">az áthelyezés után %1$d napig megmaradnak</item>
+    </plurals>
+    <string name="settings_normalization_level">Hangerőszint</string>
+    <string name="settings_normalization_normal">Normál</string>
+    <string name="settings_normalization_louder">Hangosabb</string>
+    <string name="settings_normalization_maximum">Maximum</string>
+    <string name="settings_normalization_level_hint">A hangerőt az egyes számok biztonságos határáig növeli. A hangfájlok változatlanok maradnak.</string>
+</resources>

@@ -475,7 +475,97 @@ async def signup(request: Request, response: Response) -> dict[str, Any]:
             ip=ip,
         )
     _set_session(response, request, token)
-    return {'signed_in': True, 'user': user}
+    result: dict[str, Any] = {'signed_in': True, 'user': user}
+    if payload.get('device_name'):
+        device, dev_token = await asyncio.to_thread(
+            store.create_device,
+            str(payload.get('device_name') or ''),
+            str(payload.get('platform') or 'android'),
+            ip,
+            user['id'],
+        )
+        identity = api.state.identity
+        result.update({
+            'token': dev_token,
+            'device': {'id': device.get('id'), 'name': device.get('name')},
+            'server': {
+                'server_id': identity.server_id if identity else '',
+                'name': identity.name if identity else '',
+            },
+        })
+    return result
+
+
+@router.post('/api/auth/token')
+async def create_device_token(request: Request) -> dict[str, Any]:
+    """An app signs in with a username and password and gets a device token:
+    ``{username, password, device_name, platform}`` -> ``{token, device,
+    server, user}``. Rate-limited per address."""
+
+    store = _store()
+    if store.auth_disabled:
+        raise HTTPException(
+            status_code=409,
+            detail='Sign-in is turned off (DOWNTIFY_DISABLE_AUTH)',
+        )
+    ip = _ip(request)
+    wait = api.state.login_limiter.retry_after(ip)
+    if wait:
+        raise _too_many(wait)
+    payload = await _json(request)
+    username = str(payload.get('username') or '').strip()[:64]
+    password = str(payload.get('password') or '')
+    user = await asyncio.to_thread(
+        store.users.authenticate, username, password
+    )
+    log = api.state.activity
+    if user is None:
+        api.state.login_limiter.fail(ip)
+        logger.warning('App sign-in: wrong username or password from {}', ip)
+        if log is not None:
+            await asyncio.to_thread(
+                log.record,
+                'login_failed',
+                username=username,
+                summary=username,
+                client=api.client_label(request, None),
+                ip=ip,
+            )
+        raise HTTPException(
+            status_code=401, detail='Wrong username or password'
+        )
+    api.state.login_limiter.reset(ip)
+    device, token = await asyncio.to_thread(
+        store.create_device,
+        str(payload.get('device_name') or ''),
+        str(payload.get('platform') or 'android'),
+        ip,
+        user['id'],
+    )
+    await asyncio.to_thread(store.users.record_login, user['id'], ip)
+    if user['role'] == ROLE_ADMIN:
+        await asyncio.to_thread(store.users.clear_notice)
+    if log is not None:
+        await asyncio.to_thread(
+            log.record,
+            'device_paired',
+            user_id=user['id'],
+            username=user['username'],
+            summary=str(device.get('name') or ''),
+            detail={'device_id': device.get('id')},
+            client=str(device.get('name') or ''),
+            ip=ip,
+        )
+    identity = api.state.identity
+    return {
+        'token': token,
+        'device': {'id': device.get('id'), 'name': device.get('name')},
+        'server': {
+            'server_id': identity.server_id if identity else '',
+            'name': identity.name if identity else '',
+        },
+        'user': {'username': user['username'], 'role': user['role']},
+    }
 
 
 @router.post('/api/auth/google')

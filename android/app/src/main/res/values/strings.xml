@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Downtify</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_downloads">Downloads</string>
+    <string name="nav_trash">Trash</string>
+    <string name="action_back">Back</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_open_menu">Open menu</string>
+    <string name="action_retry">Try again</string>
+    <string name="action_cancel">Cancel</string>
+
+    <!-- Connect -->
+    <string name="connect_title_line1">Your music,</string>
+    <string name="connect_title_line2">from your server.</string>
+    <string name="connect_address_label">Server address</string>
+    <string name="connect_address_hint">The same address you open Downtify at in a browser.</string>
+    <string name="connect_found">Found on this network</string>
+    <string name="connect_searching">Looking for servers…</string>
+    <string name="connect_none_found">No server found on this network yet.</string>
+    <string name="connect_server_subtitle">%1$s · Downtify\u00A0%2$s</string>
+    <string name="connect_action">Connect</string>
+    <string name="connect_step">Step %1$d of %2$d</string>
+    <string name="connect_scan">Scan a pairing QR code</string>
+    <string name="connect_cleartext_warning">Not on your home network and not HTTPS: the phone\'s key would travel unencrypted.</string>
+    <string name="connect_revoked">This phone was signed out of the server. Sign in again to keep listening.</string>
+    <string name="connect_error_invalid">That doesn\'t look like an address. Try http://192.168.1.20:8000.</string>
+    <string name="connect_error_unreachable">Can\'t reach a server at that address. Check it, and that the phone is on the same network.</string>
+    <string name="connect_error_not_downtify">Something answered, but it isn\'t Downtify.</string>
+    <string name="connect_error_too_new">This server (Downtify %1$s) is newer than this app understands. Update the app.</string>
+
+    <string name="sign_in_title">Sign in to %1$s</string>
+    <string name="sign_in_body">Use your account from the web page.</string>
+    <string name="sign_in_username">Username</string>
+    <string name="sign_in_password">Password</string>
+    <string name="sign_in_show_password">Show password</string>
+    <string name="sign_in_hide_password">Hide password</string>
+    <string name="sign_in_action">Sign in</string>
+    <string name="sign_in_use_code">Pair with a code</string>
+    <string name="sign_in_use_password">Sign in with your password instead</string>
+    <string name="sign_in_error_wrong">Wrong username or password.</string>
+    <string name="sign_in_error_off">This server has sign-in turned off. Use a pairing code instead.</string>
+    <string name="sign_in_error_failed">The server couldn\'t sign this phone in (error %1$d).</string>
+    <string name="sign_in_cleartext_warning">Not on your home network and not HTTPS: your password would travel unencrypted.</string>
+
+    <string name="pair_title">Pair with %1$s</string>
+    <string name="pair_body">From Settings › Apps on the web page.</string>
+    <string name="pair_code_label">Pairing code</string>
+    <string name="pair_code_placeholder">XXXX-XXXX</string>
+    <string name="pair_action">Pair</string>
+    <string name="pair_scan">Scan the QR code</string>
+    <string name="pair_other_server">Use another server</string>
+    <string name="pair_error_wrong_code">That code is wrong, expired or already used. Codes work once, for five minutes.</string>
+    <string name="pair_error_too_many">Too many attempts. Try again in %1$d\u00A0s.</string>
+    <string name="pair_error_unreachable">Can\'t reach the server. Check the connection and try again.</string>
+    <string name="pair_error_failed">The server couldn\'t pair this phone (error %1$d).</string>
+    <string name="pair_error_other_server">This code is for a different server than the one at that address.</string>
+
+    <string name="scan_title">Scan the pairing code</string>
+    <string name="scan_hint">Point the camera at the QR code in Settings › Apps › Pair a phone.</string>
+    <string name="scan_close">Close the scanner</string>
+    <string name="connect_local_network_denied">Local network access is off. To type an address, allow it in the app\'s settings.</string>
+    <string name="scan_permission_denied">Camera access is off. Type the code instead, or allow the camera in the phone\'s settings.</string>
+    <string name="scan_not_downtify">That QR code isn\'t a Downtify pairing code.</string>
+
+    <!-- Home -->
+    <string name="home_streaming_from">Streaming from %1$s</string>
+    <string name="home_unreachable">Can\'t reach %1$s · showing your synced library</string>
+    <string name="home_different_server">Another server answers at this address · sign in again in Settings</string>
+    <string name="home_syncing">Syncing with %1$s…</string>
+    <string name="home_jump_back_in">Jump back in</string>
+    <string name="home_recently_added">Recently added</string>
+    <string name="home_see_all">See all</string>
+    <string name="home_empty_title">Your library is empty</string>
+    <string name="home_empty_body">Music you download on the server shows up here. Pull down to check again.</string>
+    <string name="home_loading">Loading your library…</string>
+
+    <!-- Library -->
+    <string name="library_title">Library</string>
+    <string name="library_search">Search your library</string>
+    <string name="library_albums">Albums</string>
+    <string name="library_artists">Artists</string>
+    <string name="library_playlists">Playlists</string>
+    <string name="library_songs">Songs</string>
+    <string name="library_sort">Sort by: %1$s</string>
+    <string name="library_sort_recent">Recently added</string>
+    <string name="library_sort_alpha">Alphabetical</string>
+    <string name="library_sort_artist">Artist</string>
+    <string name="library_sort_by">Sort by</string>
+    <string name="library_sort_order">Order</string>
+    <string name="library_sort_ascending">Ascending</string>
+    <string name="library_sort_descending">Descending</string>
+    <string name="library_show_list">Show as list</string>
+    <string name="library_show_grid">Show as grid</string>
+    <string name="library_empty_albums">No albums yet</string>
+    <string name="library_empty_artists">No artists yet</string>
+    <string name="library_empty_playlists">No playlists yet</string>
+    <string name="library_empty_songs">No songs yet</string>
+    <string name="library_empty_body">Pull down to sync with the server.</string>
+
+    <string name="liked_songs">Liked songs</string>
+    <string name="album_subtitle">%1$s · %2$s</string>
+    <plurals name="songs_count">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
+    </plurals>
+    <plurals name="albums_count">
+        <item quantity="one">%d album</item>
+        <item quantity="other">%d albums</item>
+    </plurals>
+    <string name="minutes_short">%d\u00A0min</string>
+    <string name="unknown_artist">Unknown artist</string>
+    <string name="unknown_album">Unknown album</string>
+
+    <!-- Album / playlist / artist -->
+    <string name="collection_play">Play %1$s</string>
+    <string name="collection_pause">Pause %1$s</string>
+    <string name="collection_shuffle">Shuffle</string>
+    <string name="collection_not_found">This isn\'t in your library anymore.</string>
+    <string name="track_more">More options for %1$s</string>
+    <string name="track_like">Add to Liked songs</string>
+    <string name="track_unlike">Remove from Liked songs</string>
+    <string name="track_go_to_album">Go to album</string>
+    <string name="track_go_to_artist">Go to artist</string>
+    <string name="track_playing">Playing</string>
+    <string name="track_add_to_queue">Add to queue</string>
+    <string name="track_added_to_queue">Added to queue</string>
+    <string name="artist_songs">Songs</string>
+    <string name="artist_albums">Albums</string>
+
+    <!-- Search -->
+    <string name="search_placeholder">Search, or paste a Spotify or YouTube link</string>
+    <string name="search_clear">Clear search</string>
+    <string name="search_all">All</string>
+    <string name="search_in_library">In your library</string>
+    <string name="search_no_results">Nothing in your library matches \"%1$s\".</string>
+    <string name="search_prompt">Find music in your library, or new music for the server to download. A Spotify or YouTube Music link works too.</string>
+    <string name="search_not_in_library">Not in your library yet</string>
+    <string name="search_server_body">Play it in full, or have the server download it.</string>
+    <string name="search_server_loading">Searching the server…</string>
+    <string name="search_link_loading">Opening the link…</string>
+    <string name="search_server_unreachable">The server can\'t be reached, so only your library was searched.</string>
+    <string name="search_server_failed">The server couldn\'t search just now.</string>
+    <string name="search_link_unsupported">The server can\'t open that link.</string>
+    <string name="search_link_empty">Nothing found at that link.</string>
+    <string name="search_server_nothing">The server found nothing more for \"%1$s\".</string>
+    <string name="search_retry">Try again</string>
+    <string name="search_play_full">Play %1$s in full</string>
+    <string name="search_stop_full">Stop %1$s</string>
+    <string name="search_similar">Tracks like %1$s</string>
+
+    <string name="search_download_to_server">Download %1$s to the server</string>
+    <string name="search_job_queued">Waiting on the server</string>
+    <string name="search_job_downloading">The server is downloading it</string>
+    <string name="search_job_done">Downloaded to the server</string>
+    <string name="search_job_error">The download failed. Try again</string>
+    <string name="search_album_progress">Downloading %1$d/%2$d</string>
+    <string name="search_album_done">On the server</string>
+    <string name="search_link_download">Download to the server</string>
+    <plurals name="search_link_download_all">
+        <item quantity="one">Download %1$d song to the server</item>
+        <item quantity="other">Download all %1$d songs to the server</item>
+    </plurals>
+    <string name="search_link_play_all">Play all in full</string>
+    <string name="search_source_spotify">Spotify</string>
+    <string name="search_source_youtube">YT Music</string>
+    <string name="search_source_soulseek">Soulseek</string>
+    <string name="search_queued_one">The server will download %1$s</string>
+    <plurals name="search_queued_many">
+        <item quantity="one">The server will download %2$d song from %1$s</item>
+        <item quantity="other">The server will download %2$d songs from %1$s</item>
+    </plurals>
+    <string name="search_no_stream">That song can\'t play right now</string>
+    <string name="search_request_failed">The server didn\'t take the download</string>
+    <string name="search_unreachable">The server can\'t be reached</string>
+    <string name="search_kind_album">Album</string>
+    <string name="search_kind_artist">Artist</string>
+    <string name="search_kind_song">Song</string>
+    <string name="search_kind_playlist">Playlist</string>
+
+    <!-- Similar -->
+    <string name="similar_title">Similar</string>
+    <string name="similar_artist">Artist</string>
+    <string name="similar_track">Track</string>
+    <string name="similar_find">Find similar</string>
+    <string name="similar_empty">Name an artist or a track to hear what sounds like it.</string>
+    <string name="similar_failed">Couldn\'t find similar tracks</string>
+    <string name="similar_unreachable">The server can\'t be reached</string>
+    <string name="similar_no_results">Nothing similar found</string>
+    <string name="similar_no_stream">That song can\'t play right now</string>
+    <string name="home_shortcut_similar">Similar tracks</string>
+    <string name="home_shortcut_similar_body">Name a track to hear what sounds like it — no download needed.</string>
+    <string name="search_play">Play %1$s</string>
+
+    <!-- Downloads -->
+    <string name="downloads_title">Downloads</string>
+    <string name="load_error_unreachable">The server can\'t be reached.</string>
+    <string name="load_error_failed">The server couldn\'t answer just now.</string>
+    <string name="discover_title">Discover</string>
+    <string name="discover_refresh">Refresh suggestions</string>
+    <string name="discover_loading">Asking the server for suggestions. The first time can take a little while.</string>
+    <string name="discover_loading_more">Looking for albums and playlists…</string>
+    <string name="discover_empty_title">Nothing to go on yet</string>
+    <string name="discover_empty_body">Discover suggests new artists from the ones in your library. Add some music first.</string>
+    <string name="discover_none_title">No suggestions right now</string>
+    <string name="discover_none_body">Play and like more of your music, or try again later. Artists you hid are left out.</string>
+    <string name="discover_try_again">Tap refresh to try again.</string>
+    <string name="discover_partial">The server couldn\'t reach Deezer for some of your artists, so this list is shorter than usual. Try again later.</string>
+    <string name="discover_artists">Artists for you</string>
+    <string name="discover_albums">Albums for you</string>
+    <string name="discover_more_albums">More from your artists</string>
+    <string name="discover_playlists">Playlists for you</string>
+    <string name="discover_because">Because you like %1$s</string>
+    <string name="discover_show_all">Show all %1$d</string>
+    <string name="discover_artist_options">Options for %1$s</string>
+    <string name="discover_preview">Preview %1$s</string>
+    <string name="discover_not_interested">Not interested</string>
+    <string name="discover_hidden">%1$s won\'t be suggested again</string>
+    <string name="discover_undo">Undo</string>
+    <string name="home_shortcut_discover">Discover</string>
+    <string name="home_shortcut_discover_body">New artists, albums and playlists picked from what you play</string>
+    <string name="home_shortcut_podcasts">Podcasts</string>
+    <string name="home_shortcut_podcasts_body">The shows your server follows, with your place in each</string>
+    <string name="podcasts_title">Podcasts</string>
+    <string name="podcasts_empty_title">No podcasts yet</string>
+    <string name="podcasts_empty_body">Podcasts are added on the Downtify web page, under Podcasts. They show up here, and play from your server.</string>
+    <string name="podcasts_pull_to_retry">Pull down to try again.</string>
+    <plurals name="podcasts_episodes">
+        <item quantity="one">%1$d episode</item>
+        <item quantity="other">%1$d episodes</item>
+    </plurals>
+    <string name="show_no_episodes">No episodes yet. The server checks the feed on its own schedule.</string>
+    <string name="show_untitled_episode">Untitled episode</string>
+    <string name="show_played">Played</string>
+    <string name="show_resume_at">Resume at %1$s</string>
+    <string name="show_play_episode">Play %1$s</string>
+    <string name="show_download_episode">Download %1$s to the server</string>
+    <string name="show_downloading">The server is downloading it</string>
+    <string name="show_episode_options">Options for %1$s</string>
+    <string name="show_mark_played">Mark as played</string>
+    <string name="show_mark_unplayed">Mark as unplayed</string>
+    <string name="show_download_failed">The server couldn\'t download %1$s</string>
+    <string name="downloads_used">%1$s used</string>
+    <string name="downloads_of_limit">of %1$s limit</string>
+    <string name="downloads_no_limit">no limit</string>
+    <plurals name="downloads_storage_body">
+        <item quantity="one">%1$d song plays without the server. %2$s free on this phone.</item>
+        <item quantity="other">%1$d songs play without the server. %2$s free on this phone.</item>
+    </plurals>
+    <string name="downloads_storage_a11y">Offline storage used</string>
+    <string name="downloads_keep_liked">Keep Liked songs offline</string>
+    <string name="downloads_keep_liked_body_wifi">A song you like downloads to this phone on Wi-Fi.</string>
+    <string name="downloads_keep_liked_body">A song you like downloads to this phone.</string>
+    <string name="downloads_on_phone">On this phone</string>
+    <string name="downloads_tab_phone">On this phone</string>
+    <string name="downloads_tab_server">On the server</string>
+    <plurals name="downloads_server_card">
+        <item quantity="one">The server is downloading %1$d song</item>
+        <item quantity="other">The server is downloading %1$d songs</item>
+    </plurals>
+    <string name="downloads_server_card_detail">%1$s · %2$d of %3$d</string>
+    <string name="downloads_server_empty_title">The server isn\'t downloading anything</string>
+    <string name="downloads_server_empty_body">Find new music in Search, or paste a Spotify or YouTube Music link there, and the server downloads it into your library.</string>
+    <string name="downloads_server_job_queued">Waiting</string>
+    <string name="downloads_server_job_downloading">Downloading · %1$d%%</string>
+    <string name="downloads_server_job_done">In your library</string>
+    <string name="downloads_server_job_error">Failed</string>
+    <string name="downloads_server_job_error_detail">Failed: %1$s</string>
+    <string name="downloads_empty_title">Nothing on this phone yet</string>
+    <string name="downloads_empty_body">Tap Download on an album or a playlist, or keep your Liked songs offline, to listen without the server.</string>
+    <plurals name="downloads_status_done">
+        <item quantity="one">%1$d song · %2$s</item>
+        <item quantity="other">%1$d songs · %2$s</item>
+    </plurals>
+    <string name="downloads_status_done_synced">%1$s · kept in sync</string>
+    <string name="downloads_status_progress">Downloading %1$d of %2$d</string>
+    <string name="downloads_status_waiting_wifi">%1$s · waiting for Wi-Fi</string>
+    <string name="downloads_status_waiting_network">%1$s · waiting for a connection</string>
+    <plurals name="downloads_status_over_limit">
+        <item quantity="one">%1$d of %2$d · 1 song doesn\'t fit the storage limit</item>
+        <item quantity="other">%1$d of %2$d · %3$d songs don\'t fit the storage limit</item>
+    </plurals>
+    <string name="downloads_status_missing">Not in the library anymore</string>
+    <string name="downloads_options">Options for %1$s</string>
+    <string name="downloads_remove">Remove from this phone</string>
+    <string name="downloads_downloaded">Downloaded</string>
+    <string name="collection_download">Download</string>
+    <string name="collection_downloading">Downloading %1$d of %2$d</string>
+    <string name="collection_on_phone">On this phone</string>
+    <string name="collection_remove_title">Remove from this phone?</string>
+    <string name="collection_remove_message">%1$s stays in your library and streams from the server.</string>
+    <string name="collection_remove_confirm">Remove</string>
+    <string name="settings_downloads">Downloads</string>
+    <string name="settings_server_version" translatable="false">Downtify %1$s</string>
+    <string name="settings_signed_in_as">Signed in as %1$s</string>
+    <string name="settings_download_wifi_only">Download on Wi-Fi only</string>
+    <string name="settings_download_wifi_only_body">Offline copies wait for Wi-Fi</string>
+    <string name="settings_offline_limit">Offline storage limit</string>
+    <string name="settings_offline_limit_summary">%1$s · %2$s used</string>
+    <string name="settings_offline_limit_none">No limit</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_connected">Connected</string>
+    <string name="settings_unreachable">Unreachable</string>
+    <string name="settings_checking">Checking…</string>
+    <string name="settings_different_server">Different server</string>
+    <string name="settings_change_server">Change server</string>
+    <string name="settings_open_web">Server settings</string>
+    <string name="settings_playback">Playback</string>
+    <string name="settings_normalize_volume">Normalize volume</string>
+    <string name="settings_normalize_volume_hint">Plays songs at a similar loudness, using the server’s measurements, from the next song. Songs without a measurement keep their original volume.</string>
+    <string name="settings_quality_wifi">Streaming quality on Wi-Fi</string>
+    <string name="settings_quality_mobile">Streaming quality on mobile data</string>
+    <string name="settings_quality_no_transcoding">The server can\'t transcode (no ffmpeg): files stream as they are.</string>
+    <string name="settings_quality_original">Original · as downloaded</string>
+    <string name="settings_quality_transcoded">%1$s · %2$d\u00A0kbps · transcoded by the server</string>
+    <string name="settings_quality_label">%1$s · %2$d\u00A0kbps</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_body">System follows your device’s light or dark mode.</string>
+    <string name="settings_dynamic_color">Use wallpaper colors</string>
+    <string name="settings_dynamic_color_body">Material You instead of Downtify green</string>
+    <string name="settings_about">About</string>
+    <string name="settings_app_version">Downtify for Android %1$s</string>
+    <string name="settings_server_api">Server API version %1$d</string>
+    <string name="settings_unpair">Sign out</string>
+    <string name="settings_unpair_body">Forget this server\'s key on the phone</string>
+    <string name="settings_unpair_title">Sign out of this server?</string>
+    <string name="settings_unpair_message">The phone forgets its key and goes back to the connect screen. To remove it from the server too, open Settings › Apps › Paired apps on the web page. Your synced library stays until you sign in to another server.</string>
+    <string name="settings_unpair_confirm">Sign out</string>
+
+    <!-- Player -->
+    <string name="player_play">Play</string>
+    <string name="player_pause">Pause</string>
+    <string name="player_next">Next</string>
+    <string name="player_previous">Previous</string>
+    <string name="player_shuffle_on">Shuffle, on</string>
+    <string name="player_shuffle_off">Shuffle, off</string>
+    <string name="player_repeat_off">Repeat, off</string>
+    <string name="player_repeat_all">Repeat all</string>
+    <string name="player_repeat_one">Repeat one</string>
+    <string name="player_seek">Seek</string>
+    <string name="player_close">Close Now playing</string>
+    <string name="player_open">Open Now playing</string>
+    <string name="player_lyrics">Lyrics</string>
+    <string name="player_queue">Queue</string>
+    <string name="player_queue_close">Close queue</string>
+    <string name="player_queue_now_playing">Now playing</string>
+    <string name="player_queue_next_in_queue">Next in queue</string>
+    <string name="player_queue_next_from">Next from: %1$s</string>
+    <string name="player_queue_next_up">Next up</string>
+    <string name="player_queue_clear">Clear queue</string>
+    <string name="player_queue_empty">Nothing plays after this song.</string>
+    <string name="player_queue_remove">Remove from queue</string>
+    <string name="player_queue_reorder">Drag to reorder</string>
+    <string name="player_queue_move_up">Move up</string>
+    <string name="player_queue_move_down">Move down</string>
+    <string name="player_like">Add to Liked songs</string>
+    <string name="player_source_stream">Streaming from %1$s</string>
+    <string name="player_unlike">Remove from Liked songs</string>
+    <string name="player_playing_from_album">Playing from album</string>
+    <string name="player_playing_from_artist">Playing from artist</string>
+    <string name="player_playing_from_playlist">Playing from playlist</string>
+    <string name="player_now_playing">Now playing</string>
+    <string name="player_source_original_quality">Streaming from %1$s · Original quality</string>
+    <string name="player_sample_rate">%1$s\u00A0kHz</string>
+    <string name="player_bitrate">%1$d\u00A0kbps</string>
+    <string name="player_source_unknown">Streaming from %1$s</string>
+    <string name="player_playing_from_podcast">Podcast</string>
+    <string name="player_skip_back">Back 10 seconds</string>
+    <string name="player_skip_forward">Forward 30 seconds</string>
+    <string name="player_speed">Playback speed %1$s. Tap to change</string>
+    <string name="player_source_this_phone">Playing from this phone</string>
+    <string name="player_lyrics_none">No lyrics for this song.</string>
+    <string name="player_lyrics_loading">Loading lyrics…</string>
+    <string name="player_lyrics_synced">Synced</string>
+    <string name="player_lyrics_static">Static</string>
+    <string name="player_lyrics_timing">Adjust timing</string>
+    <string name="player_lyrics_earlier">Lyrics earlier</string>
+    <string name="player_lyrics_later">Lyrics later</string>
+    <string name="player_lyrics_timing_reset">Reset timing</string>
+    <!-- How far the lyrics are moved, in seconds: "+0.25 s". -->
+    <string name="player_lyrics_offset">%1$s\u00A0s</string>
+    <string name="player_error_network">Can\'t reach the server to play this song.</string>
+    <string name="player_error_not_found">This song isn\'t on the server anymore.</string>
+    <string name="player_error_old_server">The server is too old for streaming — update Downtify on the server.</string>
+    <string name="player_error_other">This song couldn\'t be played.</string>
+    <string name="player_notifications_rationale">Allow notifications to control playback from the lock screen and the notification shade.</string>
+
+    <!-- Settings: appearance, language, about -->
+    <string name="action_close">Close</string>
+    <string name="settings_server">Server</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_summary">%1$s · set in Android\'s app language settings</string>
+    <string name="settings_amoled">Pure black</string>
+    <string name="settings_amoled_body">True black in the dark theme. Saves power on OLED screens.</string>
+    <string name="settings_floating_nav_bar">Floating navigation bar</string>
+    <string name="settings_floating_nav_bar_body">On phones, the bar is a rounded pill instead of spanning the screen</string>
+    <string name="settings_font">Font</string>
+    <string name="settings_font_downtify">Downtify classic</string>
+    <string name="settings_font_system">System font</string>
+    <string name="settings_font_google_sans_flex" translatable="false">Google Sans Flex</string>
+    <string name="settings_about_entry">About Downtify</string>
+
+    <!-- About -->
+    <string name="about_title">About</string>
+    <string name="about_tagline">The official Android client for your self-hosted Downtify server.</string>
+    <string name="about_report_bug">Report a bug</string>
+    <string name="about_report_bug_body">Open an issue on GitHub</string>
+    <string name="about_version">Version</string>
+    <string name="about_version_value">%1$s (%2$d)</string>
+    <string name="about_version_copied">Version copied</string>
+    <string name="about_source">Source code</string>
+    <string name="about_source_body">See the project on GitHub</string>
+    <string name="about_license">License</string>
+    <string name="about_terms">Terms and disclaimer</string>
+    <string name="about_terms_body">Terms of use and the developers\' disclaimer</string>
+    <string name="about_donate">Support the project</string>
+    <string name="about_donate_body">Buy the developer a coffee or sponsor on GitHub</string>
+
+    <!-- Support sheet -->
+    <string name="donate_title">Support Downtify</string>
+    <string name="donate_body">Downtify for Android is free and open source, built in spare time. If it\'s useful to you, you can help keep it going. It\'s never required, and always appreciated.</string>
+    <string name="donate_buy_me_a_coffee" translatable="false">Buy Me a Coffee</string>
+    <string name="donate_buy_me_a_coffee_body">A one-time coffee for the developer</string>
+    <string name="donate_github_sponsors" translatable="false">GitHub Sponsors</string>
+    <string name="donate_github_sponsors_body">Sponsor the work on GitHub</string>
+
+    <!-- Terms and disclaimer sheet -->
+    <string name="terms_title">Terms and disclaimer</string>
+    <string name="terms_use_title">What this app is</string>
+    <string name="terms_use_body">Downtify for Android is a free, open-source client for Downtify, a music server you run yourself. It plays and manages the music on your own server. It is not a music service and it doesn\'t host any music.</string>
+    <string name="terms_responsibility_title">Your responsibility</string>
+    <string name="terms_responsibility_body">You are responsible for the music you search for, download, store and play with Downtify, and for following the copyright laws and the terms of the services involved where you live. Downtify does not support the unauthorized downloading of copyrighted material. Use it only with music you have the right to use.</string>
+    <string name="terms_affiliation_title">No affiliation</string>
+    <string name="terms_affiliation_body">Downtify is not affiliated with, endorsed by or sponsored by Spotify, YouTube, YouTube Music, Deezer, Soulseek or any other service it can find music, previews or artwork through. Their names and logos belong to their owners.</string>
+    <string name="terms_warranty_title">No warranty, no liability</string>
+    <string name="terms_warranty_body">The app is provided \"as is\", without warranty of any kind, express or implied, including fitness for a particular purpose. The developers are not liable for any claim, damage, loss of data or legal consequence arising from using it, or from what you do with it. See the license for the full terms.</string>
+    <string name="terms_privacy_title">Your data</string>
+    <string name="terms_privacy_body">The app has no ads, analytics or tracking, and sends nothing to its developers. It talks to the server you paired it with. Previews, covers, podcast artwork and downloadable fonts come from third-party hosts (such as Spotify, Deezer, podcast publishers and Google), which can see your IP address when you use them. The device token that pairs the phone with your server is kept encrypted on the phone.</string>
+
+    <!-- License screen -->
+    <string name="license_title">License</string>
+    <string name="license_name" translatable="false">GNU General Public License v3.0</string>
+    <string name="license_spdx" translatable="false">GPL-3.0</string>
+    <string name="license_intro">Downtify for Android is free software. You can use, study, share and change it under the terms of the GNU General Public License, version 3, as published by the Free Software Foundation. In short:</string>
+    <string name="license_permissions">Permissions</string>
+    <string name="license_conditions">Conditions</string>
+    <string name="license_limitations">Limitations</string>
+    <string name="license_permission_commercial">Commercial use</string>
+    <string name="license_permission_commercial_body">You can use the software and its source code for commercial purposes.</string>
+    <string name="license_permission_modification">Modification</string>
+    <string name="license_permission_modification_body">You can change the software.</string>
+    <string name="license_permission_distribution">Distribution</string>
+    <string name="license_permission_distribution_body">You can share the software and your changed versions of it.</string>
+    <string name="license_permission_patent">Patent use</string>
+    <string name="license_permission_patent_body">Contributors grant you a license to use their patents in it.</string>
+    <string name="license_permission_private">Private use</string>
+    <string name="license_permission_private_body">You can use and change it for yourself without sharing anything.</string>
+    <string name="license_condition_notice">License and copyright notice</string>
+    <string name="license_condition_notice_body">Keep the copyright notice and a copy of the license with every copy you share.</string>
+    <string name="license_condition_changes">State changes</string>
+    <string name="license_condition_changes_body">Say what you changed, and when.</string>
+    <string name="license_condition_source">Disclose source</string>
+    <string name="license_condition_source_body">When you distribute it, make the source code available.</string>
+    <string name="license_condition_same">Same license</string>
+    <string name="license_condition_same_body">Versions you distribute must be under the same license, GPL-3.0.</string>
+    <string name="license_limitation_liability">Liability</string>
+    <string name="license_limitation_liability_body">The authors can\'t be held liable for damages.</string>
+    <string name="license_limitation_warranty">Warranty</string>
+    <string name="license_limitation_warranty_body">The software comes without any warranty.</string>
+    <string name="license_full_text">Full license text</string>
+    <string name="license_text_unavailable">The license text couldn\'t be loaded.</string>
+    <string name="settings_read_ahead">Preload upcoming songs</string>
+    <string name="settings_read_ahead_off">Off</string>
+    <string name="settings_read_ahead_count">Songs ahead: %1$d</string>
+    <string name="settings_stream_cache">Temporary audio cache</string>
+    <string name="settings_stream_cache_size">%1$d\u00A0MB</string>
+    <string name="settings_stream_cache_body">Space for recently played and preloaded audio. Saved offline downloads are separate. Large songs may exceed this limit; only complete songs count as ready.</string>
+    <string name="settings_read_ahead_mobile">Preload using mobile data</string>
+    <string name="settings_read_ahead_mobile_body">Allow extra data usage to prepare upcoming songs.</string>
+    <string name="settings_cache_apply">Apply</string>
+    <string name="player_buffer_ready">Offline buffer: %1$d/%2$d</string>
+
+    <!-- Music trash (admins, when the server has it on) -->
+    <string name="trash_title">Trash</string>
+    <string name="trash_move">Move to trash</string>
+    <string name="trash_checking">Checking the files…</string>
+    <string name="trash_checking_body">The server is checking exactly which files would move. This can take a moment.</string>
+    <string name="trash_failed">That didn\'t go through</string>
+    <string name="trash_admin_only">Only admins can see this</string>
+    <string name="trash_admin_only_body">Ask an admin of this server to restore a song.</string>
+    <string name="trash_tab_trash">In the trash</string>
+    <string name="trash_tab_kept_out">Kept out of downloads</string>
+    <string name="trash_search">Search the trash</string>
+    <string name="trash_empty">The trash is empty</string>
+    <string name="trash_empty_body">Songs moved to the trash show up here until they expire.</string>
+    <string name="trash_no_match">Nothing in the trash matches</string>
+    <string name="trash_show_more">Show more</string>
+    <string name="trash_kept_out_body">Songs whose time in the trash ran out. Automatic downloads skip them until you allow them again.</string>
+    <string name="trash_kept_out_empty">Nothing is kept out of downloads</string>
+    <string name="trash_allow">Allow downloads</string>
+    <string name="trash_allow_title">Allow “%1$s” to be downloaded again?</string>
+    <string name="trash_allow_body">Automatic downloads may fetch it again. Nothing is downloaded right now.</string>
+    <string name="trash_kept_until">Kept until %1$s</string>
+    <string name="trash_restore">Restore</string>
+    <string name="trash_error_admin">Only an admin can use the trash.</string>
+    <string name="trash_error_changed">A file changed after it was checked. Nothing was lost; choose the song again.</string>
+    <string name="trash_error_missing">A file is missing. Check the server\'s storage, then try again.</string>
+    <string name="trash_error_collision">Another file is already in its place. Nothing was overwritten; the song stays in the trash.</string>
+    <string name="trash_error_playing">Someone is playing this song. Pause it first.</string>
+    <string name="trash_error_upgrade">The library upgrade is running. Wait for it, or pause it first.</string>
+    <string name="trash_error_confirmation">The check expired. Choose the songs again.</string>
+    <string name="trash_error_identity">This song\'s tags are too thin to keep it out of automatic downloads. Nothing was moved.</string>
+    <string name="trash_error_busy">Something is still on its way. Wait for it to finish.</string>
+    <string name="trash_error_expired">Its time in the trash ran out.</string>
+    <string name="trash_error_folder">This song\'s folder isn\'t covered by the trash.</string>
+    <string name="trash_error_storage">The server\'s storage isn\'t ready. Nothing was moved; check it, then try again.</string>
+    <string name="trash_error_off">The trash is off on this server.</string>
+    <string name="trash_error">The trash didn\'t answer. Nothing was moved or deleted.</string>
+    <string name="trash_state_pending">Waiting to move</string>
+    <string name="trash_state_moving">Moving</string>
+    <string name="trash_state_trashed">In the trash</string>
+    <string name="trash_state_restoring">Restoring</string>
+    <string name="trash_state_restored">Restored</string>
+    <string name="trash_state_expired">Expired</string>
+    <string name="trash_state_error">Stopped — files kept</string>
+    <string name="trash_state_unknown">Updating</string>
+    <plurals name="trash_moving">
+        <item quantity="one">Moving %1$d song to the trash</item>
+        <item quantity="other">Moving %1$d songs to the trash</item>
+    </plurals>
+    <plurals name="trash_confirm_title">
+        <item quantity="one">Move %1$d song to the trash?</item>
+        <item quantity="other">Move %1$d songs to the trash?</item>
+    </plurals>
+    <plurals name="trash_confirm_body">
+        <item quantity="one">Only these files move, with their lyrics. They leave the library for everyone and can be restored for %1$d day.</item>
+        <item quantity="other">Only these files move, with their lyrics. They leave the library for everyone and can be restored for %1$d days.</item>
+    </plurals>
+    <plurals name="trash_summary">
+        <item quantity="one">%1$d song · %2$s</item>
+        <item quantity="other">%1$d songs · %2$s</item>
+    </plurals>
+    <plurals name="trash_kept_days">
+        <item quantity="one">kept %1$d day after moving</item>
+        <item quantity="other">kept %1$d days after moving</item>
+    </plurals>
+    <string name="settings_normalization_level">Playback level</string>
+    <string name="settings_normalization_normal">Normal</string>
+    <string name="settings_normalization_louder">Louder</string>
+    <string name="settings_normalization_maximum">Maximum</string>
+    <string name="settings_normalization_level_hint">Raises playback volume within each track’s safe limit. Your audio files stay unchanged.</string>
+</resources>

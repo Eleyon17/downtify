@@ -720,11 +720,218 @@ def mobile_suggested_mix(request: Request) -> dict[str, Any]:
     """A personalized daily mix of songs recommended per user for mobile apps."""
     entries = api.entries_for_request(request)
     user_id = api.request_user_id(request)
-    return api.build_daily_suggested_mix(
+    mix = api.build_daily_suggested_mix(
         entries=entries,
         user_id=user_id,
         likes_store=api.state.likes,
         activity_log=api.state.activity,
         target_count=25,
     )
+    tracks = mix.get('tracks') or []
+    paths = [str(t.get('file') or '') for t in tracks if t.get('file')]
+    ids: dict[str, str] = {}
+    if paths and api.state.library_sync is not None:
+        try:
+            ids = _sync().ids_for_paths(paths)
+        except Exception:
+            ids = {}
+    enriched_tracks = []
+    track_ids = []
+    for t in tracks:
+        path = str(t.get('file') or '')
+        tid = ids.get(path, '')
+        if tid:
+            track_ids.append(tid)
+        enriched_tracks.append({**t, 'track_id': tid})
+    return {
+        **mix,
+        'tracks': enriched_tracks,
+        'track_ids': track_ids,
+    }
+
+
+@router.put('/playlists/{name}/rename')
+async def mobile_rename_playlist(name: str, request: Request) -> dict[str, Any]:
+    """Rename an owned or monitored playlist from mobile."""
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    new_name = str((payload or {}).get('new_name') or '').strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail='new_name is required')
+    api.require_playlist_owner(name, request)
+    ctx = api.library_context()
+    try:
+        result = await asyncio.to_thread(
+            api.rename_manual_playlist, ctx, name, new_name
+        )
+    except api.ManualPlaylistError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail=str(exc)
+        ) from exc
+    actual_new_name = str(result.get('name') or new_name)
+    if api.state.playlist_catalog is not None:
+        try:
+            await asyncio.to_thread(
+                api.state.playlist_catalog.rename_playlist,
+                name,
+                actual_new_name,
+            )
+        except Exception:
+            pass
+    if api.state.manual_playlist_owners is not None:
+        try:
+            await asyncio.to_thread(
+                api.state.manual_playlist_owners.rename_owner,
+                name,
+                actual_new_name,
+            )
+        except Exception:
+            pass
+    invalidate_library_paths_cache()
+    await api.log_activity(request, 'playlist_rename', f'{name} -> {actual_new_name}')
+    return {'name': actual_new_name, 'previous': name}
+
+
+@router.get('/stats')
+async def mobile_my_stats(
+    request: Request, days: int = Query(30, ge=0, le=36500)
+) -> dict[str, Any]:
+    """Listening statistics for the signed-in mobile user."""
+    from . import account_routes
+    return await account_routes.my_listening_stats(request, days=days)
+
+
+@router.delete('/stats')
+async def mobile_clear_my_stats(request: Request) -> dict[str, Any]:
+    """Clear listening statistics for the signed-in mobile user."""
+    from . import account_routes
+    return await account_routes.clear_my_listening_stats(request)
+
+
+@router.patch('/me')
+async def mobile_update_me(request: Request) -> dict[str, Any]:
+    """Update profile (username, email, display_name) for the signed-in mobile user."""
+    from . import account_routes
+    return await account_routes.update_me(request)
+
+
+@router.put('/me/preferences')
+async def mobile_set_preferences(request: Request) -> dict[str, Any]:
+    """Update user preferences for the signed-in mobile user."""
+    from . import account_routes
+    return await account_routes.set_my_preferences(request)
+
+
+@router.get('/users')
+def mobile_list_users(request: Request) -> list[dict[str, Any]]:
+    """List user accounts (admins only, for playlist ownership transfer on mobile)."""
+    if not api.request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
+    if api.state.auth is None:
+        return []
+    return [
+        {
+            'id': u['id'],
+            'username': u['username'],
+            'display_name': u.get('display_name') or '',
+            'role': u.get('role') or 'user',
+        }
+        for u in api.state.auth.users.list()
+    ]
+
+
+@router.get('/covers/search')
+async def mobile_search_covers(
+    request: Request,
+    artist: str = Query(''),
+    title: str = Query(''),
+    track: Optional[str] = Query(None),
+    query: Optional[str] = Query(None),
+    track_id: Optional[str] = Query(None),
+) -> dict[str, Any]:
+    """Search album/track cover candidates on mobile (supports track_id)."""
+    file_path: Optional[str] = None
+    if track_id:
+        row = await asyncio.to_thread(_sync().row_for, track_id)
+        if row:
+            file_path = row.get('file')
+            if not artist:
+                artist = str(row.get('artist') or '')
+            if not title:
+                title = str(row.get('album') or '')
+            if not track:
+                track = str(row.get('title') or '')
+    return await api.library_album_covers(
+        artist=artist,
+        title=title,
+        track=track,
+        query=query,
+        file=file_path,
+    )
+
+
+@router.post('/covers/apply')
+async def mobile_apply_cover(request: Request) -> dict[str, Any]:
+    """Apply and optionally lock album/track cover on mobile (admins only)."""
+    if not api.request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    track_id = str((payload or {}).get('track_id') or '').strip()
+    if track_id and not (payload or {}).get('file'):
+        row = await asyncio.to_thread(_sync().row_for, track_id)
+        if row and row.get('file'):
+            payload = {**payload, 'file': row['file']}
+            request._body = __import__('json').dumps(payload).encode('utf-8')
+    res = await api.library_set_album_cover(request)
+    if api.state.library_sync is not None:
+        await asyncio.to_thread(api.state.library_sync.touch_all)
+    return res
+
+
+@router.post('/covers/unlock')
+async def mobile_unlock_cover(request: Request) -> dict[str, Any]:
+    """Unlock album/track cover on mobile (admins only)."""
+    if not api.request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    track_id = str((payload or {}).get('track_id') or '').strip()
+    if track_id and not (payload or {}).get('file'):
+        row = await asyncio.to_thread(_sync().row_for, track_id)
+        if row and row.get('file'):
+            payload = {**payload, 'file': row['file']}
+            request._body = __import__('json').dumps(payload).encode('utf-8')
+    return await api.library_unlock_album_cover(request)
+
+
+@router.get('/upgrade')
+def mobile_upgrade_status(request: Request) -> dict[str, Any]:
+    """Current Library Upgrade status (admins only)."""
+    if not api.request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
+    return api.library_upgrade_status()
+
+
+@router.post('/upgrade/scan')
+async def mobile_upgrade_scan(request: Request) -> dict[str, Any]:
+    """Scan library for upgrade candidates from mobile (admins only)."""
+    if not api.request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
+    return await api.library_upgrade_scan()
+
+
+@router.post('/upgrade/start')
+async def mobile_upgrade_start(request: Request) -> dict[str, Any]:
+    """Start Library Upgrade from mobile (admins only)."""
+    if not api.request_is_admin(request):
+        raise HTTPException(status_code=403, detail='Admin role required')
+    return await api.library_upgrade_start(request)
+
 

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Downtify logo: the dark shield on a green disc (assets/icon-without-backgroud.svg). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="1032"
+    android:viewportHeight="1032">
+    <group android:translateX="260" android:translateY="260">
+        <path
+            android:fillColor="#1AD05C"
+            android:pathData="M256,-260a516,516 0,1 1,0 1032a516,516 0,1 1,0 -1032z" />
+        <path
+            android:fillColor="#04140A"
+            android:pathData="M480.6,111.5H406.5V35.6c0,-10.7 -8.3,-19.6 -19,-20.4 -104,-7.5 -200.4,-3.7 -263,0.8 -10.7,0.8 -19,9.8 -19,20.5v74.9H31.4c-10.9,0 -20.9,8.8 -20.6,22 40.6,166 230.9,361.7 230.9,361.7 9.8,10.8 25.6,4 28.6,0 0,0 177.1,-165.8 230.3,-359.4 1.6,-5.8 -0.5,-24.3 -20,-24.2z" />
+    </group>
+</vector>
