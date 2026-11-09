@@ -286,8 +286,15 @@ fun CollectionScreen(
                         )
                     },
                     actions = {
-                        state.playlist?.takeIf { it.favoriteSupported }?.let { playlist ->
-                            FavoriteButton(playlist.favorite, enabled = !state.favoriteBusy, onClick = onToggleFavorite)
+                        if (state.kind == CollectionKind.Playlist) {
+                            CircleButton(
+                                icon = DowntifyIcons.Share,
+                                contentDescription = "Share",
+                                onClick = { playlistActions?.onShare?.invoke() },
+                                modifier = Modifier.padding(end = Spacing.xs),
+                                containerColor = scheme.onPrimaryContainer.copy(alpha = TINT_ALPHA),
+                                contentColor = scheme.onPrimaryContainer,
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = scheme.primaryContainer),
@@ -666,21 +673,6 @@ private fun PlaylistSuggestionsSection(
             }
         }
     }
-}
-
-/** A playlist's favorite (the server's pin on the home screen), on the cover's colors. */
-@Composable
-private fun FavoriteButton(favorite: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    CircleButton(
-        if (favorite) DowntifyIcons.FavoriteFilled else DowntifyIcons.Favorite,
-        stringResource(if (favorite) R.string.playlist_remove_favorite else R.string.playlist_add_favorite),
-        onClick,
-        Modifier.padding(end = Spacing.sm),
-        enabled = enabled,
-        containerColor = if (favorite) scheme.primary else scheme.onPrimaryContainer.copy(alpha = TINT_ALPHA),
-        contentColor = if (favorite) scheme.onPrimary else scheme.onPrimaryContainer,
-    )
 }
 
 @Suppress("LongParameterList")

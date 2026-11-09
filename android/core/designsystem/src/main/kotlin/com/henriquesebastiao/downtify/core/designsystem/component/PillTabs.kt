@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -59,7 +60,7 @@ fun PillTabs(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues(horizontal = Spacing.screen),
+    contentPadding: PaddingValues = PaddingValues(horizontal = Spacing.sm),
 ) {
     val scheme = MaterialTheme.colorScheme
     val colors = ToggleButtonDefaults.colors(
@@ -68,30 +69,22 @@ fun PillTabs(
         checkedContainerColor = scheme.primary,
         checkedContentColor = scheme.onPrimary,
     )
-    // Pills when checked too: the stock toggle squares off its checked state.
     val shapes = ToggleButtonShapes(
         shape = CircleShape,
         pressedShape = ToggleButtonDefaults.pressedShape,
         checkedShape = CircleShape,
     )
-    // The selected tab is always on screen: a later one ("Artistas" in Portuguese) would start past the edge.
-    val requesters = remember(tabs.size) { List(tabs.size) { BringIntoViewRequester() } }
-    LaunchedEffect(selectedIndex) {
-        // After the first frame: before the row is laid out there is nothing to scroll to.
-        withFrameNanos { }
-        requesters.getOrNull(selectedIndex)?.bringIntoView()
-    }
     Row(
         modifier
-            .horizontalScroll(rememberScrollState())
+            .fillMaxWidth()
             .padding(contentPadding)
             .selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
         tabs.forEachIndexed { index, label ->
             val checked = index == selectedIndex
             Column(
-                Modifier.bringIntoViewRequester(requesters[index]),
+                modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 ToggleButton(
@@ -99,10 +92,10 @@ fun PillTabs(
                     onCheckedChange = { onSelect(index) },
                     shapes = shapes,
                     colors = colors,
-                    contentPadding = PaddingValues(horizontal = Spacing.xl),
+                    contentPadding = PaddingValues(horizontal = 2.dp),
                     modifier = Modifier
-                        .heightIn(min = TAB_HEIGHT)
-                        // A tab, not a checkbox: read as "Albums, tab, selected".
+                        .fillMaxWidth()
+                        .heightIn(min = 44.dp)
                         .clearAndSetSemantics {
                             role = Role.Tab
                             selected = checked
@@ -115,10 +108,11 @@ fun PillTabs(
                 ) {
                     Text(
                         label.toUpperCase(LocaleList.current),
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = if (checked) FontWeight.Bold else FontWeight.Medium,
                         letterSpacing = LABEL_TRACKING,
                         maxLines = 1,
+                        softWrap = false,
                     )
                 }
                 val width by animateDpAsState(

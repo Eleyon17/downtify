@@ -261,7 +261,12 @@ class PlayerController @Inject constructor(
         mutableState.update { s -> s.copy(positionMs = positionMs) }
     }
 
-    fun skipTo(index: Int) = command { it.seekToDefaultPosition(index) }
+    fun skipTo(index: Int) {
+        main.launch {
+            val args = Bundle().apply { putInt(PlaybackService.EXTRA_INDEX, index) }
+            connect().sendCustomCommand(SessionCommand(PlaybackService.ACTION_JUMP_TO_QUEUE, Bundle.EMPTY), args)
+        }
+    }
 
     /** "Add to queue": plays after the current song and anything queued before it. */
     fun addToQueue(track: Track) {

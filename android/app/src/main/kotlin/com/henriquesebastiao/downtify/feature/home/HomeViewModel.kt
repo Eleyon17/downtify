@@ -96,14 +96,34 @@ class HomeViewModel @Inject constructor(
             }.ifEmpty {
                 snapshot.tracks.take(25)
             }
-            val resolvedArtists = mixDto?.topArtists.orEmpty().map { a ->
-                val coverId = byFile[a.coverFile]?.id
-                    ?: snapshot.tracks.firstOrNull {
-                        it.hasCover && (it.albumArtist.equals(a.name, ignoreCase = true) || it.artist.contains(a.name, ignoreCase = true))
-                    }?.id
-                SuggestedMixArtistUi(name = a.name, coverTrackId = coverId)
-            }.ifEmpty {
-                snapshot.artists.take(5).map { SuggestedMixArtistUi(it.name, it.coverTrackId) }
+            // The 5 artists that appear the most in the mix songs
+            val topMixArtists = resolvedTracks
+                .map { it.displayArtist.ifBlank { it.albumArtist.ifBlank { it.artist } } }
+                .filter { it.isNotBlank() }
+                .groupingBy { it }
+                .eachCount()
+                .entries
+                .sortedByDescending { it.value }
+                .take(5)
+                .map { (artistName, _) ->
+                    val coverId = resolvedTracks.firstOrNull {
+                        it.hasCover && (it.displayArtist.equals(artistName, ignoreCase = true) ||
+                            it.albumArtist.equals(artistName, ignoreCase = true) ||
+                            it.artist.contains(artistName, ignoreCase = true))
+                    }?.id ?: snapshot.artists.firstOrNull { it.name.equals(artistName, ignoreCase = true) }?.coverTrackId
+                    SuggestedMixArtistUi(name = artistName, coverTrackId = coverId)
+                }
+
+            val resolvedArtists = topMixArtists.ifEmpty {
+                mixDto?.topArtists.orEmpty().map { a ->
+                    val coverId = byFile[a.coverFile]?.id
+                        ?: snapshot.tracks.firstOrNull {
+                            it.hasCover && (it.albumArtist.equals(a.name, ignoreCase = true) || it.artist.contains(a.name, ignoreCase = true))
+                        }?.id
+                    SuggestedMixArtistUi(name = a.name, coverTrackId = coverId)
+                }.ifEmpty {
+                    snapshot.artists.take(5).map { SuggestedMixArtistUi(it.name, it.coverTrackId) }
+                }
             }
             if (resolvedTracks.isNotEmpty()) {
                 val subtitle = mixDto?.subtitle?.takeIf { it.isNotBlank() } ?: run {

@@ -83,12 +83,26 @@ class CollectionScreenTest {
     }
 
     @Test
-    fun aPlaylistTheServerCanPinOffersTheFavorite() {
-        var toggled = 0
+    fun aPlaylistOffersTheShareButton() {
+        var shared = 0
         val playlist =
             Playlist("mix", false, "", album.tracks.map { it.id }, favorite = false, favoriteSupported = true)
-        show(state.copy(kind = CollectionKind.Playlist, playlist = playlist), onToggleFavorite = { toggled++ })
-        compose.onNodeWithContentDescription("Add playlist to favorites").performClick()
-        assertEquals(1, toggled)
+        compose.setContent {
+            DowntifyTheme {
+                CollectionScreen(
+                    state = state.copy(kind = CollectionKind.Playlist, playlist = playlist),
+                    onBack = {},
+                    onArtist = {},
+                    onPlay = {},
+                    onPlayOrPause = {},
+                    onShuffle = {},
+                    onToggleOffline = {},
+                    onToggleFavorite = {},
+                    playlistActions = PlaylistManageActions(onShare = { shared++ }),
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Share").performClick()
+        assertEquals(1, shared)
     }
 }

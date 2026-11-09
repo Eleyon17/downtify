@@ -93,7 +93,6 @@ import com.henriquesebastiao.downtify.core.network.ServerUrls
 import com.henriquesebastiao.downtify.core.network.dto.ArtistOverviewDto
 import com.henriquesebastiao.downtify.core.network.dto.ArtistPopularSongDto
 import com.henriquesebastiao.downtify.core.network.dto.ArtistTopAlbumDto
-import com.henriquesebastiao.downtify.core.network.dto.CoverSearchResponseDto
 import com.henriquesebastiao.downtify.core.player.PlaybackError
 import com.henriquesebastiao.downtify.core.player.PlayerState
 import com.henriquesebastiao.downtify.core.player.PlayingEpisode
@@ -163,9 +162,6 @@ fun NowPlayingScreen(
     onAddToPlaylist: (String) -> Unit = {},
     onCreatePlaylistAndAdd: (String, Boolean) -> Unit = { _, _ -> },
     onShareTrack: () -> Unit = {},
-    onSearchCovers: (String?, (CoverSearchResponseDto?) -> Unit) -> Unit = { _, _ -> },
-    onApplyCover: (String, Boolean) -> Unit = { _, _ -> },
-    onUnlockCover: () -> Unit = {},
 ) {
     val track = state.track
     val episode = state.episode
@@ -178,7 +174,6 @@ fun NowPlayingScreen(
     val coverUrl = playingCoverUrl(state, ServerUrls.COVER_LARGE)
     var flipped by rememberSaveable(track?.id, stream?.videoId) { mutableStateOf(false) }
     var showAddToPlaylistDialog by rememberSaveable { mutableStateOf(false) }
-    var showCoverDialog by rememberSaveable { mutableStateOf(false) }
 
     if (showAddToPlaylistDialog) {
         var newName by rememberSaveable { mutableStateOf("") }
@@ -243,103 +238,6 @@ fun NowPlayingScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showAddToPlaylistDialog = false }) {
-                    Text(stringResource(R.string.action_close))
-                }
-            },
-        )
-    }
-
-    if (showCoverDialog) {
-        var coverQuery by rememberSaveable { mutableStateOf("") }
-        var coverResponse by remember { mutableStateOf<CoverSearchResponseDto?>(null) }
-        var lockCover by rememberSaveable { mutableStateOf(true) }
-        AlertDialog(
-            onDismissRequest = { showCoverDialog = false },
-            title = { Text("Album / Track Artwork") },
-            text = {
-                Column(
-                    Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    ) {
-                        OutlinedTextField(
-                            value = coverQuery,
-                            onValueChange = { coverQuery = it },
-                            label = { Text("Search artwork") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextButton(
-                            onClick = {
-                                onSearchCovers(coverQuery.takeIf { it.isNotBlank() }) { coverResponse = it }
-                            },
-                        ) {
-                            Text("Search")
-                        }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = lockCover, onCheckedChange = { lockCover = it })
-                        Text("Lock cover against overwrites", style = MaterialTheme.typography.bodySmall)
-                    }
-                    if (coverResponse?.coverLocked == true) {
-                        TextButton(
-                            onClick = {
-                                onUnlockCover()
-                                showCoverDialog = false
-                            },
-                        ) {
-                            Text("Unlock current cover")
-                        }
-                    }
-                    coverResponse?.candidates.orEmpty().take(8).forEach { cand ->
-                        Surface(
-                            onClick = {
-                                onApplyCover(cand.url, lockCover)
-                                showCoverDialog = false
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainer,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Row(
-                                Modifier.padding(Spacing.sm),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                            ) {
-                                Artwork(
-                                    url = cand.thumbUrl.ifBlank { cand.url },
-                                    contentDescription = null,
-                                    shape = DowntifyShape.ArtworkThumb,
-                                    modifier = Modifier.size(48.dp),
-                                )
-                                Column(Modifier.weight(1f)) {
-                                    Text(cand.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                                    Text(
-                                        "${cand.artist} · ${cand.source}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onSearchCovers(coverQuery.takeIf { it.isNotBlank() }) { coverResponse = it }
-                    },
-                ) {
-                    Text("Load Candidates")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCoverDialog = false }) {
                     Text(stringResource(R.string.action_close))
                 }
             },
@@ -419,10 +317,6 @@ fun NowPlayingScreen(
                                     onGoToAlbum = actions.onGoToAlbum,
                                     onAddToPlaylist = { showAddToPlaylistDialog = true },
                                     onShareTrack = onShareTrack,
-                                    onOpenCoverPicker = {
-                                        showCoverDialog = true
-                                        onSearchCovers(null) {}
-                                    },
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .graphicsLayer {
@@ -877,7 +771,6 @@ private fun ArtistFlipCard(
     onGoToAlbum: (String) -> Unit = {},
     onAddToPlaylist: () -> Unit,
     onShareTrack: () -> Unit,
-    onOpenCoverPicker: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val covers = LocalCoverUrls.current
@@ -947,10 +840,6 @@ private fun ArtistFlipCard(
                     leadingIcon = {
                         Icon(painterResource(DowntifyIcons.Share), contentDescription = null, modifier = Modifier.size(16.dp))
                     },
-                )
-                AssistChip(
-                    onClick = onOpenCoverPicker,
-                    label = { Text("Artwork") },
                 )
             }
             Column(

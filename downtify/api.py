@@ -10423,6 +10423,25 @@ def build_daily_suggested_mix(
         if len(covers) >= 5:
             break
 
+    # The 5 artists that appear the most in the mix
+    artist_counts: dict[str, int] = {}
+    artist_covers: dict[str, str] = {}
+    for tr in selected:
+        art = str(tr.get('artist') or tr.get('album_artist') or '').strip()
+        if art:
+            artist_counts[art] = artist_counts.get(art, 0) + 1
+            if art not in artist_covers or (tr.get('has_cover') and str(tr.get('file') or '')):
+                artist_covers[art] = str(tr.get('file') or '')
+
+    sorted_artists = sorted(artist_counts.keys(), key=lambda a: artist_counts[a], reverse=True)[:5]
+    top_artists = [
+        {
+            'name': art,
+            'cover_file': artist_covers.get(art, ''),
+        }
+        for art in sorted_artists
+    ]
+
     return {
         'date': today,
         'title': 'Daily Suggested Mix',
@@ -10430,6 +10449,7 @@ def build_daily_suggested_mix(
         'count': len(selected),
         'tracks': selected,
         'covers': covers,
+        'top_artists': top_artists,
     }
 
 

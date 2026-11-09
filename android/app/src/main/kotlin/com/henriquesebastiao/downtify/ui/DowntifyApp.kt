@@ -564,9 +564,6 @@ private fun NowPlayingOverlay(
                         }
                     }
                 },
-                onSearchCovers = { q, cb -> player.searchCurrentTrackCovers(q, cb) },
-                onApplyCover = { url, lock -> player.applyCurrentTrackCover(url, lock) },
-                onUnlockCover = { player.unlockCurrentTrackCover() },
             )
         },
     )

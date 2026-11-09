@@ -128,6 +128,7 @@ class PlaybackService : MediaLibraryService() {
     private val likeCommand = SessionCommand(ACTION_TOGGLE_LIKE, Bundle.EMPTY)
     private val addToQueueCommand = SessionCommand(ACTION_ADD_TO_QUEUE, Bundle.EMPTY)
     private val moveInQueueCommand = SessionCommand(ACTION_MOVE_IN_QUEUE, Bundle.EMPTY)
+    private val jumpToQueueCommand = SessionCommand(ACTION_JUMP_TO_QUEUE, Bundle.EMPTY)
 
     override fun onCreate() {
         super.onCreate()
@@ -341,6 +342,32 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
+    /**
+     * Pulls the item at [targetIndex] from the queue and plays it immediately, leaving
+     * the rest of the queue intact ahead of it, rather than skipping past and discarding it.
+     */
+    private fun jumpToInQueue(player: ExoPlayer, targetIndex: Int) {
+        val count = player.mediaItemCount
+        if (targetIndex !in 0 until count) return
+        val current = player.currentMediaItemIndex
+        if (targetIndex == current) {
+            player.play()
+            return
+        }
+        if (player.shuffleModeEnabled) {
+            val shuffled = PlayOrder.shuffled(player.currentTimeline)
+            val newOrder = PlayQueue.moveAfter(shuffled, targetIndex, current)
+            player.setShuffleOrder(DefaultShuffleOrder(newOrder.toIntArray(), Random.nextLong()))
+            player.seekToDefaultPosition(targetIndex)
+            player.play()
+        } else {
+            val targetPos = if (targetIndex > current) current + 1 else current
+            player.moveMediaItem(targetIndex, targetPos)
+            player.seekToDefaultPosition(targetPos)
+            player.play()
+        }
+    }
+
     private fun likeButton(liked: Boolean): CommandButton =
         CommandButton.Builder(if (liked) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
             .setDisplayName(getString(if (liked) R.string.player_unlike else R.string.player_like))
@@ -394,7 +421,7 @@ class PlaybackService : MediaLibraryService() {
             }
             val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
             if (own(controller)) {
-                commands.add(likeCommand).add(addToQueueCommand).add(moveInQueueCommand)
+                commands.add(likeCommand).add(addToQueueCommand).add(moveInQueueCommand).add(jumpToQueueCommand)
             } else {
                 commands.add(likeCommand)
             }
@@ -437,6 +464,11 @@ class PlaybackService : MediaLibraryService() {
                 )
                 return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
             }
+            if (customCommand.customAction == ACTION_JUMP_TO_QUEUE) {
+                val index = args.getInt(EXTRA_INDEX, C.INDEX_UNSET)
+                jumpToInQueue(session.player as ExoPlayer, index)
+                return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+            }
             return super.onCustomCommand(session, controller, customCommand, args)
         }
 
@@ -475,10 +507,12 @@ class PlaybackService : MediaLibraryService() {
         const val ACTION_TOGGLE_LIKE = "com.henriquesebastiao.downtify.TOGGLE_LIKE"
         const val ACTION_ADD_TO_QUEUE = "com.henriquesebastiao.downtify.ADD_TO_QUEUE"
         const val ACTION_MOVE_IN_QUEUE = "com.henriquesebastiao.downtify.MOVE_IN_QUEUE"
+        const val ACTION_JUMP_TO_QUEUE = "com.henriquesebastiao.downtify.JUMP_TO_QUEUE"
         const val EXTRA_TRACK_ID = "track_id"
         const val EXTRA_FROM = "from"
         const val EXTRA_AFTER = "after"
         const val EXTRA_QUEUED = "queued"
+        const val EXTRA_INDEX = "index"
         const val SKIP_BACK_MS = 10_000L
         const val SKIP_FORWARD_MS = 30_000L
     }
