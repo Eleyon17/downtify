@@ -41,6 +41,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material3.ListItemDefaults
@@ -49,6 +50,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedListItem
@@ -67,6 +69,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -341,33 +344,65 @@ private fun Header(
             Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(TopAppBarDefaults.windowInsets)
-                .padding(horizontal = Spacing.screen, vertical = Spacing.sm),
+                .padding(start = Spacing.md, end = Spacing.sm, top = Spacing.xs, bottom = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = onQueryChange,
-                placeholder = { Text("Filter library tracks, albums, playlists…") },
-                singleLine = true,
-                leadingIcon = {
-                    Icon(painterResource(DowntifyIcons.Search), contentDescription = null, tint = scheme.primary)
-                },
-                trailingIcon = {
-                    CircleButton(
-                        DowntifyIcons.Close,
-                        stringResource(R.string.action_close),
-                        {
-                            if (searchQuery.isNotEmpty()) onQueryChange("")
-                            else onSearchToggle()
-                        },
-                        containerColor = scheme.surfaceContainerHighest,
-                        contentColor = scheme.onSurface,
+                placeholder = {
+                    Text(
+                        "Search library…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = scheme.onSurfaceVariant,
                     )
                 },
+                singleLine = true,
+                leadingIcon = {
+                    Icon(
+                        painter = painterResource(DowntifyIcons.Search),
+                        contentDescription = null,
+                        tint = scheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(
+                            onClick = { onQueryChange("") },
+                            modifier = Modifier.size(36.dp),
+                        ) {
+                            Icon(
+                                painter = painterResource(DowntifyIcons.Close),
+                                contentDescription = stringResource(R.string.action_close),
+                                tint = scheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                },
                 shape = CircleShape,
-                modifier = Modifier.weight(1f),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = scheme.surfaceContainerHigh,
+                    unfocusedContainerColor = scheme.surfaceContainerHigh,
+                    focusedBorderColor = scheme.primary.copy(alpha = 0.5f),
+                    unfocusedBorderColor = Color.Transparent,
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 48.dp),
             )
+            TextButton(
+                onClick = onSearchToggle,
+                colors = ButtonDefaults.textButtonColors(contentColor = scheme.primary),
+            ) {
+                Text(
+                    text = stringResource(R.string.action_cancel),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
     } else {
         Row(
@@ -393,8 +428,8 @@ private fun Header(
                 DowntifyIcons.Search,
                 stringResource(R.string.library_search),
                 onSearchToggle,
-                containerColor = scheme.primaryContainer,
-                contentColor = scheme.onPrimaryContainer,
+                containerColor = scheme.surfaceContainerHigh,
+                contentColor = scheme.onSurface,
             )
         }
     }
@@ -725,6 +760,7 @@ private fun Playlists(
     onUnhide: (String) -> Unit = {},
 ) {
     val covers = LocalCoverUrls.current
+    val scheme = MaterialTheme.colorScheme
     val liked = stringResource(R.string.liked_songs)
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     if (showCreateDialog) {
@@ -789,19 +825,61 @@ private fun Playlists(
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = Spacing.screen, vertical = Spacing.xs),
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.screen, vertical = Spacing.xs),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AssistChip(
+            Surface(
                 onClick = { showCreateDialog = true },
-                label = { Text("+ New Playlist") },
-            )
-            FilterChip(
-                selected = state.showHiddenPlaylists,
+                shape = CircleShape,
+                color = scheme.surfaceContainerHigh,
+                contentColor = scheme.onSurface,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = Spacing.md, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(DowntifyIcons.Add),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = scheme.primary,
+                    )
+                    Text(
+                        text = "New playlist",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+            Surface(
                 onClick = onToggleHidden,
-                label = { Text("Hidden") },
-            )
+                shape = CircleShape,
+                color = if (state.showHiddenPlaylists) scheme.secondaryContainer else scheme.surfaceContainerHigh,
+                contentColor = if (state.showHiddenPlaylists) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = Spacing.md, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (state.showHiddenPlaylists) {
+                        Icon(
+                            painter = painterResource(DowntifyIcons.Check),
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                    Text(
+                        text = "Hidden",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (state.showHiddenPlaylists) FontWeight.Bold else FontWeight.Medium,
+                    )
+                }
+            }
         }
         if (state.showHiddenPlaylists && state.hiddenPlaylists.isNotEmpty()) {
             Column(
@@ -810,8 +888,9 @@ private fun Playlists(
             ) {
                 state.hiddenPlaylists.forEach { hiddenPl ->
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainer,
+                        shape = RoundedCornerShape(16.dp),
+                        color = scheme.surfaceContainerHigh,
+                        contentColor = scheme.onSurface,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(

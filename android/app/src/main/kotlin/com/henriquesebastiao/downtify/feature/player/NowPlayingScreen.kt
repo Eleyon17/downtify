@@ -316,7 +316,6 @@ fun NowPlayingScreen(
                                     onQueueTopAlbum = onQueueTopAlbum,
                                     onGoToAlbum = actions.onGoToAlbum,
                                     onAddToPlaylist = { showAddToPlaylistDialog = true },
-                                    onShareTrack = onShareTrack,
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .graphicsLayer {
@@ -770,7 +769,6 @@ private fun ArtistFlipCard(
     onQueueTopAlbum: (ArtistTopAlbumDto) -> Unit = {},
     onGoToAlbum: (String) -> Unit = {},
     onAddToPlaylist: () -> Unit,
-    onShareTrack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val covers = LocalCoverUrls.current
@@ -833,13 +831,6 @@ private fun ArtistFlipCard(
                 AssistChip(
                     onClick = onAddToPlaylist,
                     label = { Text("+ Playlist") },
-                )
-                AssistChip(
-                    onClick = onShareTrack,
-                    label = { Text("Share") },
-                    leadingIcon = {
-                        Icon(painterResource(DowntifyIcons.Share), contentDescription = null, modifier = Modifier.size(16.dp))
-                    },
                 )
             }
             Column(
