@@ -901,7 +901,7 @@ private fun Playlists(
                     ) {
                         items(state.hiddenPlaylists, key = { it.name }) { hiddenPl ->
                             Surface(
-                                onClick = { onOpen(hiddenPl.name) },
+                                onClick = { navigation.onPlaylist(hiddenPl.name) },
                                 shape = RoundedCornerShape(16.dp),
                                 color = scheme.surfaceContainerHigh,
                                 contentColor = scheme.onSurface,

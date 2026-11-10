@@ -263,8 +263,8 @@ fun CollectionScreen(
     onToggleOffline: () -> Unit = {},
     trackActions: TrackActions = TrackActions(),
     onToggleFavorite: () -> Unit = {},
-    onShareCollection: () -> Unit = { playlistActions?.onShare?.invoke() },
     playlistActions: PlaylistManageActions? = null,
+    onShareCollection: () -> Unit = { playlistActions?.onShare?.invoke() },
 ) {
     val covers = LocalCoverUrls.current
     val coverUrl = state.playlist?.let { covers.playlist(it, state.coverTrackId, ServerUrls.COVER_LARGE) }

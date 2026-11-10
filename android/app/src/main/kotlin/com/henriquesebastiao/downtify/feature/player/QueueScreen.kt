@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
@@ -235,7 +236,7 @@ fun QueueScreen(
                                             text = { Text("Add to playlist") },
                                             onClick = {
                                                 nowMenuExpanded = false
-                                                val id = state.track?.id ?: state.stream?.id.orEmpty()
+                                                val id = state.track?.id ?: state.stream?.videoId.orEmpty()
                                                 if (id.isNotEmpty()) {
                                                     targetTrackForPlaylist = id to (state.track?.displayTitle ?: state.stream?.title.orEmpty())
                                                 }

@@ -64,8 +64,7 @@ jobs:
       - name: Package APK & Checksum
         id: package
         run: |
-          TAG=$(gh release view --json tagName -q .tagName 2>/dev/null || echo "v11")
-          if [ -z "$TAG" ]; then TAG="v11"; fi
+          TAG="v11"
           APK_NAME="downtify-${TAG}.apk"
           cp android/app/build/outputs/apk/release/app-release.apk "$APK_NAME"
           sha256sum "$APK_NAME" > "${APK_NAME}.sha256"
