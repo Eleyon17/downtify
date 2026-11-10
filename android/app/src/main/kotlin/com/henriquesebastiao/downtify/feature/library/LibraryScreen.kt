@@ -881,80 +881,105 @@ private fun Playlists(
                 }
             }
         }
-        if (state.showHiddenPlaylists && state.hiddenPlaylists.isNotEmpty()) {
-            Column(
-                Modifier.fillMaxWidth().padding(horizontal = Spacing.screen, vertical = Spacing.xs),
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                state.hiddenPlaylists.forEach { hiddenPl ->
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = scheme.surfaceContainerHigh,
-                        contentColor = scheme.onSurface,
-                        modifier = Modifier.fillMaxWidth(),
+        if (state.showHiddenPlaylists) {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                if (state.hiddenPlaylists.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        EmptyState(
+                            icon = DowntifyIcons.Playlist,
+                            title = "No hidden playlists",
+                            body = "Playlists you hide will appear here.",
+                        )
+                    }
+                } else {
+                    val list = rememberLazyListState()
+                    LazyColumn(
+                        Modifier.fillMaxSize(),
+                        state = list,
+                        contentPadding = listPadding,
+                        verticalArrangement = listGap,
                     ) {
-                        Row(
-                            Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                text = "${hiddenPl.title} (Hidden)",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f),
-                            )
-                            TextButton(onClick = { onUnhide(hiddenPl.name) }) {
-                                Text("Unhide")
+                        items(state.hiddenPlaylists, key = { it.name }) { hiddenPl ->
+                            Surface(
+                                onClick = { onOpen(hiddenPl.name) },
+                                shape = RoundedCornerShape(16.dp),
+                                color = scheme.surfaceContainerHigh,
+                                contentColor = scheme.onSurface,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = hiddenPl.title,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                        Text(
+                                            text = "${hiddenPl.trackIds.size} songs",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = scheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    TextButton(onClick = { onUnhide(hiddenPl.name) }) {
+                                        Text("Unhide")
+                                    }
+                                }
                             }
                         }
                     }
+                    Scrollbar(list)
                 }
             }
-        }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (state.playlists.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    EmptyState(
-                        icon = DowntifyIcons.Playlist,
-                        title = "No playlists found",
-                        body = "Create a new playlist above or add tracks from your library.",
-                    )
-                }
-            } else if (state.layout == LibraryLayout.Grid) {
-                val grid = rememberLazyGridState()
-                LazyVerticalGrid(
-                    columns = gridCells,
-                    state = grid,
-                    contentPadding = gridPadding,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    items(state.playlists, key = { it.playlist?.name ?: "__liked__" }) { item ->
-                        CoverCard(
-                            title = item.playlist?.title ?: liked,
-                            subtitle = subtitleOf(item),
-                            coverUrl = cover(item, 300),
-                            onClick = { open(item) },
-                            placeholderIcon = placeholder(item),
+        } else {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                if (state.playlists.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        EmptyState(
+                            icon = DowntifyIcons.Playlist,
+                            title = "No playlists found",
+                            body = "Create a new playlist above or add tracks from your library.",
                         )
                     }
-                }
-                Scrollbar(grid)
-            } else {
-                val list = rememberLazyListState()
-                LazyColumn(Modifier.fillMaxSize(), list, contentPadding = listPadding, verticalArrangement = listGap) {
-                    items(state.playlists, key = { it.playlist?.name ?: "__liked__" }) { item ->
-                        CoverItem(
-                            title = item.playlist?.title ?: liked,
-                            subtitle = subtitleOf(item),
-                            coverUrl = cover(item, 150),
-                            onClick = { open(item) },
-                            placeholderIcon = placeholder(item),
-                        )
+                } else if (state.layout == LibraryLayout.Grid) {
+                    val grid = rememberLazyGridState()
+                    LazyVerticalGrid(
+                        columns = gridCells,
+                        state = grid,
+                        contentPadding = gridPadding,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        items(state.playlists, key = { it.playlist?.name ?: "__liked__" }) { item ->
+                            CoverCard(
+                                title = item.playlist?.title ?: liked,
+                                subtitle = subtitleOf(item),
+                                coverUrl = cover(item, 300),
+                                onClick = { open(item) },
+                                placeholderIcon = placeholder(item),
+                            )
+                        }
                     }
+                    Scrollbar(grid)
+                } else {
+                    val list = rememberLazyListState()
+                    LazyColumn(Modifier.fillMaxSize(), list, contentPadding = listPadding, verticalArrangement = listGap) {
+                        items(state.playlists, key = { it.playlist?.name ?: "__liked__" }) { item ->
+                            CoverItem(
+                                title = item.playlist?.title ?: liked,
+                                subtitle = subtitleOf(item),
+                                coverUrl = cover(item, 150),
+                                onClick = { open(item) },
+                                placeholderIcon = placeholder(item),
+                            )
+                        }
+                    }
+                    Scrollbar(list)
                 }
-                Scrollbar(list)
             }
         }
     }

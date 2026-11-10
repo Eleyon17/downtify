@@ -144,6 +144,18 @@ class CarBrowserTest {
         assertEquals(5000L, result.startPositionMs)
     }
 
+    @Test fun `known album row plays that single song`() {
+        val folder = browser.onGetChildren(session, controller, CarLibrary.ALBUMS, 0, 20, null)
+            .get(5, TimeUnit.SECONDS).value!!.single()
+        val row = browser.onGetChildren(session, controller, folder.mediaId, 1, 1, null)
+            .get(5, TimeUnit.SECONDS).value!!.single()
+        val result = browser.onSetMediaItems(session, controller, mutableListOf(row), 0, 5000)
+            .get(5, TimeUnit.SECONDS)
+        assertEquals(listOf("b"), result.mediaItems.map { it.mediaId })
+        assertEquals(0, result.startIndex)
+        assertEquals(5000L, result.startPositionMs)
+    }
+
     @Test fun `external URI never overrides the catalog audio source`() {
         val forged = MediaItem.Builder().setMediaId("a").setUri("https://untrusted.test/audio").build()
         val result = browser.onSetMediaItems(session, controller, mutableListOf(forged), 0, C.TIME_UNSET)

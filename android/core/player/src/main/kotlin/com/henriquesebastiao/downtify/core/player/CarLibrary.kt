@@ -26,7 +26,9 @@ internal class CarLibrary(
     private val browseChildren = mutableMapOf<String, List<Entry>>()
     private val entries = mutableMapOf<String, Entry>()
     private val positions = mutableMapOf<String, Pair<String, Int>>()
-    private val searchable: List<Pair<Entry, String>>
+    private val searchableSongs: List<Pair<Entry, String>>
+    private val searchableAlbums: List<Pair<Entry, String>>
+    private val searchablePlaylists: List<Pair<Entry, String>>
 
     init {
         val tracks = snapshot.tracks.sortedWith(compareBy({ normalized(it.displayTitle) }, { it.id }))
@@ -51,8 +53,14 @@ internal class CarLibrary(
             Entry(id, artist.name, coverTrackId = artist.coverTrackId)
         }
         children.values.flatten().forEach { entries[it.id] = it }
-        searchable = (children[ARTISTS].orEmpty() + children[ALBUMS].orEmpty() + children[TRACKS].orEmpty()).map {
+        searchableSongs = children[TRACKS].orEmpty().map {
             it to normalized("${it.title} ${it.subtitle} ${it.track?.album.orEmpty()}")
+        }
+        searchableAlbums = children[ALBUMS].orEmpty().map {
+            it to normalized("${it.title} ${it.subtitle}")
+        }
+        searchablePlaylists = children[PLAYLISTS].orEmpty().map {
+            it to normalized(it.title)
         }
         children.toMap().forEach { (parent, rows) -> group(parent, rows) }
     }
@@ -81,7 +89,10 @@ internal class CarLibrary(
     fun search(query: String): List<Entry> {
         val words = normalized(query).split(' ').filter(String::isNotBlank)
         if (words.isEmpty()) return emptyList()
-        return searchable.filter { (_, text) -> words.all(text::contains) }.map { it.first }
+        val songs = searchableSongs.filter { (_, text) -> words.all(text::contains) }.map { it.first }
+        val albums = searchableAlbums.filter { (_, text) -> words.all(text::contains) }.map { it.first }
+        val playlists = searchablePlaylists.filter { (_, text) -> words.all(text::contains) }.map { it.first }
+        return songs + albums + playlists
     }
 
     /** Starting a row keeps the rest of that playlist/album in the shared player queue. */
@@ -89,7 +100,17 @@ internal class CarLibrary(
         val entry = entries[id]
         if (entry?.track != null) {
             val (parent, index) = positions[id] ?: return null
+            if (parent.startsWith("auto:album:")) {
+                return listOf(entry.track) to 0
+            }
+            if (parent.startsWith("auto:playlist:")) {
+                return children[parent].orEmpty().mapNotNull(Entry::track) to index
+            }
             return children[parent].orEmpty().mapNotNull(Entry::track) to index
+        }
+        if (id.startsWith("auto:playlist:") || id.startsWith("auto:album:")) {
+            val tracks = children[id].orEmpty().mapNotNull(Entry::track)
+            if (tracks.isNotEmpty()) return tracks to 0
         }
         return snapshot.byId[id]?.let { listOf(it) to 0 }
     }

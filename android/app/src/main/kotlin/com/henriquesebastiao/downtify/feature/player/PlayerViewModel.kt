@@ -267,6 +267,21 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    fun addTrackToPlaylist(playlistName: String, trackId: String, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val ok = library.addTrackToPlaylist(playlistName, trackId)
+            onDone(ok)
+        }
+    }
+
+    fun createPlaylistAndAddTrack(name: String, isPublic: Boolean, trackId: String, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val created = library.createPlaylist(name, isPublic)
+            val added = if (created) library.addTrackToPlaylist(name.trim(), trackId) else false
+            onDone(added)
+        }
+    }
+
     fun addCurrentTrackToPlaylist(playlistName: String, onDone: (Boolean) -> Unit = {}) {
         val id = state.value.track?.id ?: streamTrack.value?.id ?: return
         viewModelScope.launch {

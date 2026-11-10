@@ -173,76 +173,6 @@ fun NowPlayingScreen(
     val artistName = (track?.displayArtist ?: stream?.artist).orEmpty()
     val coverUrl = playingCoverUrl(state, ServerUrls.COVER_LARGE)
     var flipped by rememberSaveable(track?.id, stream?.videoId) { mutableStateOf(false) }
-    var showAddToPlaylistDialog by rememberSaveable { mutableStateOf(false) }
-
-    if (showAddToPlaylistDialog) {
-        var newName by rememberSaveable { mutableStateOf("") }
-        var newPublic by rememberSaveable { mutableStateOf(false) }
-        AlertDialog(
-            onDismissRequest = { showAddToPlaylistDialog = false },
-            title = { Text("Add to playlist") },
-            text = {
-                Column(
-                    Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                ) {
-                    editablePlaylists.filter { !it.liked }.forEach { pl ->
-                        Surface(
-                            onClick = {
-                                showAddToPlaylistDialog = false
-                                onAddToPlaylist(pl.name)
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainer,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Row(
-                                Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(pl.title, style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    "${pl.trackIds.size}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(Spacing.xs))
-                    OutlinedTextField(
-                        value = newName,
-                        onValueChange = { newName = it },
-                        label = { Text("Or new playlist name") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = newPublic, onCheckedChange = { newPublic = it })
-                        Text("Public playlist", style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            },
-            confirmButton = {
-                if (newName.isNotBlank()) {
-                    TextButton(
-                        onClick = {
-                            showAddToPlaylistDialog = false
-                            onCreatePlaylistAndAdd(newName.trim(), newPublic)
-                        },
-                    ) {
-                        Text("Create & Add")
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddToPlaylistDialog = false }) {
-                    Text(stringResource(R.string.action_close))
-                }
-            },
-        )
-    }
 
     CoverTheme(playingCoverUrl(state)) {
         val scheme = MaterialTheme.colorScheme
@@ -315,7 +245,6 @@ fun NowPlayingScreen(
                                     onQueuePopularSong = onQueuePopularSong,
                                     onQueueTopAlbum = onQueueTopAlbum,
                                     onGoToAlbum = actions.onGoToAlbum,
-                                    onAddToPlaylist = { showAddToPlaylistDialog = true },
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .graphicsLayer {
@@ -768,7 +697,6 @@ private fun ArtistFlipCard(
     onQueuePopularSong: (ArtistPopularSongDto) -> Unit = {},
     onQueueTopAlbum: (ArtistTopAlbumDto) -> Unit = {},
     onGoToAlbum: (String) -> Unit = {},
-    onAddToPlaylist: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val covers = LocalCoverUrls.current
@@ -823,15 +751,6 @@ private fun ArtistFlipCard(
                 TextButton(onClick = onFlipBack) {
                     Text("Cover")
                 }
-            }
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                AssistChip(
-                    onClick = onAddToPlaylist,
-                    label = { Text("+ Playlist") },
-                )
             }
             Column(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()),

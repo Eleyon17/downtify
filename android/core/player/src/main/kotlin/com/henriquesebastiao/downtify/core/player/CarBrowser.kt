@@ -98,10 +98,10 @@ internal open class CarBrowser(
     private fun root(): MediaItem = folder(CarLibrary.ROOT, context.getString(R.string.car_library))
 
     private fun roots(): List<MediaItem> = listOf(
+        folder(CarLibrary.TRACKS, context.getString(R.string.car_tracks)),
         folder(CarLibrary.PLAYLISTS, context.getString(R.string.car_playlists)),
+        folder(CarLibrary.ALBUMS, context.getString(R.string.car_albums)),
         folder(CarLibrary.FAVORITES, context.getString(R.string.car_favorites)),
-        folder(LIBRARY, context.getString(R.string.car_library)),
-        folder(CarLibrary.OFFLINE, context.getString(R.string.car_offline)),
     )
 
     private fun libraryRoots(): List<MediaItem> = listOf(
@@ -126,6 +126,7 @@ internal open class CarBrowser(
         if (limit in 1..3) compactRoots.add(browser) else compactRoots.remove(browser)
         val extras = Bundle(params?.extras ?: Bundle.EMPTY).apply {
             putBoolean("android.media.browse.SEARCH_SUPPORTED", true)
+            putBoolean("androidx.media.MediaBrowserCompat.EXTRA_MEDIA_SEARCH_SUPPORTED", true)
         }
         return Futures.immediateFuture(
             LibraryResult.ofItem(root(), LibraryParams.Builder().setExtras(extras).build()),
@@ -246,8 +247,7 @@ internal open class CarBrowser(
         withContext(Dispatchers.IO) { sessions.ensureLoaded() }
         if (sessions.current == null) return@future LibraryResult.ofError(authenticationError())
         val catalog = awaitIndex() ?: return@future LibraryResult.ofError(loadingError())
-        val count = withContext(Dispatchers.Default) { catalog.search(query).size }
-        if (count > CarLibrary.MAX_CHILDREN) return@future LibraryResult.ofError(searchError())
+        val count = withContext(Dispatchers.Default) { minOf(catalog.search(query).size, CarLibrary.MAX_CHILDREN) }
         session.notifySearchResultChanged(browser, query, count, params)
         LibraryResult.ofVoid(params)
     }
@@ -265,8 +265,7 @@ internal open class CarBrowser(
         if (page < 0 || pageSize <= 0) return@future LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
         val catalog = awaitIndex() ?: return@future LibraryResult.ofError(loadingError())
         val expectedOwner = sessions.current?.artworkOwner
-        val results = withContext(Dispatchers.Default) { catalog.search(query) }
-        if (results.size > CarLibrary.MAX_CHILDREN) return@future LibraryResult.ofError(searchError())
+        val results = withContext(Dispatchers.Default) { catalog.search(query).take(CarLibrary.MAX_CHILDREN) }
         val items = withContext(Dispatchers.Default) { CarLibrary.page(results, page, pageSize).map { item(it) } }
         if (sessions.current?.artworkOwner != expectedOwner) return@future LibraryResult.ofError(authenticationError())
         LibraryResult.ofItemList(items, params)
@@ -297,9 +296,20 @@ internal open class CarBrowser(
         val playback = if (selected.mediaId.isNotEmpty()) {
             catalog.playback(selected.mediaId)
         } else {
-            val query = selected.requestMetadata.searchQuery.orEmpty()
-            val results = withContext(Dispatchers.Default) { catalog.search(query).filter { it.track != null } }
-            if (results.size == 1) catalog.playback(results.single().id) else null
+            val query = selected.requestMetadata.searchQuery
+                ?: selected.requestMetadata.extras?.getString("android.intent.extra.focus")
+                ?: selected.requestMetadata.extras?.getString("query")
+                ?: selected.requestMetadata.extras?.getString("android.provider.MediaStore.extra.TITLE")
+                ?: ""
+            val results = withContext(Dispatchers.Default) { catalog.search(query) }
+            val singleExact = results.firstOrNull { it.title.equals(query.trim(), ignoreCase = true) }
+            if (singleExact != null) {
+                catalog.playback(singleExact.id)
+            } else if (results.size == 1) {
+                catalog.playback(results.single().id)
+            } else {
+                null
+            }
         } ?: throw IllegalArgumentException(context.getString(R.string.car_choose_result))
         require(sessions.current?.artworkOwner == expectedOwner) { context.getString(R.string.car_pair) }
         val base = sessions.current?.baseUrl ?: throw IllegalArgumentException(context.getString(R.string.car_pair))
@@ -335,12 +345,24 @@ internal open class CarBrowser(
         val cover = entry.coverTrackId?.takeIf { base != null }?.let {
             artwork.cached(it, Uri.parse(ServerUrls.cover(checkNotNull(base), it, ServerUrls.COVER_LARGE)))
         }
+        val mediaType = when {
+            entry.track != null -> MediaMetadata.MEDIA_TYPE_MUSIC
+            entry.id.startsWith("auto:album:") -> MediaMetadata.MEDIA_TYPE_ALBUM
+            entry.id.startsWith("auto:playlist:") -> MediaMetadata.MEDIA_TYPE_PLAYLIST
+            else -> MediaMetadata.MEDIA_TYPE_FOLDER_MIXED
+        }
+        val isFolder = entry.track == null
         return (
             entry.track?.let { MediaItems.from(it, base).buildUpon().setMediaId(entry.id).build() }
-                ?: folder(entry.id, entry.title)
+                ?: MediaItem.Builder().setMediaId(entry.id).build()
             ).let { media ->
             media.buildUpon().setMediaMetadata(
-                media.mediaMetadata.buildUpon().setSubtitle(entry.subtitle)
+                media.mediaMetadata.buildUpon()
+                    .setTitle(entry.title)
+                    .setSubtitle(entry.subtitle)
+                    .setIsBrowsable(isFolder)
+                    .setIsPlayable(!isFolder)
+                    .setMediaType(mediaType)
                     .setArtworkUri(cover).build(),
             ).build()
         }

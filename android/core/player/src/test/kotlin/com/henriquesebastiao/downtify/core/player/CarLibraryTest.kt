@@ -62,6 +62,27 @@ class CarLibraryTest {
         assertTrue(catalog().search("  ").isEmpty())
     }
 
+    @Test fun `search prioritizes songs then albums then playlists`() {
+        val playlist = Playlist("a", false, "", listOf("a"))
+        val index = catalog(listOf(playlist))
+        val results = index.search("a")
+        assertTrue(results.isNotEmpty())
+        val firstTrackIndex = results.indexOfFirst { it.track != null }
+        val firstAlbumIndex = results.indexOfFirst { it.id.startsWith("auto:album:") }
+        val firstPlaylistIndex = results.indexOfFirst { it.id.startsWith("auto:playlist:") }
+        assertTrue(firstTrackIndex in 0 until firstAlbumIndex)
+        assertTrue(firstAlbumIndex < firstPlaylistIndex)
+    }
+
+    @Test fun `album song playback returns only that track`() {
+        val index = catalog()
+        val album = index.children(CarLibrary.ALBUMS)!!.first()
+        val songs = index.children(album.id)!!
+        val playback = index.playback(songs.first().id)!!
+        assertEquals(listOf(songs.first().track), playback.first)
+        assertEquals(0, playback.second)
+    }
+
     @Test fun `known plain playback IDs are valid but forged URLs and unknown IDs are not`() {
         val index = catalog()
         assertEquals(first, index.track("a"))

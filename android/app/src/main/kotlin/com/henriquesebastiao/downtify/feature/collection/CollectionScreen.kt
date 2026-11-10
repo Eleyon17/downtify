@@ -29,6 +29,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
@@ -173,6 +175,16 @@ fun CollectionRoute(
         ),
         modifier = modifier,
         onToggleFavorite = viewModel::toggleFavorite,
+        onShareCollection = {
+            viewModel.shareCollection { url ->
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, state.title)
+                    putExtra(Intent.EXTRA_TEXT, url)
+                }
+                runCatching { context.startActivity(Intent.createChooser(intent, state.title)) }
+            }
+        },
         playlistActions = if (state.kind == CollectionKind.Playlist) {
             PlaylistManageActions(
                 onToggleVisibility = viewModel::toggleVisibility,
@@ -251,6 +263,7 @@ fun CollectionScreen(
     onToggleOffline: () -> Unit = {},
     trackActions: TrackActions = TrackActions(),
     onToggleFavorite: () -> Unit = {},
+    onShareCollection: () -> Unit = { playlistActions?.onShare?.invoke() },
     playlistActions: PlaylistManageActions? = null,
 ) {
     val covers = LocalCoverUrls.current
@@ -262,6 +275,7 @@ fun CollectionScreen(
     val appSurface = MaterialTheme.colorScheme.surface
     val list = rememberLazyListState()
     var showSuggestions by remember { mutableStateOf(false) }
+    var menuExpanded by remember { mutableStateOf(false) }
     var showCloneDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -286,18 +300,119 @@ fun CollectionScreen(
                         )
                     },
                     actions = {
-                        if (state.kind == CollectionKind.Playlist) {
+                        if (state.kind == CollectionKind.Playlist || state.kind == CollectionKind.Album) {
                             CircleButton(
                                 icon = DowntifyIcons.Share,
                                 contentDescription = "Share",
-                                onClick = { playlistActions?.onShare?.invoke() },
+                                onClick = onShareCollection,
                                 modifier = Modifier.padding(end = Spacing.xs),
                                 containerColor = scheme.onPrimaryContainer.copy(alpha = TINT_ALPHA),
                                 contentColor = scheme.onPrimaryContainer,
                             )
                         }
+                        if (state.kind == CollectionKind.Playlist || state.kind == CollectionKind.Album) {
+                            Box {
+                                CircleButton(
+                                    icon = DowntifyIcons.MoreVert,
+                                    contentDescription = "More options",
+                                    onClick = { menuExpanded = true },
+                                    modifier = Modifier.padding(end = Spacing.xs),
+                                    containerColor = scheme.onPrimaryContainer.copy(alpha = TINT_ALPHA),
+                                    contentColor = scheme.onPrimaryContainer,
+                                )
+                                DropdownMenu(
+                                    expanded = menuExpanded,
+                                    onDismissRequest = { menuExpanded = false },
+                                ) {
+                                    if (state.kind == CollectionKind.Playlist && playlistActions != null && state.playlist != null) {
+                                        val playlist = state.playlist
+                                        DropdownMenuItem(
+                                            text = { Text("Suggestions") },
+                                            onClick = {
+                                                menuExpanded = false
+                                                showSuggestions = !showSuggestions
+                                                if (showSuggestions && state.suggestions.isEmpty()) {
+                                                    playlistActions.onLoadSuggestions()
+                                                }
+                                            },
+                                        )
+                                        if (playlist.isOwner) {
+                                            DropdownMenuItem(
+                                                text = { Text(if (playlist.isPublic) "Make Private" else "Make Public") },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    playlistActions.onToggleVisibility()
+                                                },
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Rename") },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    showRenameDialog = true
+                                                },
+                                            )
+                                        }
+                                        DropdownMenuItem(
+                                            text = { Text("Clone") },
+                                            onClick = {
+                                                menuExpanded = false
+                                                showCloneDialog = true
+                                            },
+                                        )
+                                        if (playlist.isPublic && !playlist.isOwner) {
+                                            DropdownMenuItem(
+                                                text = { Text(if (playlist.hidden) "Unhide" else "Hide") },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    playlistActions.onToggleHidden()
+                                                },
+                                            )
+                                        }
+                                        if (playlist.canChangeOwner) {
+                                            DropdownMenuItem(
+                                                text = { Text("Transfer Ownership") },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    playlistActions.onLoadUsers()
+                                                    showOwnerDialog = true
+                                                },
+                                            )
+                                        }
+                                        if (playlist.isOwner || playlist.canEdit) {
+                                            DropdownMenuItem(
+                                                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    showDeleteDialog = true
+                                                },
+                                            )
+                                        }
+                                    } else if (state.kind == CollectionKind.Album) {
+                                        DropdownMenuItem(
+                                            text = { Text("Add all to queue") },
+                                            onClick = {
+                                                menuExpanded = false
+                                                state.tracks.forEach(trackActions.onAddToQueue)
+                                            },
+                                        )
+                                        if (state.artistId.isNotBlank()) {
+                                            DropdownMenuItem(
+                                                text = { Text("Go to artist") },
+                                                onClick = {
+                                                    menuExpanded = false
+                                                    onArtist(state.artistId)
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = scheme.primaryContainer),
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent,
+                    ),
                 )
             }
         },
@@ -319,11 +434,11 @@ fun CollectionScreen(
                 modifier = Modifier.padding(padding),
             )
 
-            else -> Box(Modifier.fillMaxSize().padding(padding)) {
+            else -> Box(Modifier.fillMaxSize()) {
                 LazyColumn(
                     state = list,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = Spacing.xl).plusBottomBars(),
+                    contentPadding = PaddingValues(bottom = Spacing.xl + padding.calculateBottomPadding()).plusBottomBars(),
                     verticalArrangement = Arrangement.spacedBy(ListStyle.Separated.gap),
                 ) {
                     item(key = "header") {
@@ -340,38 +455,14 @@ fun CollectionScreen(
                             )
                         }
                     }
-                    if (playlistActions != null && state.playlist != null) {
-                        item(key = "playlist-actions") {
-                            PlaylistManageRow(
-                                state = state,
-                                showSuggestions = showSuggestions,
-                                onToggleSuggestions = {
-                                    showSuggestions = !showSuggestions
-                                    if (showSuggestions && state.suggestions.isEmpty()) {
-                                        playlistActions.onLoadSuggestions()
-                                    }
-                                },
-                                onToggleVisibility = playlistActions.onToggleVisibility,
-                                onShare = playlistActions.onShare,
-                                onClone = { showCloneDialog = true },
-                                onRename = { showRenameDialog = true },
-                                onToggleHidden = playlistActions.onToggleHidden,
-                                onOwner = {
-                                    playlistActions.onLoadUsers()
-                                    showOwnerDialog = true
-                                },
-                                onDelete = { showDeleteDialog = true },
+                    if (showSuggestions && playlistActions != null) {
+                        item(key = "playlist-suggestions") {
+                            PlaylistSuggestionsSection(
+                                suggestions = state.suggestions,
+                                loading = state.loadingSuggestions,
+                                onRefresh = playlistActions.onLoadSuggestions,
+                                onAdd = playlistActions.onAddSuggestion,
                             )
-                        }
-                        if (showSuggestions) {
-                            item(key = "playlist-suggestions") {
-                                PlaylistSuggestionsSection(
-                                    suggestions = state.suggestions,
-                                    loading = state.loadingSuggestions,
-                                    onRefresh = playlistActions.onLoadSuggestions,
-                                    onAdd = playlistActions.onAddSuggestion,
-                                )
-                            }
                         }
                     }
                     if (state.favoriteError) {
@@ -521,86 +612,6 @@ fun CollectionScreen(
 }
 
 @Composable
-private fun PlaylistManageRow(
-    state: CollectionUiState,
-    showSuggestions: Boolean,
-    onToggleSuggestions: () -> Unit,
-    onToggleVisibility: () -> Unit,
-    onShare: () -> Unit,
-    onClone: () -> Unit,
-    onRename: () -> Unit,
-    onToggleHidden: () -> Unit,
-    onOwner: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    val playlist = state.playlist ?: return
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = Spacing.screen),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-    ) {
-        FilterChip(
-            selected = showSuggestions,
-            onClick = onToggleSuggestions,
-            label = { Text("Suggestions") },
-            shape = CircleShape,
-        )
-        FilterChip(
-            selected = false,
-            onClick = onShare,
-            label = { Text("Share") },
-            shape = CircleShape,
-        )
-        if (playlist.isOwner) {
-            FilterChip(
-                selected = playlist.isPublic,
-                onClick = onToggleVisibility,
-                label = { Text(if (playlist.isPublic) "Public" else "Private") },
-                shape = CircleShape,
-            )
-            FilterChip(
-                selected = false,
-                onClick = onRename,
-                label = { Text("Rename") },
-                shape = CircleShape,
-            )
-        }
-        FilterChip(
-            selected = false,
-            onClick = onClone,
-            label = { Text("Clone") },
-            shape = CircleShape,
-        )
-        if (playlist.isPublic && !playlist.isOwner) {
-            FilterChip(
-                selected = playlist.hidden,
-                onClick = onToggleHidden,
-                label = { Text(if (playlist.hidden) "Unhide" else "Hide") },
-                shape = CircleShape,
-            )
-        }
-        if (playlist.canChangeOwner) {
-            FilterChip(
-                selected = false,
-                onClick = onOwner,
-                label = { Text("Owner") },
-                shape = CircleShape,
-            )
-        }
-        if (playlist.isOwner || playlist.canEdit) {
-            FilterChip(
-                selected = false,
-                onClick = onDelete,
-                label = { Text("Delete", color = MaterialTheme.colorScheme.error) },
-                shape = CircleShape,
-            )
-        }
-    }
-}
-
-@Composable
 private fun PlaylistSuggestionsSection(
     suggestions: List<PlaylistSuggestionItemDto>,
     loading: Boolean,
@@ -692,6 +703,8 @@ private fun Header(
         Modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(scheme.primaryContainer, appSurface)))
+            .statusBarsPadding()
+            .padding(top = 56.dp)
             .padding(horizontal = Spacing.xl, vertical = Spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),

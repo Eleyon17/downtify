@@ -584,6 +584,9 @@ private fun NowPlayingOverlay(
                 onMove = player::moveInQueue,
             ),
             controls = controls,
+            playlists = playlists,
+            onAddToPlaylist = player::addTrackToPlaylist,
+            onCreatePlaylistAndAdd = player::createPlaylistAndAddTrack,
         )
     }
 

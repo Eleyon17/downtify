@@ -20,10 +20,18 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -67,6 +75,7 @@ import com.henriquesebastiao.downtify.core.designsystem.theme.ListStyle
 import com.henriquesebastiao.downtify.core.designsystem.theme.Spacing
 import com.henriquesebastiao.downtify.core.model.EpisodeIds
 import com.henriquesebastiao.downtify.core.model.PlayQueue
+import com.henriquesebastiao.downtify.core.model.Playlist
 import com.henriquesebastiao.downtify.core.model.PlaybackContext
 import com.henriquesebastiao.downtify.core.model.PlaybackContextType
 import com.henriquesebastiao.downtify.core.model.StreamIds
@@ -100,6 +109,9 @@ fun QueueScreen(
     actions: QueueActions,
     controls: NowPlayingActions,
     modifier: Modifier = Modifier,
+    playlists: List<Playlist> = emptyList(),
+    onAddToPlaylist: (playlistName: String, trackId: String) -> Unit = { _, _ -> },
+    onCreatePlaylistAndAdd: (name: String, isPublic: Boolean, trackId: String) -> Unit = { _, _, _ -> },
 ) {
     val now = nowPlayingRow(state) ?: return
     val listState = rememberLazyListState()
@@ -107,6 +119,78 @@ fun QueueScreen(
     val entries = reorder.entries
     val queued = entries.takeWhile { it.queued }
     val rest = entries.drop(queued.size)
+    var targetTrackForPlaylist by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    if (targetTrackForPlaylist != null) {
+        val (trackId, trackTitle) = targetTrackForPlaylist!!
+        var newName by remember { mutableStateOf("") }
+        var newPublic by remember { mutableStateOf(false) }
+        val editable = playlists.filter { it.canEdit || it.isOwner }
+        AlertDialog(
+            onDismissRequest = { targetTrackForPlaylist = null },
+            title = { Text("Add to playlist") },
+            text = {
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    editable.forEach { pl ->
+                        Surface(
+                            onClick = {
+                                onAddToPlaylist(pl.name, trackId)
+                                targetTrackForPlaylist = null
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(pl.title.ifBlank { pl.name }, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    "${pl.trackIds.size}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(Spacing.xs))
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = { Text("Or new playlist name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = newPublic, onCheckedChange = { newPublic = it })
+                        Text("Public playlist", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            },
+            confirmButton = {
+                if (newName.isNotBlank()) {
+                    TextButton(
+                        onClick = {
+                            onCreatePlaylistAndAdd(newName.trim(), newPublic, trackId)
+                            targetTrackForPlaylist = null
+                        },
+                    ) {
+                        Text("Create & Add")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { targetTrackForPlaylist = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
 
     CoverTheme(now.artworkUrl) {
         val scheme = MaterialTheme.colorScheme
@@ -127,6 +211,7 @@ fun QueueScreen(
                 ) {
                     item(key = "now-header") { QueueHeader(stringResource(R.string.player_queue_now_playing)) }
                     item(key = "now") {
+                        var nowMenuExpanded by remember { mutableStateOf(false) }
                         QueueRow(
                             title = now.title,
                             artist = now.artist,
@@ -134,7 +219,32 @@ fun QueueScreen(
                             current = true,
                             onClick = controls.onTogglePlay,
                             containerColor = rowColor,
-                            trailing = { PlayingBars(animate = state.isPlaying) },
+                            trailing = {
+                                Box {
+                                    IconButton(onClick = { nowMenuExpanded = true }) {
+                                        Icon(
+                                            painterResource(DowntifyIcons.MoreVert),
+                                            contentDescription = "More options",
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = nowMenuExpanded,
+                                        onDismissRequest = { nowMenuExpanded = false },
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("Add to playlist") },
+                                            onClick = {
+                                                nowMenuExpanded = false
+                                                val id = state.track?.id ?: state.stream?.id.orEmpty()
+                                                if (id.isNotEmpty()) {
+                                                    targetTrackForPlaylist = id to (state.track?.displayTitle ?: state.stream?.title.orEmpty())
+                                                }
+                                            },
+                                        )
+                                    }
+                                }
+                                PlayingBars(animate = state.isPlaying)
+                            },
                         )
                     }
                     if (queued.isNotEmpty()) {
@@ -145,11 +255,11 @@ fun QueueScreen(
                                 onAction = actions.onClearQueued,
                             )
                         }
-                        entries(queued, actions, reorder, rowColor)
+                        entries(queued, actions, reorder, rowColor, onPickTrackForPlaylist = { targetTrackForPlaylist = it })
                     }
                     if (rest.isNotEmpty()) {
                         item(key = "rest-header") { QueueHeader(nextFromLabel(state.context)) }
-                        entries(rest, actions, reorder, rowColor)
+                        entries(rest, actions, reorder, rowColor, onPickTrackForPlaylist = { targetTrackForPlaylist = it })
                     }
                     if (entries.isEmpty()) {
                         item(key = "empty") {
@@ -179,6 +289,7 @@ private fun LazyListScope.entries(
     actions: QueueActions,
     reorder: QueueReorder,
     rowColor: Color,
+    onPickTrackForPlaylist: (Pair<String, String>) -> Unit = {},
 ) {
     items(entries, key = ::entryKey) { entry ->
         val key = entryKey(entry)
@@ -197,6 +308,7 @@ private fun LazyListScope.entries(
                     )
                 },
         ) {
+            var itemMenuExpanded by remember { mutableStateOf(false) }
             QueueRow(
                 title = entry.title,
                 artist = entry.artist,
@@ -205,6 +317,33 @@ private fun LazyListScope.entries(
                 onClick = { actions.onSkipTo(entry.index) },
                 containerColor = rowColor,
                 trailing = {
+                    Box {
+                        IconButton(onClick = { itemMenuExpanded = true }) {
+                            Icon(
+                                painterResource(DowntifyIcons.MoreVert),
+                                contentDescription = "More options",
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = itemMenuExpanded,
+                            onDismissRequest = { itemMenuExpanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Add to playlist") },
+                                onClick = {
+                                    itemMenuExpanded = false
+                                    onPickTrackForPlaylist(entry.trackId to entry.title)
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.player_queue_remove)) },
+                                onClick = {
+                                    itemMenuExpanded = false
+                                    actions.onRemove(entry.index)
+                                },
+                            )
+                        }
+                    }
                     IconButton(onClick = { actions.onRemove(entry.index) }) {
                         Icon(
                             painterResource(DowntifyIcons.Close),
