@@ -214,14 +214,13 @@ fun ArtistScreen(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun Actions(state: ArtistUiState, name: String, onPlayOrPause: () -> Unit, onShuffle: () -> Unit) {
+private fun Actions(state: ArtistUiState, name: String, onPlayOrPause: () -> Unit, onShuffle: () -> Unit = {}) {
     val playing = state.isCurrentContext && state.isPlaying
     Row(
         Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End),
     ) {
-        CircleButton(DowntifyIcons.Shuffle, stringResource(R.string.collection_shuffle), onShuffle)
         FilledIconButton(
             onClick = onPlayOrPause,
             shapes = IconButtonShapes(shape = DowntifyShape.Fab, pressedShape = RoundedCornerShape(16.dp)),

@@ -396,21 +396,37 @@ data class PlaylistOwnerRequest(@SerialName("owner_id") val ownerId: Int)
 data class PlaylistTrackMutationRequest(
     @SerialName("track_id") val trackId: String? = null,
     val file: String? = null,
+    @SerialName("song_id") val songId: String? = null,
+    val title: String? = null,
+    val artist: String? = null,
+    @SerialName("cover_url") val coverUrl: String? = null,
+    val url: String? = null,
 )
 
 @Serializable
 data class PlaylistSuggestionItemDto(
     @SerialName("video_id") val videoId: String = "",
+    @SerialName("song_id") val songId: String = "",
     val title: String = "",
+    val name: String = "",
     val artist: String = "",
     val album: String = "",
-    val duration: String = "",
+    @SerialName("album_name") val albumName: String = "",
     val thumbnail: String = "",
+    @SerialName("cover_url") val coverUrl: String = "",
     val url: String = "",
     @SerialName("in_library") val inLibrary: Boolean = false,
     @SerialName("local_file") val localFile: String = "",
+    val file: String = "",
     @SerialName("track_id") val trackId: String = "",
-)
+) {
+    val displayId: String get() = videoId.ifBlank { songId }
+    val displayTitle: String get() = title.ifBlank { name }
+    val displayArtist: String get() = artist
+    val displayAlbum: String get() = album.ifBlank { albumName }
+    val displayCover: String get() = thumbnail.ifBlank { coverUrl }
+    val displayFile: String get() = localFile.ifBlank { file }
+}
 
 @Serializable
 data class PlaylistSuggestionsResponseDto(

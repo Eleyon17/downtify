@@ -8,10 +8,12 @@ import com.henriquesebastiao.downtify.core.data.offline.OfflineRepository
 import com.henriquesebastiao.downtify.core.model.PlaybackContext
 import com.henriquesebastiao.downtify.core.model.PlaybackContextType
 import com.henriquesebastiao.downtify.core.model.Playlist
+import com.henriquesebastiao.downtify.core.model.RemoteSong
 import com.henriquesebastiao.downtify.core.model.Track
 import com.henriquesebastiao.downtify.core.network.dto.MobileUserDto
 import com.henriquesebastiao.downtify.core.network.dto.PlaylistSuggestionItemDto
 import com.henriquesebastiao.downtify.core.player.PlayerController
+import com.henriquesebastiao.downtify.core.player.RemotePlayback
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 enum class CollectionKind { Album, Playlist, Liked }
@@ -46,6 +49,8 @@ data class CollectionUiState(
     val favoriteError: Boolean = false,
     val suggestions: List<PlaylistSuggestionItemDto> = emptyList(),
     val loadingSuggestions: Boolean = false,
+    val addingSuggestionIds: Set<String> = emptySet(),
+    val addedSuggestionIds: Set<String> = emptySet(),
     val users: List<MobileUserDto> = emptyList(),
 ) {
     val durationSeconds: Double get() = tracks.sumOf { it.duration }
@@ -69,10 +74,11 @@ class CollectionViewModel @Inject constructor(
     private val library: LibraryRepository,
     private val player: PlayerController,
     private val offline: OfflineRepository,
+    private val remotePlayback: RemotePlayback,
 ) : ViewModel() {
     private val albumId: String? = savedState["albumId"]
     private val playlistName: String? = savedState["name"]
-    private val kind = when {
+    val kind = when {
         albumId != null -> CollectionKind.Album
         playlistName != null -> CollectionKind.Playlist
         else -> CollectionKind.Liked
@@ -93,9 +99,19 @@ class CollectionViewModel @Inject constructor(
     val suggestions = mutableSuggestions.asStateFlow()
     private val mutableLoadingSuggestions = MutableStateFlow(false)
     val loadingSuggestions = mutableLoadingSuggestions.asStateFlow()
+    private val mutableAddingSuggestionIds = MutableStateFlow<Set<String>>(emptySet())
+    val addingSuggestionIds = mutableAddingSuggestionIds.asStateFlow()
+    private val mutableAddedSuggestionIds = MutableStateFlow<Set<String>>(emptySet())
+    val addedSuggestionIds = mutableAddedSuggestionIds.asStateFlow()
     private val mutableUsers = MutableStateFlow<List<MobileUserDto>>(emptyList())
     val users = mutableUsers.asStateFlow()
     val playlists: StateFlow<List<Playlist>> = library.playlists
+
+    init {
+        if (kind == CollectionKind.Playlist) {
+            loadSuggestions()
+        }
+    }
 
     val uiState: StateFlow<CollectionUiState> = combine(
         library.library,
@@ -211,15 +227,54 @@ class CollectionViewModel @Inject constructor(
         }
     }
 
+    fun playSuggestedSong(item: PlaylistSuggestionItemDto) {
+        val tracks = uiState.value.tracks
+        val matchingLocal = if (item.trackId.isNotBlank()) {
+            tracks.firstOrNull { it.id == item.trackId }
+        } else if (item.displayFile.isNotBlank()) {
+            tracks.firstOrNull { it.id == item.displayFile }
+        } else null
+
+        if (matchingLocal != null) {
+            val idx = tracks.indexOf(matchingLocal).coerceAtLeast(0)
+            player.play(tracks, idx, context(uiState.value.title))
+            return
+        }
+
+        viewModelScope.launch {
+            val remote = RemoteSong(
+                id = item.displayId,
+                title = item.displayTitle,
+                artist = item.displayArtist,
+                album = item.displayAlbum,
+                coverUrl = item.displayCover,
+                url = item.url,
+            )
+            remotePlayback.play(
+                listOf(remote),
+                0,
+                PlaybackContext(PlaybackContextType.Playlist, playlistName.orEmpty(), playlistName.orEmpty())
+            )
+        }
+    }
+
     fun addSuggestedSong(item: PlaylistSuggestionItemDto) {
         val name = playlistName ?: return
+        val id = item.displayId.ifBlank { item.displayTitle }
+        if (mutableAddingSuggestionIds.value.contains(id) || mutableAddedSuggestionIds.value.contains(id)) return
+        mutableAddingSuggestionIds.update { it + id }
         viewModelScope.launch {
-            if (item.trackId.isNotBlank()) {
-                if (library.addTrackToPlaylist(name, item.trackId)) {
-                    mutableSuggestions.value = mutableSuggestions.value.filterNot {
-                        it.trackId == item.trackId && it.title == item.title
-                    }
+            try {
+                val ok = if (item.inLibrary && item.trackId.isNotBlank()) {
+                    library.addTrackToPlaylist(name, item.trackId)
+                } else {
+                    library.addSuggestionToPlaylist(name, item)
                 }
+                if (ok) {
+                    mutableAddedSuggestionIds.update { it + id }
+                }
+            } finally {
+                mutableAddingSuggestionIds.update { it - id }
             }
         }
     }

@@ -55,15 +55,13 @@ class CollectionScreenTest {
     }
 
     @Test
-    fun theHeaderPlaysShufflesAndKeepsTheAlbumOffline() {
+    fun theHeaderPlaysAndKeepsTheAlbumOffline() {
         var played = 0
-        var shuffled = 0
         var offline = 0
-        show(state, onPlayOrPause = { played++ }, onShuffle = { shuffled++ }, onToggleOffline = { offline++ })
+        show(state, onPlayOrPause = { played++ }, onToggleOffline = { offline++ })
         compose.onNodeWithContentDescription("Play ${album.title}").performClick()
-        compose.onNodeWithContentDescription("Shuffle").performClick()
         compose.onNodeWithText("Download").performClick()
-        assertEquals(listOf(1, 1, 1), listOf(played, shuffled, offline))
+        assertEquals(listOf(1, 1), listOf(played, offline))
     }
 
     @Test
@@ -102,7 +100,8 @@ class CollectionScreenTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("Share").performClick()
+        compose.onNodeWithContentDescription("More options").performClick()
+        compose.onNodeWithText("Share").performClick()
         assertEquals(1, shared)
     }
 }

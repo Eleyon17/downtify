@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -53,9 +54,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -95,16 +98,10 @@ import com.henriquesebastiao.downtify.ui.common.TrackActions
 import com.henriquesebastiao.downtify.ui.common.TrackItem
 import com.henriquesebastiao.downtify.ui.common.plusBottomBars
 import com.henriquesebastiao.downtify.ui.common.songsCount
+import kotlinx.coroutines.launch
 
 @Composable
-private fun BoxScope.Scrollbar(state: LazyListState) {
-    VerticalScrollbar(state, scrollbarPlacement())
-}
-
-@Composable
-private fun BoxScope.scrollbarPlacement(): Modifier = Modifier
-    .align(Alignment.TopEnd)
-    .padding(top = Spacing.sm, bottom = Spacing.xl + LocalBottomBarsInset.current)
+private fun BoxScope.Scrollbar(state: LazyListState) {}
 
 data class PlaylistManageActions(
     val onToggleVisibility: () -> Unit = {},
@@ -114,6 +111,7 @@ data class PlaylistManageActions(
     val onDelete: () -> Unit = {},
     val onLoadSuggestions: () -> Unit = {},
     val onAddSuggestion: (PlaylistSuggestionItemDto) -> Unit = {},
+    val onPlaySuggestion: (PlaylistSuggestionItemDto) -> Unit = {},
     val onLoadUsers: () -> Unit = {},
     val onChangeOwner: (Int) -> Unit = {},
     val onShare: () -> Unit = {},
@@ -132,6 +130,8 @@ fun CollectionRoute(
     val favoriteError by viewModel.favoriteError.collectAsStateWithLifecycle()
     val suggestions by viewModel.suggestions.collectAsStateWithLifecycle()
     val loadingSuggestions by viewModel.loadingSuggestions.collectAsStateWithLifecycle()
+    val addingSuggestionIds by viewModel.addingSuggestionIds.collectAsStateWithLifecycle()
+    val addedSuggestionIds by viewModel.addedSuggestionIds.collectAsStateWithLifecycle()
     val users by viewModel.users.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -146,6 +146,8 @@ fun CollectionRoute(
             favoriteError = favoriteError,
             suggestions = suggestions,
             loadingSuggestions = loadingSuggestions,
+            addingSuggestionIds = addingSuggestionIds,
+            addedSuggestionIds = addedSuggestionIds,
             users = users,
         ),
         onBack = onBack,
@@ -194,6 +196,7 @@ fun CollectionRoute(
                 onDelete = { viewModel.deletePlaylist(onBack) },
                 onLoadSuggestions = viewModel::loadSuggestions,
                 onAddSuggestion = viewModel::addSuggestedSong,
+                onPlaySuggestion = viewModel::playSuggestedSong,
                 onLoadUsers = viewModel::loadUsers,
                 onChangeOwner = viewModel::changeOwner,
                 onShare = {
@@ -274,7 +277,7 @@ fun CollectionScreen(
     // Captured outside the cover's theme: the header fades into the app's surface, not the cover's.
     val appSurface = MaterialTheme.colorScheme.surface
     val list = rememberLazyListState()
-    var showSuggestions by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     var menuExpanded by remember { mutableStateOf(false) }
     var showCloneDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
@@ -301,16 +304,6 @@ fun CollectionScreen(
                     },
                     actions = {
                         if (state.kind == CollectionKind.Playlist || state.kind == CollectionKind.Album) {
-                            CircleButton(
-                                icon = DowntifyIcons.Share,
-                                contentDescription = "Share",
-                                onClick = onShareCollection,
-                                modifier = Modifier.padding(end = Spacing.xs),
-                                containerColor = scheme.onPrimaryContainer.copy(alpha = TINT_ALPHA),
-                                contentColor = scheme.onPrimaryContainer,
-                            )
-                        }
-                        if (state.kind == CollectionKind.Playlist || state.kind == CollectionKind.Album) {
                             Box {
                                 CircleButton(
                                     icon = DowntifyIcons.MoreVert,
@@ -324,15 +317,26 @@ fun CollectionScreen(
                                     expanded = menuExpanded,
                                     onDismissRequest = { menuExpanded = false },
                                 ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Share") },
+                                        onClick = {
+                                            menuExpanded = false
+                                            onShareCollection()
+                                        },
+                                    )
                                     if (state.kind == CollectionKind.Playlist && playlistActions != null && state.playlist != null) {
                                         val playlist = state.playlist
                                         DropdownMenuItem(
                                             text = { Text("Suggestions") },
                                             onClick = {
                                                 menuExpanded = false
-                                                showSuggestions = !showSuggestions
-                                                if (showSuggestions && state.suggestions.isEmpty()) {
+                                                if (state.suggestions.isEmpty() && !state.loadingSuggestions) {
                                                     playlistActions.onLoadSuggestions()
+                                                }
+                                                scope.launch {
+                                                    val target = (state.tracks.size + 1 + (if (state.favoriteError) 1 else 0))
+                                                        .coerceAtMost((list.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
+                                                    list.animateScrollToItem(target)
                                                 }
                                             },
                                         )
@@ -455,16 +459,6 @@ fun CollectionScreen(
                             )
                         }
                     }
-                    if (showSuggestions && playlistActions != null) {
-                        item(key = "playlist-suggestions") {
-                            PlaylistSuggestionsSection(
-                                suggestions = state.suggestions,
-                                loading = state.loadingSuggestions,
-                                onRefresh = playlistActions.onLoadSuggestions,
-                                onAdd = playlistActions.onAddSuggestion,
-                            )
-                        }
-                    }
                     if (state.favoriteError) {
                         item(key = "favorite-error") {
                             Text(
@@ -490,6 +484,22 @@ fun CollectionScreen(
                             downloaded = track.id in state.offline.downloadedIds,
                             actions = trackActions,
                             showDuration = false,
+                            modifier = Modifier.padding(horizontal = Spacing.screen),
+                        )
+                    }
+                    if (state.kind == CollectionKind.Playlist && playlistActions != null) {
+                        item(key = "playlist-suggestions") {
+                            PlaylistSuggestionsSection(
+                                suggestions = state.suggestions,
+                                loading = state.loadingSuggestions,
+                                addingIds = state.addingSuggestionIds,
+                                addedIds = state.addedSuggestionIds,
+                                onRefresh = playlistActions.onLoadSuggestions,
+                                onPlay = playlistActions.onPlaySuggestion,
+                                onAdd = playlistActions.onAddSuggestion,
+                            )
+                        }
+                    }
                             modifier = Modifier.padding(horizontal = Spacing.screen),
                         )
                     }
@@ -615,19 +625,23 @@ fun CollectionScreen(
 private fun PlaylistSuggestionsSection(
     suggestions: List<PlaylistSuggestionItemDto>,
     loading: Boolean,
+    addingIds: Set<String>,
+    addedIds: Set<String>,
     onRefresh: () -> Unit,
+    onPlay: (PlaylistSuggestionItemDto) -> Unit,
     onAdd: (PlaylistSuggestionItemDto) -> Unit,
 ) {
+    val covers = LocalCoverUrls.current
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.screen),
+            .padding(horizontal = Spacing.screen, vertical = Spacing.sm),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(
             modifier = Modifier.padding(Spacing.md),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -636,48 +650,126 @@ private fun PlaylistSuggestionsSection(
             ) {
                 Text(
                     "Suggested Songs",
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                 )
                 TextButton(onClick = onRefresh, enabled = !loading) {
                     Text(if (loading) "Loading..." else "Refresh")
                 }
             }
-            if (suggestions.isEmpty() && !loading) {
+            if (loading && suggestions.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.md),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    LoadingIndicator()
+                }
+            } else if (suggestions.isEmpty()) {
                 Text(
                     "No song suggestions available yet.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = Spacing.xs),
                 )
             } else {
-                suggestions.take(8).forEach { item ->
+                suggestions.forEach { item ->
+                    val itemId = item.displayId.ifBlank { item.displayTitle }
+                    val isAdding = addingIds.contains(itemId)
+                    val isAdded = addedIds.contains(itemId)
+                    val coverUrl = when {
+                        item.displayCover.startsWith("http") -> item.displayCover
+                        item.trackId.isNotBlank() -> covers.track(item.trackId, ServerUrls.COVER_SMALL)
+                        item.displayCover.isNotBlank() -> item.displayCover
+                        else -> null
+                    }
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 2.dp),
+                            .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
-                        Column(Modifier.weight(1f)) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onPlay(item) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Artwork(
+                                url = coverUrl,
+                                contentDescription = null,
+                                shape = RoundedCornerShape(8.dp),
+                                placeholderIcon = DowntifyIcons.Song,
+                                modifier = Modifier.size(48.dp),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.35f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    painter = painterResource(DowntifyIcons.Play),
+                                    contentDescription = "Play ${item.displayTitle}",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onPlay(item) },
+                        ) {
                             Text(
-                                item.title,
+                                item.displayTitle,
                                 style = MaterialTheme.typography.bodyMedium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
-                                item.artist,
+                                item.displayArtist,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        if (item.inLibrary && item.trackId.isNotBlank()) {
-                            TextButton(onClick = { onAdd(item) }) {
-                                Text("+ Add")
+
+                        when {
+                            isAdded -> {
+                                TextButton(
+                                    onClick = {},
+                                    enabled = false,
+                                ) {
+                                    Icon(
+                                        painter = painterResource(DowntifyIcons.CheckCircle),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Added")
+                                }
                             }
-                        } else {
-                            Tag("Not in library", small = true)
+                            isAdding -> {
+                                TextButton(
+                                    onClick = {},
+                                    enabled = false,
+                                ) {
+                                    Text("Adding...")
+                                }
+                            }
+                            else -> {
+                                TextButton(
+                                    onClick = { onAdd(item) },
+                                ) {
+                                    Text("+ Add")
+                                }
+                            }
                         }
                     }
                 }
@@ -789,14 +881,6 @@ private fun Actions(
             onClick = { if (state.offline.kept) confirmRemove = true else onToggleOffline() },
         )
         Spacer(Modifier.weight(1f))
-        CircleButton(
-            DowntifyIcons.Shuffle,
-            stringResource(R.string.collection_shuffle),
-            onShuffle,
-            enabled = state.tracks.isNotEmpty(),
-            containerColor = scheme.onPrimaryContainer.copy(alpha = TINT_ALPHA),
-            contentColor = scheme.onPrimaryContainer,
-        )
         FilledIconButton(
             onClick = onPlayOrPause,
             enabled = state.tracks.isNotEmpty(),

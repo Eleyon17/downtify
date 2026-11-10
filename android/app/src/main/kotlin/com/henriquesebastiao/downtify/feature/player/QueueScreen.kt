@@ -37,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -298,62 +299,64 @@ private fun LazyListScope.entries(
         val moveUp = stringResource(R.string.player_queue_move_up)
         val moveDown = stringResource(R.string.player_queue_move_down)
         val shape = ListStyle.Separated.shapeOf(0, 1)
-        SwipeToRemove(
-            onRemove = { actions.onRemove(entry.index) },
-            shape = shape,
-            modifier = reorderableModifier(dragging, reorder)
-                .semantics {
-                    customActions = listOf(
-                        CustomAccessibilityAction(moveUp) { reorder.step(key, -1) },
-                        CustomAccessibilityAction(moveDown) { reorder.step(key, 1) },
-                    )
-                },
-        ) {
-            var itemMenuExpanded by remember { mutableStateOf(false) }
-            QueueRow(
-                title = entry.title,
-                artist = entry.artist,
-                artworkUrl = artworkOf(entry),
-                current = false,
-                onClick = { actions.onSkipTo(entry.index) },
-                containerColor = rowColor,
-                trailing = {
-                    Box {
-                        IconButton(onClick = { itemMenuExpanded = true }) {
-                            Icon(
-                                painterResource(DowntifyIcons.MoreVert),
-                                contentDescription = "More options",
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = itemMenuExpanded,
-                            onDismissRequest = { itemMenuExpanded = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Add to playlist") },
-                                onClick = {
-                                    itemMenuExpanded = false
-                                    onPickTrackForPlaylist(entry.trackId to entry.title)
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.player_queue_remove)) },
-                                onClick = {
-                                    itemMenuExpanded = false
-                                    actions.onRemove(entry.index)
-                                },
-                            )
-                        }
-                    }
-                    IconButton(onClick = { actions.onRemove(entry.index) }) {
-                        Icon(
-                            painterResource(DowntifyIcons.Close),
-                            contentDescription = stringResource(R.string.player_queue_remove),
+        key(key) {
+            SwipeToRemove(
+                onRemove = { actions.onRemove(entry.index) },
+                shape = shape,
+                modifier = reorderableModifier(dragging, reorder)
+                    .semantics {
+                        customActions = listOf(
+                            CustomAccessibilityAction(moveUp) { reorder.step(key, -1) },
+                            CustomAccessibilityAction(moveDown) { reorder.step(key, 1) },
                         )
-                    }
-                    DragHandle(key, reorder)
-                },
-            )
+                    },
+            ) {
+                var itemMenuExpanded by remember { mutableStateOf(false) }
+                QueueRow(
+                    title = entry.title,
+                    artist = entry.artist,
+                    artworkUrl = artworkOf(entry),
+                    current = false,
+                    onClick = { actions.onSkipTo(entry.index) },
+                    containerColor = rowColor,
+                    trailing = {
+                        Box {
+                            IconButton(onClick = { itemMenuExpanded = true }) {
+                                Icon(
+                                    painterResource(DowntifyIcons.MoreVert),
+                                    contentDescription = "More options",
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = itemMenuExpanded,
+                                onDismissRequest = { itemMenuExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Add to playlist") },
+                                    onClick = {
+                                        itemMenuExpanded = false
+                                        onPickTrackForPlaylist(entry.trackId to entry.title)
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.player_queue_remove)) },
+                                    onClick = {
+                                        itemMenuExpanded = false
+                                        actions.onRemove(entry.index)
+                                    },
+                                )
+                            }
+                        }
+                        IconButton(onClick = { actions.onRemove(entry.index) }) {
+                            Icon(
+                                painterResource(DowntifyIcons.Close),
+                                contentDescription = stringResource(R.string.player_queue_remove),
+                            )
+                        }
+                        DragHandle(key, reorder)
+                    },
+                )
+            }
         }
     }
 }
@@ -364,7 +367,7 @@ private fun LazyItemScope.reorderableModifier(dragging: Boolean, reorder: QueueR
         translationY = reorder.dragOffset
     }.shadow(8.dp, ListStyle.Separated.shapeOf(0, 1))
 } else {
-    Modifier.animateItem()
+    Modifier
 }
 
 @Composable

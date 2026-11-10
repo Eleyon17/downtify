@@ -254,30 +254,59 @@ async def mobile_add_playlist_track(
     name: str,
     request: Request,
 ) -> dict[str, Any]:
-    """Add a library track by track_id to an owned playlist on mobile."""
+    """Add a library track by track_id, or download a suggested song directly into the playlist."""
 
     try:
         payload = await request.json()
     except Exception:
         payload = {}
     track_id = str((payload or {}).get('track_id') or '').strip()
-    if not track_id:
-        raise HTTPException(status_code=400, detail='track_id is required')
     if not api.is_liked_playlist(name):
         api.require_playlist_owner(name, request)
-    row = await asyncio.to_thread(_sync().row_for, track_id)
-    if row is None:
-        raise HTTPException(status_code=404, detail='Track not found')
     user_id = api.request_user_id(request)
-    try:
-        result = await asyncio.to_thread(
-            api.add_track_to_playlist_internal_sync, name, row['file'], user_id
-        )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-    return {'status': 'ok', 'playlist': name, 'track_id': track_id, 'result': result}
+
+    if track_id:
+        row = await asyncio.to_thread(_sync().row_for, track_id)
+        if row is not None:
+            try:
+                result = await asyncio.to_thread(
+                    api.add_track_to_playlist_internal_sync, name, row['file'], user_id
+                )
+                return {'status': 'ok', 'playlist': name, 'track_id': track_id, 'result': result}
+            except HTTPException:
+                raise
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    # If track is not already in the library, queue download into this playlist on the server
+    song_id = str((payload or {}).get('song_id') or (payload or {}).get('video_id') or '').strip()
+    title = str((payload or {}).get('title') or (payload or {}).get('name') or '').strip()
+    artist = str((payload or {}).get('artist') or '').strip()
+    cover_url = str((payload or {}).get('cover_url') or (payload or {}).get('thumbnail') or '').strip()
+    url = str((payload or {}).get('url') or '').strip() or (f'https://music.youtube.com/watch?v={song_id}' if song_id else '')
+
+    if not title and not song_id and not track_id:
+        raise HTTPException(status_code=400, detail='track_id or song details required')
+
+    song_dict = {
+        'song_id': song_id,
+        'name': title,
+        'title': title,
+        'artist': artist,
+        'artists': [artist] if artist else [],
+        'cover_url': cover_url,
+        'thumbnail': cover_url,
+        'url': url,
+    }
+    batch_res = await api._submit_playlist_batch(
+        [song_dict],
+        playlist_url='',
+        generate_m3u=True,
+        playlist_name=name,
+        cover_url=cover_url or None,
+        user_id=user_id,
+    )
+    return {'status': 'ok', 'playlist': name, 'download_queued': True, 'result': batch_res}
 
 
 @router.post('/playlists/{name}/tracks/remove')

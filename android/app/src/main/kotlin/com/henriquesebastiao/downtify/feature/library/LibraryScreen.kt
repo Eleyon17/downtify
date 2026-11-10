@@ -635,7 +635,7 @@ private val gridCells = AtLeastTwoColumns(CoverGridMinSize)
 // The end leaves room for the scrollbar; the bottom clears the mini player and the bar.
 private val gridPadding: PaddingValues
     @Composable get() =
-        PaddingValues(start = Spacing.screen, end = ScrollbarTouchWidth, top = Spacing.sm, bottom = Spacing.xl)
+        PaddingValues(start = Spacing.screen, end = Spacing.screen, top = Spacing.sm, bottom = Spacing.xl)
             .plusBottomBars()
 private val listPadding: PaddingValues
     @Composable get() = gridPadding
@@ -650,21 +650,11 @@ private const val HALF_TURN = 180f
 private const val ORDER_ICON_ALPHA = 0.12f
 private const val ORDER_LABEL_ALPHA = 0.8f
 
-/** The scrollbar along the panel's end, from the first row to just above the mini player and the bar. */
 @Composable
-private fun BoxScope.Scrollbar(state: LazyListState) {
-    VerticalScrollbar(state, scrollbarPlacement())
-}
+private fun BoxScope.Scrollbar(state: LazyListState) {}
 
 @Composable
-private fun BoxScope.Scrollbar(state: LazyGridState) {
-    VerticalScrollbar(state, scrollbarPlacement())
-}
-
-@Composable
-private fun BoxScope.scrollbarPlacement(): Modifier = Modifier
-    .align(Alignment.TopEnd)
-    .padding(top = Spacing.sm, bottom = Spacing.xl + LocalBottomBarsInset.current)
+private fun BoxScope.Scrollbar(state: LazyGridState) {}
 
 @Composable
 private fun Albums(state: LibraryUiState, navigation: LibraryNavigation) {

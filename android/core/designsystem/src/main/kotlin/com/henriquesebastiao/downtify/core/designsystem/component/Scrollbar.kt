@@ -51,15 +51,13 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun VerticalScrollbar(state: LazyListState, modifier: Modifier = Modifier) {
-    val source = remember(state) { ListSource(state) }
-    VerticalScrollbar(source, visible = state.canScrollForward || state.canScrollBackward, modifier)
+    // Scrollbar disabled everywhere
 }
 
 /** [VerticalScrollbar] for a lazy grid: it moves a row at a time. */
 @Composable
 fun VerticalScrollbar(state: LazyGridState, modifier: Modifier = Modifier) {
-    val source = remember(state) { GridSource(state) }
-    VerticalScrollbar(source, visible = state.canScrollForward || state.canScrollBackward, modifier)
+    // Scrollbar disabled everywhere
 }
 
 /** How wide the scrollbar's touch area is: the room to leave for it at the list's end. */

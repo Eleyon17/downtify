@@ -64,7 +64,7 @@ jobs:
       - name: Package APK & Checksum
         id: package
         run: |
-          TAG="v11"
+          TAG="v12"
           APK_NAME="downtify-${TAG}.apk"
           cp android/app/build/outputs/apk/release/app-release.apk "$APK_NAME"
           sha256sum "$APK_NAME" > "${APK_NAME}.sha256"

@@ -403,6 +403,30 @@ class LibraryRepository @Inject constructor(
         }
     }
 
+    suspend fun addSuggestionToPlaylist(playlistName: String, item: PlaylistSuggestionItemDto): Boolean {
+        val api = api() ?: return false
+        return try {
+            api.addPlaylistTrack(
+                playlistName,
+                PlaylistTrackMutationRequest(
+                    trackId = item.trackId.ifBlank { null },
+                    songId = item.displayId.ifBlank { null },
+                    title = item.displayTitle.ifBlank { null },
+                    artist = item.displayArtist.ifBlank { null },
+                    coverUrl = item.displayCover.ifBlank { null },
+                    url = item.url.ifBlank { null },
+                )
+            )
+            refreshPlaylists(api)
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not add suggested song ${item.displayTitle} to $playlistName", e)
+            false
+        }
+    }
+
     suspend fun removeTrackFromPlaylist(playlistName: String, trackId: String): Boolean {
         val api = api() ?: return false
         return try {

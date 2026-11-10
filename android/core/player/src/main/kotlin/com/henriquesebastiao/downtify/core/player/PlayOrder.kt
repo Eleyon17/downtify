@@ -33,7 +33,7 @@ internal object PlayOrder {
     private fun walk(timeline: Timeline, from: Int, shuffle: Boolean): List<Int> {
         val order = ArrayList<Int>()
         var index = from
-        while (index != C.INDEX_UNSET && order.size < timeline.windowCount) {
+        while (index != C.INDEX_UNSET && index !in order && order.size < timeline.windowCount) {
             order += index
             index = timeline.getNextWindowIndex(index, Player.REPEAT_MODE_OFF, shuffle)
         }
