@@ -613,6 +613,7 @@ fun CollectionScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun PlaylistSuggestionsSection(
     suggestions: List<PlaylistSuggestionItemDto>,
