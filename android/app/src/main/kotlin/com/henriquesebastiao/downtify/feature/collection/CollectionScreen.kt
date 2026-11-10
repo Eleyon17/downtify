@@ -81,7 +81,6 @@ import com.henriquesebastiao.downtify.core.designsystem.component.EmptyState
 import com.henriquesebastiao.downtify.core.designsystem.component.PhonePreviews
 import com.henriquesebastiao.downtify.core.designsystem.component.Tag
 import com.henriquesebastiao.downtify.core.designsystem.component.TagTone
-import com.henriquesebastiao.downtify.core.designsystem.component.VerticalScrollbar
 import com.henriquesebastiao.downtify.core.designsystem.theme.DowntifyShape
 import com.henriquesebastiao.downtify.core.designsystem.theme.DowntifyTheme
 import com.henriquesebastiao.downtify.core.designsystem.theme.ListStyle
@@ -99,9 +98,6 @@ import com.henriquesebastiao.downtify.ui.common.TrackItem
 import com.henriquesebastiao.downtify.ui.common.plusBottomBars
 import com.henriquesebastiao.downtify.ui.common.songsCount
 import kotlinx.coroutines.launch
-
-@Composable
-private fun BoxScope.Scrollbar(state: LazyListState) {}
 
 data class PlaylistManageActions(
     val onToggleVisibility: () -> Unit = {},
@@ -500,13 +496,9 @@ fun CollectionScreen(
                             )
                         }
                     }
-                            modifier = Modifier.padding(horizontal = Spacing.screen),
-                        )
-                    }
                     // No navigation bar here: the list clears the system's, unless the mini player under it does.
                     item(key = "system-bar") { Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)) }
                 }
-                Scrollbar(list)
             }
         }
     }

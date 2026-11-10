@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.henriquesebastiao.downtify.core.data.library.LibraryRepository
 import com.henriquesebastiao.downtify.core.data.offline.OfflineRepository
+import com.henriquesebastiao.downtify.core.model.CatalogSource
 import com.henriquesebastiao.downtify.core.model.PlaybackContext
 import com.henriquesebastiao.downtify.core.model.PlaybackContextType
 import com.henriquesebastiao.downtify.core.model.Playlist
@@ -245,10 +246,15 @@ class CollectionViewModel @Inject constructor(
             val remote = RemoteSong(
                 id = item.displayId,
                 title = item.displayTitle,
-                artist = item.displayArtist,
+                artists = if (item.displayArtist.isNotBlank()) listOf(item.displayArtist) else emptyList(),
                 album = item.displayAlbum,
                 coverUrl = item.displayCover,
+                durationSeconds = 0,
                 url = item.url,
+                source = CatalogSource.YouTube,
+                previewUrl = "",
+                year = "",
+                raw = "",
             )
             remotePlayback.play(
                 listOf(remote),
