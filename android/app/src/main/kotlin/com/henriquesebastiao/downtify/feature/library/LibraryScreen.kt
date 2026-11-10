@@ -286,7 +286,15 @@ fun LibraryScreen(
                 modifier = Modifier.fillMaxSize().padding(top = Spacing.xs),
             ) {
                 Column {
-                    Toolbar(displayState, onSort, onSortDescending, onToggleLayout, onShuffle)
+                    Toolbar(
+                        state = displayState,
+                        onSort = onSort,
+                        onSortDescending = onSortDescending,
+                        onToggleLayout = onToggleLayout,
+                        onShuffle = onShuffle,
+                        onCreatePlaylist = onCreatePlaylist,
+                        onToggleHiddenPlaylists = onToggleHiddenPlaylists,
+                    )
                     PullToRefreshBox(
                         isRefreshing = state.refreshing,
                         onRefresh = onRefresh,
@@ -313,8 +321,6 @@ fun LibraryScreen(
                                 LibraryTab.Playlists -> Playlists(
                                     state = displayState,
                                     navigation = navigation,
-                                    onCreatePlaylist = onCreatePlaylist,
-                                    onToggleHidden = onToggleHiddenPlaylists,
                                     onUnhide = onUnhidePlaylist,
                                 )
                                 LibraryTab.Songs -> Songs(displayState, onPlaySong, trackActions)
@@ -447,28 +453,131 @@ private fun Toolbar(
     onSortDescending: (Boolean) -> Unit,
     onToggleLayout: () -> Unit,
     onShuffle: () -> Unit,
+    onCreatePlaylist: (String, Boolean) -> Unit = { _, _ -> },
+    onToggleHiddenPlaylists: () -> Unit = {},
 ) {
     var sorting by rememberSaveable { mutableStateOf(false) }
+    var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     val scheme = MaterialTheme.colorScheme
+    if (showCreateDialog) {
+        var newName by rememberSaveable { mutableStateOf("") }
+        var isPublic by rememberSaveable { mutableStateOf(false) }
+        AlertDialog(
+            onDismissRequest = { showCreateDialog = false },
+            title = { Text("New Playlist") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = { Text("Playlist name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = isPublic, onCheckedChange = { isPublic = it })
+                        Text("Public playlist", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = newName.isNotBlank(),
+                    onClick = {
+                        showCreateDialog = false
+                        onCreatePlaylist(newName.trim(), isPublic)
+                    },
+                ) {
+                    Text("Create")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
     Row(
-        Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.lg, bottom = Spacing.sm),
+        Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.md, bottom = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val height = ButtonDefaults.MediumContainerHeight
-        Button(
-            onClick = onShuffle,
-            enabled = state.canShuffle,
-            shapes = ButtonDefaults.shapesFor(height),
-            contentPadding = ButtonDefaults.contentPaddingFor(height),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = scheme.tertiaryContainer,
-                contentColor = scheme.onTertiaryContainer,
-            ),
-            modifier = Modifier.heightIn(min = height),
-        ) {
-            Icon(painterResource(DowntifyIcons.Shuffle), contentDescription = null)
-            Spacer(Modifier.size(Spacing.sm))
-            Text(stringResource(R.string.collection_shuffle), style = MaterialTheme.typography.titleMedium)
+        when (state.tab) {
+            LibraryTab.Songs -> {
+                val height = ButtonDefaults.MediumContainerHeight
+                Button(
+                    onClick = onShuffle,
+                    enabled = state.canShuffle,
+                    shapes = ButtonDefaults.shapesFor(height),
+                    contentPadding = ButtonDefaults.contentPaddingFor(height),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = scheme.tertiaryContainer,
+                        contentColor = scheme.onTertiaryContainer,
+                    ),
+                    modifier = Modifier.heightIn(min = height),
+                ) {
+                    Icon(painterResource(DowntifyIcons.Shuffle), contentDescription = null)
+                    Spacer(Modifier.size(Spacing.sm))
+                    Text(stringResource(R.string.collection_shuffle), style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            LibraryTab.Playlists -> {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        onClick = { showCreateDialog = true },
+                        shape = CircleShape,
+                        color = scheme.surfaceContainerHigh,
+                        contentColor = scheme.onSurface,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = Spacing.md, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Icon(
+                                painter = painterResource(DowntifyIcons.Add),
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = scheme.primary,
+                            )
+                            Text(
+                                text = "New playlist",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                    Surface(
+                        onClick = onToggleHiddenPlaylists,
+                        shape = CircleShape,
+                        color = if (state.showHiddenPlaylists) scheme.secondaryContainer else scheme.surfaceContainerHigh,
+                        contentColor = if (state.showHiddenPlaylists) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = Spacing.md, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            if (state.showHiddenPlaylists) {
+                                Icon(
+                                    painter = painterResource(DowntifyIcons.Check),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
+                            Text(
+                                text = "Hidden",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (state.showHiddenPlaylists) FontWeight.Bold else FontWeight.Medium,
+                            )
+                        }
+                    }
+                }
+            }
+            LibraryTab.Albums, LibraryTab.Artists -> {}
         }
         Spacer(Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
@@ -745,53 +854,11 @@ private fun Artists(state: LibraryUiState, navigation: LibraryNavigation) {
 private fun Playlists(
     state: LibraryUiState,
     navigation: LibraryNavigation,
-    onCreatePlaylist: (String, Boolean) -> Unit = { _, _ -> },
-    onToggleHidden: () -> Unit = {},
     onUnhide: (String) -> Unit = {},
 ) {
     val covers = LocalCoverUrls.current
     val scheme = MaterialTheme.colorScheme
     val liked = stringResource(R.string.liked_songs)
-    var showCreateDialog by rememberSaveable { mutableStateOf(false) }
-    if (showCreateDialog) {
-        var newName by rememberSaveable { mutableStateOf("") }
-        var isPublic by rememberSaveable { mutableStateOf(false) }
-        AlertDialog(
-            onDismissRequest = { showCreateDialog = false },
-            title = { Text("New Playlist") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    OutlinedTextField(
-                        value = newName,
-                        onValueChange = { newName = it },
-                        label = { Text("Playlist name") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = isPublic, onCheckedChange = { isPublic = it })
-                        Text("Public playlist", style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = newName.isNotBlank(),
-                    onClick = {
-                        showCreateDialog = false
-                        onCreatePlaylist(newName.trim(), isPublic)
-                    },
-                ) {
-                    Text("Create")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
-        )
-    }
 
     fun open(item: PlaylistItem) = item.playlist?.let { navigation.onPlaylist(it.name) } ?: navigation.onLiked()
 
@@ -814,63 +881,6 @@ private fun Playlists(
     }
 
     Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.screen, vertical = Spacing.xs),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                onClick = { showCreateDialog = true },
-                shape = CircleShape,
-                color = scheme.surfaceContainerHigh,
-                contentColor = scheme.onSurface,
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = Spacing.md, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Icon(
-                        painter = painterResource(DowntifyIcons.Add),
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = scheme.primary,
-                    )
-                    Text(
-                        text = "New playlist",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
-            }
-            Surface(
-                onClick = onToggleHidden,
-                shape = CircleShape,
-                color = if (state.showHiddenPlaylists) scheme.secondaryContainer else scheme.surfaceContainerHigh,
-                contentColor = if (state.showHiddenPlaylists) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = Spacing.md, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    if (state.showHiddenPlaylists) {
-                        Icon(
-                            painter = painterResource(DowntifyIcons.Check),
-                            contentDescription = null,
-                            modifier = Modifier.size(14.dp),
-                        )
-                    }
-                    Text(
-                        text = "Hidden",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (state.showHiddenPlaylists) FontWeight.Bold else FontWeight.Medium,
-                    )
-                }
-            }
-        }
         if (state.showHiddenPlaylists) {
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (state.hiddenPlaylists.isEmpty()) {

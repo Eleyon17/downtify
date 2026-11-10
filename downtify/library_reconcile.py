@@ -354,6 +354,11 @@ def refresh_playlists_after_moves(  # noqa: PLR0914
     for name in sorted(playlist_names):
         catalog_rows = playlist_catalog.list_tracks(name)
         existing_m3u = m3u.find_m3u_for_name(download_dir, name)
+        was_manual = bool(
+            existing_m3u is not None
+            and existing_m3u.is_file()
+            and m3u.is_manual_m3u(existing_m3u)
+        )
         m3u_tracks: list[str] = []
         if existing_m3u is not None and existing_m3u.is_file():
             try:
@@ -500,6 +505,7 @@ def refresh_playlists_after_moves(  # noqa: PLR0914
 
         entries: list[dict[str, Any]] = []
         songs_for_nav: list[dict[str, Any]] = []
+        seen_entry_files: set[str] = set()
         for row in catalog_rows:
             tid = row['track_spotify_id']
             filename = row['filename']
@@ -510,6 +516,10 @@ def refresh_playlists_after_moves(  # noqa: PLR0914
             if actual_stored != filename:
                 playlist_catalog.update_filename(filename, actual_stored)
                 filename = actual_stored
+            norm_filename = str(filename).replace('\\', '/')
+            if norm_filename in seen_entry_files:
+                continue
+            seen_entry_files.add(norm_filename)
 
             meta = by_id.get(tid) or {'song_id': tid}
             song = dict(meta)
@@ -524,6 +534,7 @@ def refresh_playlists_after_moves(  # noqa: PLR0914
                         playlist_name=name,
                     )
                 ):
+                    seen_entry_files.discard(norm_filename)
                     continue
             entries.append({
                 'filename': filename,
@@ -547,6 +558,7 @@ def refresh_playlists_after_moves(  # noqa: PLR0914
                     entries,
                     playlist_subdir=pl_subdir,
                     slskd_dir=slskd_dir,
+                    manual=was_manual,
                 )
                 logger.info(
                     'library reconcile: rewrote M3U for playlist {!r} ({} tracks)',

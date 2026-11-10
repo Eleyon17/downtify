@@ -91,6 +91,14 @@ class PlaylistCatalog:
                 )
             """)
             conn.execute("""
+                DELETE FROM playlist_tracks
+                WHERE rowid NOT IN (
+                    SELECT MAX(rowid)
+                    FROM playlist_tracks
+                    GROUP BY playlist_name, filename
+                )
+            """)
+            conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_playlist_tracks_content_key
                 ON playlist_tracks (content_key)
                 WHERE content_key IS NOT NULL
@@ -148,19 +156,54 @@ class PlaylistCatalog:
         track_order: int = 0,
     ) -> None:
         pl_name = str(playlist_name or '').strip()
-        tid = normalize_spotify_track_id(song) or str(
+        explicit_tid = normalize_spotify_track_id(song) or str(
             song.get('song_id')
             or song.get('youtube_id')
             or song.get('id')
-            or Path(filename).name
-            or f'track_{track_order}'
+            or ''
         ).strip()
+        fallback_tid = str(
+            Path(filename).name or f'track_{track_order}'
+        ).strip()
+        tid = explicit_tid or fallback_tid
         name = _norm_path(filename)
         if not pl_name or not tid or not name:
             return
         ck = file_content_key(full_path)
         self.ensure_playlist(pl_name, spotify_id=None)
         with self._connect() as conn:
+            existing_for_file = conn.execute(
+                """SELECT track_spotify_id, track_order FROM playlist_tracks
+                   WHERE playlist_name = ?
+                     AND (track_spotify_id = ? OR filename = ? OR (? IS NOT NULL AND ? != '' AND content_key = ?))
+                   ORDER BY track_order ASC LIMIT 1""",
+                (pl_name, tid, name, ck, ck, ck),
+            ).fetchone()
+            if not explicit_tid and existing_for_file is not None and existing_for_file['track_spotify_id']:
+                tid = str(existing_for_file['track_spotify_id'])
+
+            # Remove any duplicate row for the same file under a different synthetic ID
+            conn.execute(
+                """DELETE FROM playlist_tracks
+                   WHERE playlist_name = ?
+                     AND track_spotify_id != ?
+                     AND (filename = ? OR (? IS NOT NULL AND ? != '' AND content_key = ?))""",
+                (pl_name, tid, name, ck, ck, ck),
+            )
+
+            effective_order = int(track_order)
+            if effective_order <= 0:
+                if existing_for_file is not None:
+                    effective_order = int(existing_for_file['track_order'])
+                else:
+                    max_row = conn.execute(
+                        """SELECT MAX(track_order) AS max_order, COUNT(*) AS cnt
+                           FROM playlist_tracks WHERE playlist_name = ?""",
+                        (pl_name,),
+                    ).fetchone()
+                    if max_row is not None and int(max_row['cnt'] or 0) > 0:
+                        effective_order = int(max_row['max_order'] or 0) + 1
+
             conn.execute(
                 """INSERT INTO playlist_tracks
                    (playlist_name, track_spotify_id, content_key, filename, track_order)
@@ -169,7 +212,7 @@ class PlaylistCatalog:
                    content_key=excluded.content_key,
                    filename=excluded.filename,
                    track_order=excluded.track_order""",
-                (pl_name, tid, ck, name, int(track_order)),
+                (pl_name, tid, ck, name, effective_order),
             )
 
     def replace_playlist_tracks(
@@ -288,15 +331,20 @@ class PlaylistCatalog:
                    ORDER BY track_order ASC, track_spotify_id ASC""",
                 (pl_name,),
             ).fetchall()
-        return [
-            {
+        result: list[dict[str, Any]] = []
+        seen_files: set[str] = set()
+        for row in rows:
+            fn = _norm_path(str(row['filename']))
+            if fn in seen_files:
+                continue
+            seen_files.add(fn)
+            result.append({
                 'track_spotify_id': str(row['track_spotify_id']),
                 'content_key': row['content_key'],
-                'filename': _norm_path(str(row['filename'])),
+                'filename': fn,
                 'track_order': int(row['track_order']),
-            }
-            for row in rows
-        ]
+            })
+        return result
 
     def playlists_for_track(self, spotify_track_id: str) -> list[str]:
         """Playlist names that catalog this Spotify track ID."""

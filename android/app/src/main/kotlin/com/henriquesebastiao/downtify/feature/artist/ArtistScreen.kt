@@ -221,6 +221,7 @@ private fun Actions(state: ArtistUiState, name: String, onPlayOrPause: () -> Uni
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End),
     ) {
+        CircleButton(DowntifyIcons.Shuffle, stringResource(R.string.collection_shuffle), onShuffle)
         FilledIconButton(
             onClick = onPlayOrPause,
             shapes = IconButtonShapes(shape = DowntifyShape.Fab, pressedShape = RoundedCornerShape(16.dp)),

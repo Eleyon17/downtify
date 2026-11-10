@@ -278,7 +278,7 @@ async def mobile_add_playlist_track(
             except Exception as exc:
                 raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    # If track is not already in the library, queue download into this playlist on the server
+    # If track is not already in the library, download it directly into this playlist
     song_id = str((payload or {}).get('song_id') or (payload or {}).get('video_id') or '').strip()
     title = str((payload or {}).get('title') or (payload or {}).get('name') or '').strip()
     artist = str((payload or {}).get('artist') or '').strip()
@@ -288,7 +288,24 @@ async def mobile_add_playlist_track(
     if not title and not song_id and not track_id:
         raise HTTPException(status_code=400, detail='track_id or song details required')
 
-    song_dict = {
+    if song_id and api.state.track_index is not None:
+        existing_file = await asyncio.to_thread(api.state.track_index.lookup, song_id)
+        if existing_file:
+            try:
+                result = await asyncio.to_thread(
+                    api.add_track_to_playlist_internal_sync, name, existing_file, user_id
+                )
+                await asyncio.to_thread(_refresh)
+                return {'status': 'ok', 'playlist': name, 'file': existing_file, 'result': result}
+            except FileNotFoundError:
+                pass
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if api.state.downloader is None:
+        raise HTTPException(status_code=500, detail='Downloader not ready')
+
+    client_hints: dict[str, Any] = {
         'song_id': song_id,
         'name': title,
         'title': title,
@@ -297,16 +314,30 @@ async def mobile_add_playlist_track(
         'cover_url': cover_url,
         'thumbnail': cover_url,
         'url': url,
+        'downtify_playlist_name': name,
     }
-    batch_res = await api._submit_playlist_batch(
-        [song_dict],
-        playlist_url='',
-        generate_m3u=True,
-        playlist_name=name,
-        cover_url=cover_url or None,
-        user_id=user_id,
+    song = await asyncio.to_thread(
+        api._song_from_download_request, url, client_hints
     )
-    return {'status': 'ok', 'playlist': name, 'download_queued': True, 'result': batch_res}
+    pl_ctx = await asyncio.to_thread(
+        api._playlist_context_from_hints, client_hints
+    )
+    job_id = api._register_job(song, status='downloading', user_id=user_id)
+    try:
+        filename = await api._run_download(
+            song,
+            job_id,
+            subdir=pl_ctx.get('subdir'),
+            playlist_name=name,
+            spotify_playlist_id=pl_ctx.get('spotify_playlist_id'),
+            track_order=0,
+            user_id=user_id,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    await asyncio.to_thread(_refresh)
+    return {'status': 'ok', 'playlist': name, 'downloaded': True, 'file': filename}
 
 
 @router.post('/playlists/{name}/tracks/remove')

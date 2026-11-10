@@ -93,22 +93,24 @@ def _scan_library_playlists(
             keep_missing=True,
         )
         tracks: list[str] = []
+        seen_track_paths: set[str] = set()
+        had_duplicate_in_m3u = False
         for stored in raw_tracks:
             stored_norm = stored.replace('\\', '/')
-            if known is None or stored_norm in known:
-                tracks.append(stored_norm)
+            resolved_norm = stored_norm
+            if known is not None and stored_norm not in known:
+                stem, _ = os.path.splitext(stored_norm)
+                if stem in known_by_stem:
+                    resolved_norm = known_by_stem[stem]
+                else:
+                    base_stem, _ = os.path.splitext(os.path.basename(stored_norm))
+                    if base_stem in known_by_basename:
+                        resolved_norm = known_by_basename[base_stem]
+            if resolved_norm in seen_track_paths:
+                had_duplicate_in_m3u = True
                 continue
-            # Try matching by stem (e.g. format upgrade .mp3 -> .flac)
-            stem, _ = os.path.splitext(stored_norm)
-            if stem in known_by_stem:
-                tracks.append(known_by_stem[stem])
-                continue
-            # Try matching by basename stem (e.g. reorganized into artist/album folder)
-            base_stem, _ = os.path.splitext(os.path.basename(stored_norm))
-            if base_stem in known_by_basename:
-                tracks.append(known_by_basename[base_stem])
-                continue
-            tracks.append(stored_norm)
+            seen_track_paths.add(resolved_norm)
+            tracks.append(resolved_norm)
 
         if not tracks and not manual:
             continue
@@ -155,6 +157,7 @@ def _scan_library_playlists(
 
         if recovered:
             tracks.extend(recovered)
+        if recovered or had_duplicate_in_m3u:
             try:
                 m3u_entries = [{'filename': t} for t in tracks]
                 if m3u_path.parent == base / 'Playlists':

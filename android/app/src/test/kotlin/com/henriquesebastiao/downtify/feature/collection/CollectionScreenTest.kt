@@ -55,13 +55,15 @@ class CollectionScreenTest {
     }
 
     @Test
-    fun theHeaderPlaysAndKeepsTheAlbumOffline() {
+    fun theHeaderPlaysShufflesAndKeepsTheAlbumOffline() {
         var played = 0
+        var shuffled = 0
         var offline = 0
-        show(state, onPlayOrPause = { played++ }, onToggleOffline = { offline++ })
+        show(state, onPlayOrPause = { played++ }, onShuffle = { shuffled++ }, onToggleOffline = { offline++ })
         compose.onNodeWithContentDescription("Play ${album.title}").performClick()
+        compose.onNodeWithContentDescription("Shuffle").performClick()
         compose.onNodeWithText("Download").performClick()
-        assertEquals(listOf(1, 1), listOf(played, offline))
+        assertEquals(listOf(1, 1, 1), listOf(played, shuffled, offline))
     }
 
     @Test

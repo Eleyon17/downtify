@@ -2469,7 +2469,11 @@ def _upsert_track_in_playlists(
 
 
 def add_track_to_playlist_internal_sync(
-    name: str, file: str, user_id: int = 0
+    name: str,
+    file: str,
+    user_id: int = 0,
+    *,
+    song: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Add an audio file already in the library to any playlist (liked, manual, imported)."""
 
@@ -2482,6 +2486,57 @@ def add_track_to_playlist_internal_sync(
     full = resolve_library_file(clean_file, ctx)
     if full is None or not full.is_file():
         raise FileNotFoundError(f'Track not in library: {clean_file}')
+
+    def _build_song_meta(target_file: str, target_full: Path, base_song: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+        if isinstance(base_song, dict) and (
+            base_song.get('song_id') or base_song.get('youtube_id') or base_song.get('id')
+        ):
+            return dict(base_song)
+        meta = read_audio_metadata(target_full)
+        known_tid = (
+            state.track_index.spotify_id_for_filename(target_file)
+            if state.track_index is not None
+            else None
+        )
+        built: dict[str, Any] = {
+            'name': meta.get('title') or target_full.stem,
+            'artists': [meta.get('artist') or ''],
+            'duration': meta.get('duration') or 0,
+        }
+        if isinstance(base_song, dict):
+            for k, v in base_song.items():
+                if v and k not in built:
+                    built[k] = v
+        if known_tid:
+            built['song_id'] = known_tid
+        return built
+
+    def _sync_catalog_with_m3u_tracks(tracks_on_disk: list[str]) -> None:
+        if state.playlist_catalog is None:
+            return
+        state.playlist_catalog.ensure_playlist(clean_name, user_id=user_id)
+        existing_rows = state.playlist_catalog.list_tracks(clean_name)
+        existing_files = {
+            str(r.get('filename') or '').replace('\\', '/') for r in existing_rows
+        }
+        for idx, t_file in enumerate(tracks_on_disk):
+            t_norm = str(t_file or '').strip().replace('\\', '/')
+            if not t_norm or t_norm in existing_files:
+                continue
+            t_full = resolve_library_file(t_norm, ctx)
+            if t_full is None or not t_full.is_file():
+                continue
+            t_song = _build_song_meta(
+                t_norm,
+                t_full,
+                song if t_norm == clean_file else None,
+            )
+            state.playlist_catalog.upsert_track(
+                clean_name, t_song, t_norm, t_full, track_order=idx + 1
+            )
+            existing_files.add(t_norm)
+        if user_id:
+            auto_hide_new_playlist_for_others(clean_name, user_id)
 
     # 1. Liked songs
     if is_liked_playlist(clean_name):
@@ -2496,6 +2551,14 @@ def add_track_to_playlist_internal_sync(
     path = m3u.find_m3u_for_name(ctx.download_dir, clean_name)
     if path is not None and m3u.is_manual_m3u(path):
         res = edit_manual_playlist(ctx, clean_name, add=[clean_file])
+        current_tracks = m3u.read_m3u_tracks(
+            path,
+            ctx.download_dir,
+            slskd_dir=ctx.slskd_dir,
+            extra_dirs=ctx.extra_dirs,
+            keep_missing=True,
+        )
+        _sync_catalog_with_m3u_tracks(current_tracks)
         invalidate_library_paths_cache()
         announce_library_changed()
         return res
@@ -2520,19 +2583,16 @@ def add_track_to_playlist_internal_sync(
                 extra_dirs=ctx.extra_dirs,
             )
             path.write_text(content, encoding='utf-8', newline='\n')
+        _sync_catalog_with_m3u_tracks(current_tracks)
         if state.playlist_catalog is not None:
-            meta = read_audio_metadata(full)
-            song = {
-                'name': meta.get('title') or full.stem,
-                'artists': [meta.get('artist') or ''],
-                'duration': meta.get('duration') or 0,
-            }
-            state.playlist_catalog.ensure_playlist(clean_name, user_id=user_id)
+            song_meta = _build_song_meta(clean_file, full, song)
             state.playlist_catalog.upsert_track(
-                clean_name, song, clean_file, full
+                clean_name,
+                song_meta,
+                clean_file,
+                full,
+                track_order=len(current_tracks),
             )
-            if user_id:
-                auto_hide_new_playlist_for_others(clean_name, user_id)
         invalidate_library_paths_cache()
         announce_library_changed()
         return {
@@ -2543,14 +2603,9 @@ def add_track_to_playlist_internal_sync(
 
     # 4. Catalog playlist or create manual playlist if no M3U on disk yet
     if state.playlist_catalog is not None:
-        meta = read_audio_metadata(full)
-        song = {
-            'name': meta.get('title') or full.stem,
-            'artists': [meta.get('artist') or ''],
-            'duration': meta.get('duration') or 0,
-        }
+        song_meta = _build_song_meta(clean_file, full, song)
         state.playlist_catalog.ensure_playlist(clean_name, user_id=user_id)
-        state.playlist_catalog.upsert_track(clean_name, song, clean_file, full)
+        state.playlist_catalog.upsert_track(clean_name, song_meta, clean_file, full)
         if user_id:
             auto_hide_new_playlist_for_others(clean_name, user_id)
         invalidate_library_paths_cache()
@@ -2580,7 +2635,7 @@ def _register_download_playlists_on_disk(
     if playlist_name:
         try:
             add_track_to_playlist_internal_sync(
-                playlist_name, filename, user_id=user_id
+                playlist_name, filename, user_id=user_id, song=song
             )
         except Exception:
             logger.opt(exception=True).debug(
@@ -4492,15 +4547,51 @@ async def _write_batch_m3u(
     # Playlists/ directory (playlist_subdir=None) where relative paths
     # still resolve.
     organize = _organize_enabled()
-    try:
-        m3u_path, _kept = await asyncio.to_thread(
-            m3u.write_m3u,
-            state.downloader.download_dir,
-            playlist_name,
-            entries,
-            playlist_subdir=None if organize else playlist_subdir,
-            slskd_dir=slskd_dir_from_downloader(state.downloader),
+    dl_dir = Path(state.downloader.download_dir)
+    slskd_dir = slskd_dir_from_downloader(state.downloader)
+
+    def _merge_and_write() -> tuple[Optional[Path], int]:
+        existing_m3u = m3u.find_m3u_for_name(dl_dir, playlist_name)
+        was_manual = bool(
+            existing_m3u is not None
+            and existing_m3u.is_file()
+            and m3u.is_manual_m3u(existing_m3u)
         )
+        merged_entries: list[dict[str, Any]] = []
+        seen_files: set[str] = set()
+        if existing_m3u is not None and existing_m3u.is_file():
+            try:
+                prior_tracks = m3u.read_m3u_tracks(existing_m3u, dl_dir, slskd_dir)
+            except Exception:
+                prior_tracks = []
+            batch_files = {
+                str(e.get('filename') or '').replace('\\', '/')
+                for e in entries
+                if e.get('filename')
+            }
+            # Preserve existing tracks on disk if this batch only adds a subset of tracks
+            if prior_tracks and not prior_tracks[0].replace('\\', '/') in batch_files:
+                for pt in prior_tracks:
+                    pt_norm = str(pt or '').replace('\\', '/')
+                    if pt_norm and pt_norm not in seen_files:
+                        seen_files.add(pt_norm)
+                        merged_entries.append({'filename': pt_norm})
+        for e in entries:
+            fn = str(e.get('filename') or '').replace('\\', '/')
+            if fn and fn not in seen_files:
+                seen_files.add(fn)
+                merged_entries.append(e)
+        return m3u.write_m3u(
+            dl_dir,
+            playlist_name,
+            merged_entries,
+            playlist_subdir=None if organize else playlist_subdir,
+            slskd_dir=slskd_dir,
+            manual=was_manual,
+        )
+
+    try:
+        m3u_path, _kept = await asyncio.to_thread(_merge_and_write)
     except Exception:
         logger.exception('Failed to write M3U for {!r}', playlist_name)
         return None

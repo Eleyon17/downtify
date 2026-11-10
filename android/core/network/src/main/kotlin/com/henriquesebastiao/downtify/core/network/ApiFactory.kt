@@ -27,6 +27,9 @@ class ApiFactory @Inject constructor(@DefaultClient private val client: OkHttpCl
     /** The mobile client contract's routes (`/api/v1/…`, pairing, sign-in). */
     fun create(baseUrl: String): DowntifyApi = retrofit(baseUrl).create(DowntifyApi::class.java)
 
+    /** Mobile routes that may download a track or query external catalogs before answering. */
+    fun createPatient(baseUrl: String): DowntifyApi = retrofit(baseUrl, patient = true).create(DowntifyApi::class.java)
+
     /** The web app's own routes a device may call: search, downloads, podcasts, Discover. */
     fun createWeb(baseUrl: String): WebApi = retrofit(baseUrl).create(WebApi::class.java)
 

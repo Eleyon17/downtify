@@ -135,6 +135,7 @@ class LibraryRepository @Inject constructor(
     private val lyricsCache = LruCache<String, Lyrics>(LYRICS_CACHE_SIZE)
 
     private fun api(): DowntifyApi? = sessions.current?.let { apis.create(it.baseUrl) }
+    private fun patientApi(): DowntifyApi? = sessions.current?.let { apis.createPatient(it.baseUrl) }
     private fun webApi(): WebApi? = sessions.current?.let { apis.createWeb(it.baseUrl) }
 
     /**
@@ -404,7 +405,7 @@ class LibraryRepository @Inject constructor(
     }
 
     suspend fun addSuggestionToPlaylist(playlistName: String, item: PlaylistSuggestionItemDto): Boolean {
-        val api = api() ?: return false
+        val api = patientApi() ?: return false
         return try {
             api.addPlaylistTrack(
                 playlistName,
@@ -417,7 +418,7 @@ class LibraryRepository @Inject constructor(
                     url = item.url.ifBlank { null },
                 )
             )
-            refreshPlaylists(api)
+            sync(refresh = true)
             true
         } catch (e: CancellationException) {
             throw e
@@ -442,7 +443,7 @@ class LibraryRepository @Inject constructor(
     }
 
     suspend fun playlistSuggestions(name: String): List<PlaylistSuggestionItemDto> {
-        val api = api() ?: return emptyList()
+        val api = patientApi() ?: return emptyList()
         return try {
             api.playlistSuggestions(name).suggestions
         } catch (e: CancellationException) {

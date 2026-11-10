@@ -874,6 +874,14 @@ private fun Actions(
             onClick = { if (state.offline.kept) confirmRemove = true else onToggleOffline() },
         )
         Spacer(Modifier.weight(1f))
+        CircleButton(
+            DowntifyIcons.Shuffle,
+            stringResource(R.string.collection_shuffle),
+            onShuffle,
+            enabled = state.tracks.isNotEmpty(),
+            containerColor = scheme.secondaryContainer,
+            contentColor = scheme.onSecondaryContainer,
+        )
         FilledIconButton(
             onClick = onPlayOrPause,
             enabled = state.tracks.isNotEmpty(),

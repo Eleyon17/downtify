@@ -59,8 +59,7 @@ class LibraryScreenTest {
     }
 
     @Test
-    fun everyTabOffersShuffle() {
-        var shuffled = 0
+    fun onlySongsTabOffersShuffle() {
         var state by mutableStateOf(
             LibraryUiState(loading = false, tab = LibraryTab.Albums, albums = PreviewData.albums),
         )
@@ -74,15 +73,14 @@ class LibraryScreenTest {
                     onToggleLayout = {},
                     onRefresh = {},
                     onPlaySong = {},
-                    onShuffle = { shuffled++ },
                 )
             }
         }
-        compose.onNodeWithText("Shuffle").assertIsEnabled().performClick()
-        assertEquals(1, shuffled)
-        // Nothing to pick from: no shuffle.
+        compose.onNodeWithText("Shuffle").assertDoesNotExist()
         state = LibraryUiState(loading = false, tab = LibraryTab.Artists)
-        compose.onNodeWithText("Shuffle").assertIsNotEnabled()
+        compose.onNodeWithText("Shuffle").assertDoesNotExist()
+        state = LibraryUiState(loading = false, tab = LibraryTab.Playlists)
+        compose.onNodeWithText("Shuffle").assertDoesNotExist()
     }
 
     @Test
